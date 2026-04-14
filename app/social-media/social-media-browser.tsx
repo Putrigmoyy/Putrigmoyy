@@ -1,13 +1,26 @@
 'use client';
 
-import { useDeferredValue, useState, useTransition } from 'react';
-import type { NormalizedPusatPanelService } from '@/lib/pusatpanel';
-
-const INITIAL_VISIBLE_COUNT = 36;
+import { useDeferredValue, useEffect, useMemo, useState, useTransition } from 'react';
+import type { NormalizedPusatPanelProfile, NormalizedPusatPanelService } from '@/lib/pusatpanel';
 
 type Props = {
+  profile: NormalizedPusatPanelProfile | null;
+  providerMeta: {
+    apiUrl: string;
+    configured: boolean;
+  };
   services: NormalizedPusatPanelService[];
   categories: string[];
+};
+
+type SocialTab = 'sosmed' | 'riwayat' | 'status' | 'provider';
+
+type ProviderOrderResult = {
+  status?: boolean;
+  data?: {
+    id?: string;
+    msg?: string;
+  };
 };
 
 type ProviderStatusResult = {
@@ -20,12 +33,19 @@ type ProviderStatusResult = {
   };
 };
 
-type ProviderOrderResult = {
-  status?: boolean;
-  data?: {
-    id?: string;
-    msg?: string;
-  };
+type HistoryItem = {
+  id: number;
+  providerOrderId: string;
+  serviceId: string;
+  serviceName: string;
+  category: string;
+  targetData: string;
+  quantity: number | null;
+  username: string;
+  comments: string;
+  orderStatus: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 function buildMenuTypeTitle(menuType: string) {
@@ -37,11 +57,11 @@ function buildMenuTypeTitle(menuType: string) {
 }
 
 function buildMenuTypeHint(menuType: string) {
-  if (menuType === '2') return 'Isi link/target lalu daftar komentar terpisah per baris.';
-  if (menuType === '3') return 'Isi link/target, quantity, lalu username pemilik komentar.';
-  if (menuType === '4') return 'Isi link/target tanpa quantity tambahan.';
-  if (menuType === '5') return 'Isi link/target, quantity, lalu daftar keyword / komen per baris.';
-  return 'Isi link/target lalu quantity sesuai batas min dan max provider.';
+  if (menuType === '2') return 'Isi target lalu komentar dipisah per baris.';
+  if (menuType === '3') return 'Isi target, quantity, dan username pemilik komentar.';
+  if (menuType === '4') return 'Isi target tanpa quantity tambahan.';
+  if (menuType === '5') return 'Isi target, quantity, lalu keyword per baris.';
+  return 'Isi target dan quantity sesuai batas min dan max.';
 }
 
 function createInitialOrderForm(service?: NormalizedPusatPanelService | null) {
@@ -53,58 +73,169 @@ function createInitialOrderForm(service?: NormalizedPusatPanelService | null) {
   };
 }
 
-export function SocialMediaBrowser({ services, categories }: Props) {
+function formatDate(value: string) {
+  if (!value) return '-';
+  return new Date(value).toLocaleString('id-ID', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function mapStatusTone(status: string) {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (normalized.includes('success') || normalized.includes('complete') || normalized.includes('completed') || normalized.includes('processing')) {
+    return 'success';
+  }
+  if (normalized.includes('cancel') || normalized.includes('error') || normalized.includes('fail') || normalized.includes('partial') || normalized.includes('expired')) {
+    return 'failed';
+  }
+  return 'pending';
+}
+
+function SocialNavGlyph({ type }: { type: SocialTab }) {
+  if (type === 'sosmed') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="4" y="5" width="16" height="14" rx="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M8 9h8M8 12h8M8 15h4" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+  if (type === 'riwayat') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 7v5l3 2" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+        <path d="M20 12a8 8 0 1 1-2.34-5.66" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+        <path d="M20 5v3h-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+  if (type === 'status') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M9.5 12.3l1.7 1.7 3.7-4.1" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 8h16M7 5h10M6 11h12v8H6z" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+export function SocialMediaBrowser({ profile, providerMeta, services, categories }: Props) {
+  const [activeTab, setActiveTab] = useState<SocialTab>('sosmed');
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('Semua');
   const [activeMenuType, setActiveMenuType] = useState('Semua');
-  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
+  const [sosmedMode, setSosmedMode] = useState<'catalog' | 'order'>('catalog');
   const [selectedServiceId, setSelectedServiceId] = useState(services[0]?.id || '');
   const [orderForm, setOrderForm] = useState(createInitialOrderForm(services[0] || null));
   const [orderFeedback, setOrderFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
     tone: 'idle',
-    text: 'Pilih layanan di katalog lalu isi form order di panel ini.',
+    text: 'Pilih layanan social media langsung dari katalog live provider.',
   });
   const [statusOrderId, setStatusOrderId] = useState('');
   const [statusFeedback, setStatusFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
     tone: 'idle',
-    text: 'Masukkan ID order untuk cek status proses provider.',
+    text: 'Masukkan ID order untuk cek status dari provider.',
   });
   const [statusResult, setStatusResult] = useState<ProviderStatusResult['data'] | null>(null);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<number | null>(null);
   const [isOrdering, startOrdering] = useTransition();
   const [isCheckingStatus, startStatusCheck] = useTransition();
+  const [isRefreshingHistory, startHistoryRefresh] = useTransition();
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
+
+  const menuTypeOptions = useMemo(() => ['Semua', ...Array.from(new Set(services.map((service) => service.menuType).filter(Boolean)))], [services]);
+
+  useEffect(() => {
+    const previousPaddingBottom = document.body.style.paddingBottom;
+    const previousOverflowX = document.body.style.overflowX;
+    document.body.style.paddingBottom = '0';
+    document.body.style.overflowX = 'hidden';
+
+    return () => {
+      document.body.style.paddingBottom = previousPaddingBottom;
+      document.body.style.overflowX = previousOverflowX;
+    };
+  }, []);
+
+  const refreshHistory = () => {
+    startHistoryRefresh(async () => {
+      try {
+        const response = await fetch('/api/smm/history?limit=40', {
+          method: 'GET',
+          cache: 'no-store',
+        });
+        const result = (await response.json()) as {
+          status?: boolean;
+          data?: {
+            items?: HistoryItem[];
+            msg?: string;
+          };
+        };
+        if (!response.ok || !result.status || !result.data?.items) {
+          return;
+        }
+        setHistoryItems(result.data.items);
+      } catch {
+        // keep current history view
+      }
+    });
+  };
+
+  useEffect(() => {
+    refreshHistory();
+  }, []);
 
   const filteredServices = services.filter((service) => {
     const matchesCategory = activeCategory === 'Semua' || service.category === activeCategory;
     const matchesMenuType = activeMenuType === 'Semua' || service.menuType === activeMenuType;
-    const haystack = [
-      service.name,
-      service.category,
-      service.note,
-      service.logoType,
-      service.speed,
-    ].join(' ').toLowerCase();
+    const haystack = [service.name, service.category, service.note, service.logoType, service.speed].join(' ').toLowerCase();
     const matchesQuery = !deferredQuery || haystack.includes(deferredQuery);
     return matchesCategory && matchesMenuType && matchesQuery;
   });
 
-  const visibleServices = filteredServices.slice(0, visibleCount);
-  const selectedService = services.find((service) => service.id === selectedServiceId) || filteredServices[0] || services[0] || null;
-  const menuTypeOptions = ['Semua', ...Array.from(new Set(services.map((service) => service.menuType).filter(Boolean)))];
+  const selectedService =
+    filteredServices.find((service) => service.id === selectedServiceId) ||
+    services.find((service) => service.id === selectedServiceId) ||
+    filteredServices[0] ||
+    services[0] ||
+    null;
 
-  const resetVisible = () => setVisibleCount(INITIAL_VISIBLE_COUNT);
+  const summaryStats = {
+    totalServices: services.length,
+    totalCategories: categories.length,
+    avgPrice: services.length ? Math.round(services.reduce((sum, service) => sum + service.price, 0) / services.length) : 0,
+  };
 
   const pickService = (service: NormalizedPusatPanelService) => {
     setSelectedServiceId(service.id);
     setOrderForm(createInitialOrderForm(service));
     setOrderFeedback({
       tone: 'idle',
-      text: `Layanan "${service.name}" siap diorder.`,
+      text: `Layanan "${service.name}" siap dilanjutkan ke order provider.`,
+    });
+    setActiveTab('sosmed');
+    setSosmedMode('order');
+  };
+
+  const backToCatalog = () => {
+    setSosmedMode('catalog');
+    setOrderFeedback({
+      tone: 'idle',
+      text: 'Pilih layanan social media langsung dari katalog live provider.',
     });
   };
 
-  const submitOrder = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const submitOrder = () => {
     if (!selectedService) {
       setOrderFeedback({ tone: 'error', text: 'Pilih layanan dulu sebelum kirim order.' });
       return;
@@ -155,7 +286,7 @@ export function SocialMediaBrowser({ services, categories }: Props) {
             komen: comments,
           }),
         });
-        const result = await response.json() as ProviderOrderResult;
+        const result = (await response.json()) as ProviderOrderResult;
         if (!response.ok || !result.status || !result.data?.id) {
           setOrderFeedback({
             tone: 'error',
@@ -168,6 +299,8 @@ export function SocialMediaBrowser({ services, categories }: Props) {
           tone: 'success',
           text: `Order berhasil dibuat. ID provider: ${result.data.id}`,
         });
+        refreshHistory();
+        setActiveTab('riwayat');
       } catch (error) {
         setOrderFeedback({
           tone: 'error',
@@ -194,7 +327,7 @@ export function SocialMediaBrowser({ services, categories }: Props) {
           },
           body: JSON.stringify({ id: orderId }),
         });
-        const result = await response.json() as ProviderStatusResult;
+        const result = (await response.json()) as ProviderStatusResult;
         if (!response.ok || !result.status || !result.data?.status) {
           setStatusResult(null);
           setStatusFeedback({
@@ -208,6 +341,7 @@ export function SocialMediaBrowser({ services, categories }: Props) {
           tone: 'success',
           text: `Status order saat ini: ${result.data.status}`,
         });
+        refreshHistory();
       } catch (error) {
         setStatusResult(null);
         setStatusFeedback({
@@ -219,281 +353,408 @@ export function SocialMediaBrowser({ services, categories }: Props) {
   };
 
   return (
-    <>
-      <section className="section-block">
-        <div className="section-headline">
-          <span className="section-kicker">KATALOG LIVE</span>
-          <h2>Daftar layanan provider yang sudah bisa kamu filter langsung dari HP</h2>
-        </div>
-
-        <div className="catalog-toolbar">
-          <label className="catalog-search">
-            <span>Cari layanan</span>
-            <input
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                resetVisible();
-              }}
-              placeholder="Cari nama layanan, kategori, note, atau logo"
-            />
-          </label>
-          <div className="catalog-toolbar-side">
-            <span className="catalog-chip catalog-chip--solid">{filteredServices.length} layanan</span>
-            <span className="catalog-chip">{categories.length} kategori</span>
-          </div>
-        </div>
-
-        <div className="chip-scroller">
-          <button
-            type="button"
-            className={activeCategory === 'Semua' ? 'catalog-chip catalog-chip--active' : 'catalog-chip'}
-            onClick={() => {
-              setActiveCategory('Semua');
-              resetVisible();
-            }}
-          >
-            Semua
-          </button>
-          {categories.map((category) => (
-            <button
-              key={category}
-              type="button"
-              className={activeCategory === category ? 'catalog-chip catalog-chip--active' : 'catalog-chip'}
-              onClick={() => {
-                setActiveCategory(category);
-                resetVisible();
-              }}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
-
-        <div className="chip-scroller chip-scroller--secondary">
-          {menuTypeOptions.map((menuType) => (
-            <button
-              key={menuType}
-              type="button"
-              className={activeMenuType === menuType ? 'catalog-chip catalog-chip--secondary-active' : 'catalog-chip catalog-chip--secondary'}
-              onClick={() => {
-                setActiveMenuType(menuType);
-                resetVisible();
-              }}
-            >
-              Menu {menuType}
-            </button>
-          ))}
-        </div>
-
-        <div className="services-grid">
-          {visibleServices.map((service) => (
-            <article key={service.id} className="service-card">
-              <div className="service-card-top">
-                <span className="service-logo-pill">{service.logoType}</span>
-                <span className="service-id-pill">ID {service.id}</span>
-              </div>
-              <h3>{service.name}</h3>
-              <p className="service-category">{service.category}</p>
-              <div className="service-metrics">
-                <div>
-                  <span>Harga</span>
-                  <strong>Rp {service.priceLabel}</strong>
-                </div>
-                <div>
-                  <span>Kecepatan</span>
-                  <strong>{service.speed}</strong>
-                </div>
-                <div>
-                  <span>Min</span>
-                  <strong>{service.min.toLocaleString('id-ID')}</strong>
-                </div>
-                <div>
-                  <span>Max</span>
-                  <strong>{service.max.toLocaleString('id-ID')}</strong>
-                </div>
-              </div>
-              {service.note ? <p className="service-note">{service.note}</p> : <p className="service-note service-note--empty">Belum ada note tambahan dari provider.</p>}
-              <div className="service-card-actions">
-                <button type="button" className="hero-cta service-action-button" onClick={() => pickService(service)}>
-                  Pilih Layanan
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
-
-        {filteredServices.length === 0 ? (
-          <div className="empty-state">
-            Tidak ada layanan yang cocok dengan pencarian atau filter ini.
-          </div>
-        ) : null}
-
-        {visibleCount < filteredServices.length ? (
-          <div className="catalog-actions">
-            <button type="button" className="hero-cta" onClick={() => setVisibleCount((current) => current + INITIAL_VISIBLE_COUNT)}>
-              Muat lebih banyak
-            </button>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="section-block">
-        <div className="section-headline">
-          <span className="section-kicker">ORDER & STATUS</span>
-          <h2>Form order provider dan cek status dibuat dalam satu alur</h2>
-        </div>
-
-        <div className="order-status-grid">
-          <article className="order-panel">
-            <div className="order-panel-head">
-              <div>
-                <span className="stack-label">FORM ORDER</span>
-                <h3>{selectedService ? selectedService.name : 'Pilih layanan dari katalog'}</h3>
-              </div>
-              {selectedService ? <span className="service-id-pill">Menu {selectedService.menuType}</span> : null}
-            </div>
-
-            {selectedService ? (
-              <>
-                <p className="order-panel-copy">{buildMenuTypeHint(selectedService.menuType)}</p>
-                <div className="order-selected-summary">
-                  <div>
-                    <span>Harga</span>
-                    <strong>Rp {selectedService.priceLabel}</strong>
-                  </div>
-                  <div>
-                    <span>Min</span>
-                    <strong>{selectedService.min.toLocaleString('id-ID')}</strong>
-                  </div>
-                  <div>
-                    <span>Max</span>
-                    <strong>{selectedService.max.toLocaleString('id-ID')}</strong>
-                  </div>
-                  <div>
-                    <span>Tipe</span>
-                    <strong>{buildMenuTypeTitle(selectedService.menuType)}</strong>
-                  </div>
-                </div>
-
-                <form className="order-form" onSubmit={submitOrder}>
-                  <label className="form-field">
-                    <span>Target / data</span>
+    <div className="apk-app-shell">
+      <div className="apk-app-phone">
+        <div className="apk-app-content apk-app-content--tight">
+          {activeTab === 'sosmed' ? (
+            <section className="apk-app-panel apk-app-panel--plain">
+              {sosmedMode === 'catalog' ? (
+                <>
+                  <label className="apk-app-search apk-app-search--top">
+                    <span>Cari layanan social media</span>
                     <input
-                      value={orderForm.data}
-                      onChange={(event) => setOrderForm((prev) => ({ ...prev, data: event.target.value }))}
-                      placeholder="Masukkan link, username, atau target order"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Cari followers, views, likes, subscribers"
                     />
                   </label>
 
-                  {selectedService.menuType !== '4' && selectedService.menuType !== '2' ? (
-                    <label className="form-field">
-                      <span>Quantity</span>
-                      <input
-                        value={orderForm.quantity}
-                        onChange={(event) => setOrderForm((prev) => ({ ...prev, quantity: event.target.value.replace(/[^\d]/g, '') }))}
-                        placeholder={`Minimal ${selectedService.min}`}
-                      />
-                    </label>
-                  ) : null}
-
-                  {selectedService.menuType === '3' ? (
-                    <label className="form-field">
-                      <span>Username pemilik komentar</span>
-                      <input
-                        value={orderForm.username}
-                        onChange={(event) => setOrderForm((prev) => ({ ...prev, username: event.target.value }))}
-                        placeholder="Masukkan username pemilik komentar"
-                      />
-                    </label>
-                  ) : null}
-
-                  {selectedService.menuType === '2' || selectedService.menuType === '5' ? (
-                    <label className="form-field">
-                      <span>{selectedService.menuType === '2' ? 'Daftar komentar' : 'Daftar keyword / komen'}</span>
-                      <textarea
-                        value={orderForm.comments}
-                        onChange={(event) => setOrderForm((prev) => ({ ...prev, comments: event.target.value }))}
-                        rows={6}
-                        placeholder={selectedService.menuType === '2' ? 'Satu komentar per baris' : 'Satu keyword per baris'}
-                      />
-                    </label>
-                  ) : null}
-
-                  <div className={`feedback-box feedback-box--${orderFeedback.tone}`}>
-                    {orderFeedback.text}
+                  <div className="apk-app-inline-stats">
+                    {categories.slice(0, 8).map((category) => (
+                      <span key={category}>{category}</span>
+                    ))}
                   </div>
 
-                  <div className="order-form-actions">
-                    <button type="submit" className="hero-cta order-submit-button" disabled={isOrdering}>
-                      {isOrdering ? 'Mengirim order...' : 'Kirim Order Provider'}
-                    </button>
+                  <div className="smm-mini-summary">
+                    <div>
+                      <span>Total layanan</span>
+                      <strong>{summaryStats.totalServices.toLocaleString('id-ID')}</strong>
+                    </div>
+                    <div>
+                      <span>Kategori</span>
+                      <strong>{summaryStats.totalCategories.toLocaleString('id-ID')}</strong>
+                    </div>
+                    <div>
+                      <span>Avg harga</span>
+                      <strong>Rp {summaryStats.avgPrice.toLocaleString('id-ID')}</strong>
+                    </div>
+                  </div>
+
+                  <div className="chip-scroller">
                     <button
                       type="button"
-                      className="hero-ghost order-submit-button"
-                      onClick={() => {
-                        setOrderForm(createInitialOrderForm(selectedService));
-                        setOrderFeedback({
-                          tone: 'idle',
-                          text: 'Form order direset untuk layanan yang sedang dipilih.',
-                        });
-                      }}
+                      className={activeCategory === 'Semua' ? 'catalog-chip catalog-chip--active' : 'catalog-chip'}
+                      onClick={() => setActiveCategory('Semua')}
                     >
-                      Reset Form
+                      Semua
                     </button>
+                    {categories.map((category) => (
+                      <button
+                        key={category}
+                        type="button"
+                        className={activeCategory === category ? 'catalog-chip catalog-chip--active' : 'catalog-chip'}
+                        onClick={() => setActiveCategory(category)}
+                      >
+                        {category}
+                      </button>
+                    ))}
                   </div>
-                </form>
-              </>
-            ) : (
-              <div className="empty-state">
-                Pilih salah satu layanan di katalog agar panel order aktif.
+
+                  <div className="chip-scroller chip-scroller--secondary">
+                    {menuTypeOptions.map((menuType) => (
+                      <button
+                        key={menuType}
+                        type="button"
+                        className={activeMenuType === menuType ? 'catalog-chip catalog-chip--secondary-active' : 'catalog-chip catalog-chip--secondary'}
+                        onClick={() => setActiveMenuType(menuType)}
+                      >
+                        {menuType === 'Semua' ? 'Semua Menu' : `Menu ${menuType}`}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="smm-app-service-list">
+                    {filteredServices.map((service) => (
+                      <button
+                        key={service.id}
+                        type="button"
+                        className="smm-app-service-card"
+                        onClick={() => pickService(service)}
+                      >
+                        <div className="smm-app-service-top">
+                          <span className="service-logo-pill">{service.logoType}</span>
+                          <span className="service-id-pill">ID {service.id}</span>
+                        </div>
+                        <strong>{service.name}</strong>
+                        <small>{service.category}</small>
+                        <div className="smm-app-service-meta">
+                          <span>{buildMenuTypeTitle(service.menuType)}</span>
+                          <span>{service.speed}</span>
+                        </div>
+                        <div className="smm-app-service-stats">
+                          <div>
+                            <span>Harga</span>
+                            <strong>Rp {service.priceLabel}</strong>
+                          </div>
+                          <div>
+                            <span>Min</span>
+                            <strong>{service.min.toLocaleString('id-ID')}</strong>
+                          </div>
+                          <div>
+                            <span>Max</span>
+                            <strong>{service.max.toLocaleString('id-ID')}</strong>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {filteredServices.length === 0 ? <div className="apk-app-empty">Tidak ada layanan yang cocok dengan pencarian ini.</div> : null}
+                </>
+              ) : selectedService ? (
+                <>
+                  <div className="apk-app-order-head">
+                    <button type="button" className="apk-app-back-button" onClick={backToCatalog}>
+                      Kembali
+                    </button>
+                    <div className="apk-app-order-head-copy">
+                      <span className="apk-app-section-label">Kebutuhan Social Media</span>
+                      <h3>{selectedService.name}</h3>
+                    </div>
+                  </div>
+
+                  <div className="apk-app-selected-card">
+                    <div className="apk-app-selected-copy apk-app-selected-copy--wide">
+                      <strong>{selectedService.name}</strong>
+                      <small>{selectedService.category} - Menu {selectedService.menuType}</small>
+                    </div>
+                  </div>
+
+                  <div className="apk-app-info-card smm-order-summary">
+                    <div>
+                      <span>Harga</span>
+                      <strong>Rp {selectedService.priceLabel}</strong>
+                    </div>
+                    <div>
+                      <span>Min</span>
+                      <strong>{selectedService.min.toLocaleString('id-ID')}</strong>
+                    </div>
+                    <div>
+                      <span>Max</span>
+                      <strong>{selectedService.max.toLocaleString('id-ID')}</strong>
+                    </div>
+                    <div>
+                      <span>Tipe</span>
+                      <strong>{buildMenuTypeTitle(selectedService.menuType)}</strong>
+                    </div>
+                  </div>
+
+                  <div className="apk-app-inline-helper">
+                    {buildMenuTypeHint(selectedService.menuType)}
+                  </div>
+
+                  <div className="apk-app-form-card">
+                    <span className="apk-app-section-label">Order</span>
+                    <div className="apk-app-form-grid">
+                      <label className="apk-app-form-field">
+                        <span>Target / data</span>
+                        <input
+                          value={orderForm.data}
+                          onChange={(event) => setOrderForm((prev) => ({ ...prev, data: event.target.value }))}
+                          placeholder="Link post, username, atau target layanan"
+                        />
+                      </label>
+
+                      {selectedService.menuType !== '4' && selectedService.menuType !== '2' ? (
+                        <label className="apk-app-form-field">
+                          <span>Quantity</span>
+                          <input
+                            value={orderForm.quantity}
+                            onChange={(event) => setOrderForm((prev) => ({ ...prev, quantity: event.target.value.replace(/[^\d]/g, '') }))}
+                            placeholder={`Minimal ${selectedService.min}`}
+                          />
+                        </label>
+                      ) : null}
+
+                      {selectedService.menuType === '3' ? (
+                        <label className="apk-app-form-field">
+                          <span>Username komentar</span>
+                          <input
+                            value={orderForm.username}
+                            onChange={(event) => setOrderForm((prev) => ({ ...prev, username: event.target.value }))}
+                            placeholder="Username pemilik komentar"
+                          />
+                        </label>
+                      ) : null}
+
+                      {selectedService.menuType === '2' || selectedService.menuType === '5' ? (
+                        <label className="apk-app-form-field">
+                          <span>{selectedService.menuType === '2' ? 'Daftar komentar' : 'Daftar keyword / komen'}</span>
+                          <textarea
+                            value={orderForm.comments}
+                            onChange={(event) => setOrderForm((prev) => ({ ...prev, comments: event.target.value }))}
+                            rows={6}
+                            placeholder={selectedService.menuType === '2' ? 'Satu komentar per baris' : 'Satu keyword per baris'}
+                          />
+                        </label>
+                      ) : null}
+                    </div>
+
+                    {orderFeedback.tone !== 'idle' ? (
+                      <div className={`apk-app-feedback apk-app-feedback--${orderFeedback.tone}`}>
+                        {orderFeedback.text}
+                      </div>
+                    ) : null}
+
+                    <div className="apk-app-action-row">
+                      <button type="button" className="apk-app-primary-button" onClick={submitOrder} disabled={isOrdering}>
+                        {isOrdering ? 'Mengirim...' : 'Kirim Order'}
+                      </button>
+                      <button type="button" className="apk-app-ghost-button" onClick={backToCatalog}>
+                        Pilih Layanan Lain
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="apk-app-empty">Belum ada layanan dari provider yang bisa dipilih.</div>
+              )}
+            </section>
+          ) : null}
+
+          {activeTab === 'riwayat' ? (
+            <section className="apk-app-panel apk-app-panel--plain">
+              <div className="apk-app-panel-head">
+                <div>
+                  <span className="apk-app-section-label">Riwayat</span>
+                  <h3>Order social media yang tersimpan</h3>
+                </div>
+                <button type="button" className="apk-app-ghost-button" onClick={refreshHistory} disabled={isRefreshingHistory}>
+                  {isRefreshingHistory ? 'Memuat...' : 'Refresh'}
+                </button>
               </div>
-            )}
-          </article>
 
-          <article className="status-panel">
-            <span className="stack-label">CEK STATUS ORDER</span>
-            <h3>Status order provider bisa dicek langsung dari website</h3>
-            <p className="order-panel-copy">Masukkan ID order dari hasil transaksi. Sistem akan membaca status terbaru dari provider.</p>
+              <div className="apk-app-history-card">
+                {historyItems.length === 0 ? (
+                  <div className="apk-app-empty">Belum ada riwayat order social media yang tersimpan.</div>
+                ) : (
+                  historyItems.map((item) => (
+                    <article key={item.id} className="apk-app-info-card">
+                      <div className="apk-app-history-head">
+                        <div className="apk-app-history-meta">
+                          <strong>{item.serviceName}</strong>
+                          <span>{item.category}</span>
+                          <span>ID Provider : {item.providerOrderId || '-'}</span>
+                          <span>Waktu : {formatDate(item.createdAt)}</span>
+                        </div>
+                        <div className={`apk-app-history-status apk-app-history-status--${mapStatusTone(item.orderStatus)}`}>
+                          {item.orderStatus}
+                        </div>
+                      </div>
+                      <div className="apk-app-action-row apk-app-action-row--compact">
+                        <button
+                          type="button"
+                          className="apk-app-ghost-button"
+                          onClick={() => setExpandedHistoryId((current) => (current === item.id ? null : item.id))}
+                        >
+                          {expandedHistoryId === item.id ? 'Tutup Detail' : 'Lihat Detail'}
+                        </button>
+                      </div>
+                      {expandedHistoryId === item.id ? (
+                        <div className="apk-app-history-detail">
+                          <p>Target : {item.targetData || '-'}</p>
+                          <p>Quantity : {item.quantity == null ? '-' : item.quantity.toLocaleString('id-ID')}</p>
+                          <p>Username : {item.username || '-'}</p>
+                          <p>Komentar : {item.comments || '-'}</p>
+                          <p>Update Terakhir : {formatDate(item.updatedAt)}</p>
+                        </div>
+                      ) : null}
+                    </article>
+                  ))
+                )}
+              </div>
+            </section>
+          ) : null}
 
-            <label className="form-field">
-              <span>ID order</span>
-              <input
-                value={statusOrderId}
-                onChange={(event) => setStatusOrderId(event.target.value)}
-                placeholder="Contoh: 123456"
-              />
-            </label>
-
-            <div className={`feedback-box feedback-box--${statusFeedback.tone}`}>
-              {statusFeedback.text}
-            </div>
-
-            {statusResult ? (
-              <div className="status-result-card">
+          {activeTab === 'status' ? (
+            <section className="apk-app-panel apk-app-panel--plain">
+              <div className="apk-app-panel-head">
                 <div>
-                  <span>Status</span>
-                  <strong>{statusResult.status || '-'}</strong>
-                </div>
-                <div>
-                  <span>Start count</span>
-                  <strong>{Number(statusResult.start_count || 0).toLocaleString('id-ID')}</strong>
-                </div>
-                <div>
-                  <span>Remains</span>
-                  <strong>{Number(statusResult.remains || 0).toLocaleString('id-ID')}</strong>
+                  <span className="apk-app-section-label">Status</span>
+                  <h3>Cek status order provider langsung</h3>
                 </div>
               </div>
-            ) : null}
 
-            <div className="order-form-actions">
-              <button type="button" className="hero-cta order-submit-button" onClick={checkOrderStatus} disabled={isCheckingStatus}>
-                {isCheckingStatus ? 'Mengambil status...' : 'Cek Status'}
-              </button>
-            </div>
-          </article>
+              <div className="apk-app-form-card">
+                <div className="apk-app-form-grid">
+                  <label className="apk-app-form-field">
+                    <span>ID order provider</span>
+                    <input
+                      value={statusOrderId}
+                      onChange={(event) => setStatusOrderId(event.target.value)}
+                      placeholder="Contoh 123456"
+                    />
+                  </label>
+                </div>
+
+                {statusFeedback.tone !== 'idle' ? (
+                  <div className={`apk-app-feedback apk-app-feedback--${statusFeedback.tone}`}>
+                    {statusFeedback.text}
+                  </div>
+                ) : null}
+
+                {statusResult ? (
+                  <div className="smm-status-grid">
+                    <div className="apk-app-info-card">
+                      <span>Status</span>
+                      <strong>{statusResult.status || '-'}</strong>
+                    </div>
+                    <div className="apk-app-info-card">
+                      <span>Start Count</span>
+                      <strong>{Number(statusResult.start_count || 0).toLocaleString('id-ID')}</strong>
+                    </div>
+                    <div className="apk-app-info-card">
+                      <span>Remains</span>
+                      <strong>{Number(statusResult.remains || 0).toLocaleString('id-ID')}</strong>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="apk-app-action-row">
+                  <button type="button" className="apk-app-primary-button" onClick={checkOrderStatus} disabled={isCheckingStatus}>
+                    {isCheckingStatus ? 'Memuat...' : 'Cek Status'}
+                  </button>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          {activeTab === 'provider' ? (
+            <section className="apk-app-panel apk-app-panel--plain">
+              <div className="apk-app-panel-head">
+                <div>
+                  <span className="apk-app-section-label">Provider</span>
+                  <h3>Koneksi langsung ke PusatPanelSMM</h3>
+                </div>
+              </div>
+
+              <div className="apk-app-history-card">
+                <article className="apk-app-info-card">
+                  <strong>{profile?.fullName || 'Profil provider belum terbaca'}</strong>
+                  <p className="smm-provider-copy">Semua layanan di halaman ini diambil langsung dari API provider menggunakan API key dan secret key aktif di Vercel.</p>
+                </article>
+                <article className="apk-app-info-card smm-provider-grid">
+                  <div>
+                    <span>Username</span>
+                    <strong>{profile?.username || '-'}</strong>
+                  </div>
+                  <div>
+                    <span>Email</span>
+                    <strong>{profile?.email || '-'}</strong>
+                  </div>
+                  <div>
+                    <span>Balance</span>
+                    <strong>Rp {profile?.balanceLabel || '0'}</strong>
+                  </div>
+                  <div>
+                    <span>API URL</span>
+                    <strong>{providerMeta.apiUrl}</strong>
+                  </div>
+                </article>
+                <article className="apk-app-info-card smm-provider-grid">
+                  <div>
+                    <span>Status API</span>
+                    <strong>{providerMeta.configured ? 'Terhubung' : 'Belum lengkap'}</strong>
+                  </div>
+                  <div>
+                    <span>Total layanan live</span>
+                    <strong>{services.length.toLocaleString('id-ID')}</strong>
+                  </div>
+                  <div>
+                    <span>Total kategori</span>
+                    <strong>{categories.length.toLocaleString('id-ID')}</strong>
+                  </div>
+                  <div>
+                    <span>Mode data</span>
+                    <strong>Direct provider</strong>
+                  </div>
+                </article>
+              </div>
+            </section>
+          ) : null}
         </div>
-      </section>
-    </>
+
+        <nav className="apk-app-bottom-nav">
+          {([
+            ['sosmed', 'Sosmed'],
+            ['riwayat', 'Riwayat'],
+            ['status', 'Status'],
+            ['provider', 'Provider'],
+          ] as Array<[SocialTab, string]>).map(([tab, label]) => (
+            <button
+              key={tab}
+              type="button"
+              className={activeTab === tab ? 'apk-app-bottom-tab apk-app-bottom-tab--active' : 'apk-app-bottom-tab'}
+              onClick={() => setActiveTab(tab)}
+            >
+              <span className="apk-app-bottom-icon">
+                <SocialNavGlyph type={tab} />
+              </span>
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+    </div>
   );
 }

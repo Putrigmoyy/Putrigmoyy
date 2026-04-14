@@ -842,6 +842,126 @@ a {
   text-decoration: none;
 }
 
+.smm-mini-summary,
+.smm-order-summary,
+.smm-status-grid,
+.smm-provider-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.smm-mini-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.smm-mini-summary div,
+.smm-order-summary div,
+.smm-status-grid .apk-app-info-card,
+.smm-provider-grid div {
+  padding: 14px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.smm-mini-summary span,
+.smm-order-summary span,
+.smm-status-grid span,
+.smm-provider-grid span {
+  display: block;
+  color: rgba(17, 17, 17, 0.64);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.smm-mini-summary strong,
+.smm-order-summary strong,
+.smm-status-grid strong,
+.smm-provider-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: #111111;
+  font-size: 0.92rem;
+}
+
+.smm-app-service-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.smm-app-service-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid rgba(23, 153, 242, 0.14);
+  border-radius: 22px;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.smm-app-service-card:active {
+  transform: scale(0.99);
+}
+
+.smm-app-service-card strong {
+  color: #111111;
+  font-size: 0.97rem;
+  line-height: 1.4;
+}
+
+.smm-app-service-card small {
+  color: rgba(17, 17, 17, 0.65);
+  font-size: 0.8rem;
+}
+
+.smm-app-service-top,
+.smm-app-service-meta,
+.smm-app-service-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.smm-app-service-meta span {
+  color: rgba(17, 17, 17, 0.72);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.smm-app-service-stats div {
+  min-width: 0;
+}
+
+.smm-app-service-stats span {
+  display: block;
+  color: rgba(17, 17, 17, 0.62);
+  font-size: 0.74rem;
+}
+
+.smm-app-service-stats strong {
+  display: block;
+  margin-top: 4px;
+  color: #111111;
+  font-size: 0.85rem;
+}
+
+.apk-app-selected-copy--wide {
+  width: 100%;
+}
+
+.smm-provider-copy {
+  margin: 8px 0 0;
+  color: rgba(17, 17, 17, 0.72);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
 .apk-app-feedback {
   margin-top: 14px;
   padding: 14px;
@@ -1062,6 +1182,12 @@ a {
   .apk-app-qris-card {
     grid-template-columns: 0.92fr 1fr;
     align-items: start;
+  }
+
+  .smm-order-summary,
+  .smm-status-grid,
+  .smm-provider-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
