@@ -353,33 +353,6 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                     })}
                   </div>
 
-                  <div className="apk-app-summary-card">
-                    <div>
-                      <span>Produk</span>
-                      <strong>{selectedProduct.title}</strong>
-                    </div>
-                    <div>
-                      <span>Varian</span>
-                      <strong>{selectedVariant.title}</strong>
-                    </div>
-                    <div>
-                      <span>Harga</span>
-                      <strong>Rp {formatRupiah(selectedVariant.price)}</strong>
-                    </div>
-                    <div>
-                      <span>Pengiriman</span>
-                      <strong>{selectedProduct.delivery}</strong>
-                    </div>
-                    <div>
-                      <span>Jumlah</span>
-                      <strong>{selectedQuantity}</strong>
-                    </div>
-                    <div>
-                      <span>Total Bayar</span>
-                      <strong>Rp {formatRupiah(selectedTotal)}</strong>
-                    </div>
-                  </div>
-
                   <div className="apk-app-form-card">
                     <span className="apk-app-section-label">Order</span>
                     <div className="apk-app-form-note">
