@@ -1,0 +1,16 @@
+<svg width="320" height="320" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="320" height="320" rx="40" fill="#FFFFFF"/>
+  <rect x="24" y="24" width="272" height="272" rx="34" fill="url(#paint0_linear)"/>
+  <circle cx="160" cy="172" r="70" fill="#FFFFFF"/>
+  <path d="M160 114L192 132V168L160 186L128 168V132L160 114Z" fill="#1799F2"/>
+  <path d="M160 158L196 178V214L160 234L124 214V178L160 158Z" fill="#D209D1"/>
+  <path d="M124 132L160 152V188L124 208L88 188V152L124 132Z" fill="#111111" fill-opacity="0.88"/>
+  <text x="54" y="72" fill="#111111" font-family="Arial, sans-serif" font-size="28" font-weight="700">ChatGPT Plus</text>
+  <text x="54" y="101" fill="#111111" fill-opacity="0.72" font-family="Arial, sans-serif" font-size="18">AI premium workspace</text>
+  <defs>
+    <linearGradient id="paint0_linear" x1="24" y1="24" x2="296" y2="296" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1799F2" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#D209D1" stop-opacity="0.2"/>
+    </linearGradient>
+  </defs>
+</svg>

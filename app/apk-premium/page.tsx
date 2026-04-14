@@ -7,7 +7,7 @@ export default async function ApkPremiumPage() {
   const catalog = await getApkPremiumCatalog();
 
   return (
-    <main className="market-shell">
+    <main className="apk-app-page">
       <ApkPremiumBrowser products={catalog.products} categories={catalog.categories} />
     </main>
   );

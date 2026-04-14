@@ -1,0 +1,16 @@
+<svg width="320" height="320" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="320" height="320" rx="40" fill="#FFFFFF"/>
+  <rect x="24" y="24" width="272" height="272" rx="34" fill="url(#paint0_linear)"/>
+  <circle cx="86" cy="228" r="44" fill="#1799F2" fill-opacity="0.14"/>
+  <circle cx="236" cy="102" r="34" fill="#D209D1" fill-opacity="0.16"/>
+  <rect x="72" y="112" width="176" height="96" rx="30" fill="#D209D1"/>
+  <path d="M150 142L194 160L150 178V142Z" fill="#FFFFFF"/>
+  <text x="54" y="72" fill="#111111" font-family="Arial, sans-serif" font-size="28" font-weight="700">YouTube Premium</text>
+  <text x="54" y="101" fill="#111111" fill-opacity="0.72" font-family="Arial, sans-serif" font-size="18">Watch and music bundle</text>
+  <defs>
+    <linearGradient id="paint0_linear" x1="24" y1="24" x2="296" y2="296" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1799F2" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#D209D1" stop-opacity="0.18"/>
+    </linearGradient>
+  </defs>
+</svg>
