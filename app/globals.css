@@ -83,10 +83,10 @@ a {
 
 .dashboard-mobile {
   position: relative;
-  width: min(calc(100% - 24px), 430px);
+  width: min(calc(100% - 32px), 390px);
   height: 100dvh;
   margin: 0 auto;
-  padding: 12px 0;
+  padding: 18px 0;
   opacity: 0;
   animation: dashboard-content-show 0.45s ease 2s forwards;
 }
@@ -95,21 +95,23 @@ a {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
   height: 100%;
+  align-content: center;
 }
 
 .dashboard-card {
   position: relative;
   display: block;
   border: 1px solid rgba(23, 153, 242, 0.16);
-  border-radius: 28px;
+  border-radius: 24px;
   background: #ffffff;
   padding: 0;
   box-shadow: 0 16px 40px rgba(23, 153, 242, 0.08);
   overflow: hidden;
   appearance: none;
   cursor: pointer;
+  aspect-ratio: 1 / 1;
 }
 
 .dashboard-card-media {
@@ -130,15 +132,15 @@ a {
   inset: auto 0 0 0;
   display: flex;
   align-items: flex-end;
-  min-height: 88px;
-  padding: 16px 14px;
+  min-height: 66px;
+  padding: 10px 10px 12px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.92) 55%, #ffffff 100%);
 }
 
 .dashboard-card-overlay h2 {
   margin: 0;
   color: #111111;
-  font-size: 0.96rem;
+  font-size: 0.84rem;
   line-height: 1.3;
   text-align: left;
 }
@@ -169,7 +171,7 @@ a {
 .dashboard-preview-media {
   position: relative;
   overflow: hidden;
-  aspect-ratio: 0.84;
+  aspect-ratio: 1 / 1;
   border: 1px solid rgba(23, 153, 242, 0.16);
   border-radius: 34px;
   background: #ffffff;
@@ -1422,26 +1424,26 @@ a {
   }
 
   .dashboard-mobile {
-    width: min(calc(100% - 20px), 430px);
+    width: min(calc(100% - 28px), 370px);
     height: 100svh;
-    padding: 10px 0;
+    padding: 14px 0;
   }
 
   .dashboard-grid {
-    gap: 10px;
+    gap: 8px;
   }
 
   .dashboard-card {
-    border-radius: 24px;
+    border-radius: 22px;
   }
 
   .dashboard-card-overlay {
-    min-height: 72px;
-    padding: 12px;
+    min-height: 58px;
+    padding: 9px 9px 11px;
   }
 
   .dashboard-card-overlay h2 {
-    font-size: 0.88rem;
+    font-size: 0.78rem;
   }
 
   .hero-card h1,
