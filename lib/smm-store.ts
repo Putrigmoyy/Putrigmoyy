@@ -14,6 +14,8 @@ export async function saveSmmOrder(input: {
   category: string;
   targetData: string;
   quantity: number | null;
+  unitPrice: number;
+  totalPrice: number;
   username: string;
   comments: string;
   orderStatus: string;
@@ -23,6 +25,8 @@ export async function saveSmmOrder(input: {
   }
 
   const sql = getNeonClient('smm');
+  await sql`alter table smm_orders add column if not exists unit_price integer not null default 0`;
+  await sql`alter table smm_orders add column if not exists total_price integer not null default 0`;
   await sql`
     insert into smm_orders (
       provider_order_id,
@@ -31,6 +35,8 @@ export async function saveSmmOrder(input: {
       category,
       target_data,
       quantity,
+      unit_price,
+      total_price,
       username,
       comments,
       order_status
@@ -41,6 +47,8 @@ export async function saveSmmOrder(input: {
       ${input.category || 'Tanpa Kategori'},
       ${input.targetData},
       ${input.quantity},
+      ${Math.max(0, Number(input.unitPrice || 0))},
+      ${Math.max(0, Number(input.totalPrice || 0))},
       ${input.username},
       ${input.comments},
       ${input.orderStatus}
@@ -119,6 +127,8 @@ export type SmmOrderHistoryItem = {
   category: string;
   targetData: string;
   quantity: number | null;
+  unitPrice: number;
+  totalPrice: number;
   username: string;
   comments: string;
   orderStatus: string;
@@ -132,6 +142,8 @@ export async function getSmmOrderHistory(limit = 40) {
   }
 
   const sql = getNeonClient('smm');
+  await sql`alter table smm_orders add column if not exists unit_price integer not null default 0`;
+  await sql`alter table smm_orders add column if not exists total_price integer not null default 0`;
   const rows = (await sql`
     select
       id,
@@ -141,6 +153,8 @@ export async function getSmmOrderHistory(limit = 40) {
       category,
       target_data,
       quantity,
+      unit_price,
+      total_price,
       username,
       comments,
       order_status,
@@ -157,6 +171,8 @@ export async function getSmmOrderHistory(limit = 40) {
     category: string;
     target_data: string;
     quantity: number | null;
+    unit_price: number | null;
+    total_price: number | null;
     username: string | null;
     comments: string | null;
     order_status: string;
@@ -172,6 +188,8 @@ export async function getSmmOrderHistory(limit = 40) {
     category: row.category,
     targetData: row.target_data,
     quantity: row.quantity == null ? null : Number(row.quantity),
+    unitPrice: Number(row.unit_price || 0),
+    totalPrice: Number(row.total_price || 0),
     username: String(row.username || ''),
     comments: String(row.comments || ''),
     orderStatus: row.order_status,

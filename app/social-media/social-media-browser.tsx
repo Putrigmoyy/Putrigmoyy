@@ -83,6 +83,8 @@ type HistoryItem = {
   category: string;
   targetData: string;
   quantity: number | null;
+  unitPrice: number;
+  totalPrice: number;
   username: string;
   comments: string;
   orderStatus: string;
@@ -331,6 +333,18 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const [statusResult, setStatusResult] = useState<ProviderStatusResult['data'] | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [expandedHistoryId, setExpandedHistoryId] = useState<number | null>(null);
+  const [statusFilterDraft, setStatusFilterDraft] = useState({
+    limit: '10',
+    status: 'Semua',
+    year: String(new Date().getFullYear()),
+    search: '',
+  });
+  const [appliedStatusFilter, setAppliedStatusFilter] = useState({
+    limit: 10,
+    status: 'Semua',
+    year: String(new Date().getFullYear()),
+    search: '',
+  });
   const [isOrdering, startOrdering] = useTransition();
   const [isCheckingStatus, startStatusCheck] = useTransition();
   const [isRefreshingHistory, startHistoryRefresh] = useTransition();
@@ -339,6 +353,18 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     { label: 'OTP Nokos', href: process.env.NEXT_PUBLIC_OTP_URL || '#', external: true },
     { label: 'Sewa Bot', href: process.env.NEXT_PUBLIC_BOT_RENTAL_URL || '#', external: true },
   ];
+  const availableYears = useMemo(() => {
+    const years = Array.from(new Set(historyItems.map((item) => new Date(item.createdAt).getFullYear()).filter(Boolean))).sort((a, b) => b - a);
+    const currentYear = new Date().getFullYear();
+    if (!years.includes(currentYear)) {
+      years.unshift(currentYear);
+    }
+    return years.map(String);
+  }, [historyItems]);
+  const availableStatuses = useMemo(() => {
+    const values = Array.from(new Set(historyItems.map((item) => String(item.orderStatus || '').trim()).filter(Boolean)));
+    return ['Semua', ...values];
+  }, [historyItems]);
 
   const syncAccountBundle = async (contact: string) => {
     const normalizedContact = String(contact || '').trim();
@@ -379,7 +405,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const refreshHistory = () => {
     startHistoryRefresh(async () => {
       try {
-        const response = await fetch('/api/smm/history?limit=40', {
+        const response = await fetch('/api/smm/history?limit=150', {
           method: 'GET',
           cache: 'no-store',
         });
@@ -397,6 +423,15 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       } catch {
         // keep current history view
       }
+    });
+  };
+
+  const applyStatusFilter = () => {
+    setAppliedStatusFilter({
+      limit: Math.max(1, Number(statusFilterDraft.limit || 10)),
+      status: statusFilterDraft.status,
+      year: statusFilterDraft.year,
+      search: statusFilterDraft.search.trim().toLowerCase(),
     });
   };
 
@@ -514,6 +549,21 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     return selectedService.price * units;
   }, [calculatedQuantity, selectedService]);
 
+  const filteredStatusOrders = useMemo(() => {
+    const filtered = historyItems.filter((item) => {
+      const itemYear = String(new Date(item.createdAt).getFullYear());
+      const matchesYear = !appliedStatusFilter.year || itemYear === appliedStatusFilter.year;
+      const matchesStatus =
+        appliedStatusFilter.status === 'Semua' ||
+        String(item.orderStatus || '').toLowerCase() === appliedStatusFilter.status.toLowerCase();
+      const haystack = [item.providerOrderId, item.targetData, item.serviceName, item.category].join(' ').toLowerCase();
+      const matchesSearch = !appliedStatusFilter.search || haystack.includes(appliedStatusFilter.search);
+      return matchesYear && matchesStatus && matchesSearch;
+    });
+
+    return filtered.slice(0, appliedStatusFilter.limit);
+  }, [appliedStatusFilter, historyItems]);
+
   const submitOrder = () => {
     if (!selectedService) {
       setOrderFeedback({ tone: 'error', text: 'Pilih layanan dulu sebelum kirim order.' });
@@ -561,6 +611,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             category: selectedService.category,
             data,
             quantity,
+            unitPrice: selectedService.price,
+            totalPrice: liveTotal,
             username,
             komen: comments,
           }),
@@ -579,7 +631,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
           text: `Order berhasil dibuat. ID provider: ${result.data.id}`,
         });
         refreshHistory();
-        setActiveTab('riwayat');
+        setActiveTab('status');
       } catch (error) {
         setOrderFeedback({
           tone: 'error',
@@ -875,12 +927,153 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             <section className="apk-app-panel apk-app-panel--plain">
               <div className="apk-app-panel-head">
                 <div>
-                  <span className="apk-app-section-label">Status</span>
-                  <h3>Cek status order provider langsung</h3>
+                  <span className="apk-app-section-label">Status Order</span>
+                  <h3>Filter dan lihat detail order social media</h3>
                 </div>
               </div>
 
+              <div className="smm-status-order-note">
+                Klik tombol detail untuk melihat rincian pesanan dan target order.
+              </div>
+
               <div className="apk-app-form-card">
+                <div className="smm-status-filter-grid">
+                  <label className="apk-app-form-field">
+                    <span>Tampilkan</span>
+                    <select
+                      value={statusFilterDraft.limit}
+                      onChange={(event) => setStatusFilterDraft((current) => ({ ...current, limit: event.target.value }))}
+                      className="smm-select"
+                    >
+                      {['10', '25', '50', '100'].map((limit) => (
+                        <option key={limit} value={limit}>
+                          {limit}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="apk-app-form-field">
+                    <span>Filter Status</span>
+                    <select
+                      value={statusFilterDraft.status}
+                      onChange={(event) => setStatusFilterDraft((current) => ({ ...current, status: event.target.value }))}
+                      className="smm-select"
+                    >
+                      {availableStatuses.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="apk-app-form-field">
+                    <span>Filter Tahun</span>
+                    <select
+                      value={statusFilterDraft.year}
+                      onChange={(event) => setStatusFilterDraft((current) => ({ ...current, year: event.target.value }))}
+                      className="smm-select"
+                    >
+                      {availableYears.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="apk-app-form-field">
+                    <span>Cari Order ID</span>
+                    <input
+                      value={statusFilterDraft.search}
+                      onChange={(event) => setStatusFilterDraft((current) => ({ ...current, search: event.target.value }))}
+                      placeholder="Cari Order ID/Target"
+                    />
+                  </label>
+                </div>
+
+                <div className="apk-app-action-row">
+                  <button type="button" className="apk-app-primary-button" onClick={applyStatusFilter}>
+                    Filter
+                  </button>
+                  <button type="button" className="apk-app-ghost-button" onClick={refreshHistory} disabled={isRefreshingHistory}>
+                    {isRefreshingHistory ? 'Memuat...' : 'Refresh'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="smm-status-table-wrap">
+                <table className="smm-status-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Waktu</th>
+                      <th>Layanan</th>
+                      <th>Target</th>
+                      <th>Jumlah</th>
+                      <th>Harga</th>
+                      <th>Status</th>
+                      <th>Detail</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStatusOrders.length ? (
+                      filteredStatusOrders.map((item) => {
+                        const expanded = expandedHistoryId === item.id;
+                        return (
+                          <>
+                            <tr key={item.id}>
+                              <td>{item.providerOrderId || '-'}</td>
+                              <td>{formatDate(item.createdAt)}</td>
+                              <td>{item.serviceName}</td>
+                              <td>
+                                <div className="smm-status-target">{item.targetData || '-'}</div>
+                              </td>
+                              <td>{item.quantity == null ? '-' : item.quantity.toLocaleString('id-ID')}</td>
+                              <td>Rp {(item.totalPrice || item.unitPrice || 0).toLocaleString('id-ID')}</td>
+                              <td>
+                                <span className={`smm-status-badge smm-status-badge--${mapStatusTone(item.orderStatus)}`}>{item.orderStatus}</span>
+                              </td>
+                              <td>
+                                <button
+                                  type="button"
+                                  className="smm-status-detail-button"
+                                  onClick={() => setExpandedHistoryId(expanded ? null : item.id)}
+                                >
+                                  Detail
+                                </button>
+                              </td>
+                            </tr>
+                            {expanded ? (
+                              <tr key={`${item.id}-detail`}>
+                                <td colSpan={8}>
+                                  <div className="smm-status-detail-panel">
+                                    <p>Kategori : {item.category || '-'}</p>
+                                    <p>Target : {item.targetData || '-'}</p>
+                                    <p>Jumlah : {item.quantity == null ? '-' : item.quantity.toLocaleString('id-ID')}</p>
+                                    <p>Harga per unit : Rp {(item.unitPrice || 0).toLocaleString('id-ID')}</p>
+                                    <p>Total harga : Rp {(item.totalPrice || item.unitPrice || 0).toLocaleString('id-ID')}</p>
+                                    <p>Username : {item.username || '-'}</p>
+                                    <p>Komentar : {item.comments || '-'}</p>
+                                    <p>Update terakhir : {formatDate(item.updatedAt)}</p>
+                                  </div>
+                                </td>
+                              </tr>
+                            ) : null}
+                          </>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={8}>
+                          <div className="apk-app-empty">Belum ada order yang cocok dengan filter ini.</div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="apk-app-form-card">
+                <span className="apk-app-section-label">Cek Status Manual</span>
                 <div className="apk-app-form-grid">
                   <label className="apk-app-form-field">
                     <span>ID order provider</span>

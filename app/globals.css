@@ -1177,6 +1177,123 @@ a {
   font-size: 0.94rem;
 }
 
+.smm-status-order-note {
+  margin-bottom: 14px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #27c6a8, #2ac2a6);
+  color: #ffffff;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.smm-status-filter-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.smm-status-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 20px;
+  background: #ffffff;
+}
+
+.smm-status-table {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: collapse;
+}
+
+.smm-status-table th,
+.smm-status-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(23, 153, 242, 0.08);
+  border-right: 1px solid rgba(23, 153, 242, 0.08);
+  text-align: left;
+  vertical-align: top;
+}
+
+.smm-status-table th:last-child,
+.smm-status-table td:last-child {
+  border-right: 0;
+}
+
+.smm-status-table thead th {
+  color: #111111;
+  font-size: 0.86rem;
+  font-weight: 800;
+  background: rgba(23, 153, 242, 0.03);
+}
+
+.smm-status-table tbody td {
+  color: #111111;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.smm-status-target {
+  min-width: 180px;
+  max-width: 240px;
+  padding: 10px 12px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 14px;
+  background: #ffffff;
+  word-break: break-word;
+}
+
+.smm-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.smm-status-badge--success {
+  background: rgba(39, 198, 168, 0.14);
+  color: #16a085;
+}
+
+.smm-status-badge--failed {
+  background: rgba(255, 90, 95, 0.14);
+  color: #d93b3b;
+}
+
+.smm-status-badge--pending {
+  background: rgba(23, 153, 242, 0.12);
+  color: #146fc0;
+}
+
+.smm-status-detail-button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #1554b5;
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  box-shadow: 0 12px 24px rgba(21, 84, 181, 0.22);
+}
+
+.smm-status-detail-panel {
+  display: grid;
+  gap: 8px;
+  padding: 6px 2px;
+}
+
+.smm-status-detail-panel p {
+  margin: 0;
+  color: #111111;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
 .smm-app-service-card {
   display: grid;
   gap: 10px;
@@ -1474,6 +1591,10 @@ a {
   .smm-status-grid,
   .smm-provider-grid,
   .smm-order-summary-card {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .smm-status-filter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

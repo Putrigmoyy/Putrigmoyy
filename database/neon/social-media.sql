@@ -20,6 +20,8 @@ create table if not exists smm_orders (
   category text not null,
   target_data text not null,
   quantity integer,
+  unit_price integer not null default 0,
+  total_price integer not null default 0,
   username text,
   comments text,
   order_status text not null default 'pending',

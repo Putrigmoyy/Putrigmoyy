@@ -8,6 +8,8 @@ export async function POST(request: NextRequest) {
     const service = String(body.service || '').trim();
     const data = String(body.data || '').trim();
     const quantity = String(body.quantity || '').trim();
+    const unitPrice = Number(body.unitPrice || 0);
+    const totalPrice = Number(body.totalPrice || 0);
     const username = String(body.username || '').trim();
     const serviceName = String(body.serviceName || '').trim();
     const category = String(body.category || '').trim();
@@ -41,6 +43,8 @@ export async function POST(request: NextRequest) {
         category,
         targetData: data,
         quantity: quantity ? Number(quantity) : null,
+        unitPrice,
+        totalPrice,
         username,
         comments: komen,
         orderStatus: 'pending',
