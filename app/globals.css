@@ -562,26 +562,6 @@ a {
   margin-bottom: 14px;
 }
 
-.apk-app-selected-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.apk-app-selected-tags span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 34px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgba(210, 9, 209, 0.1), rgba(23, 153, 242, 0.1));
-  color: #111111;
-  font-size: 0.74rem;
-  font-weight: 700;
-}
-
 .apk-app-order-head {
   display: flex;
   align-items: center;
@@ -701,6 +681,30 @@ a {
 .apk-app-form-field {
   display: grid;
   gap: 8px;
+}
+
+.apk-app-live-total-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.06), rgba(210, 9, 209, 0.06));
+}
+
+.apk-app-live-total-card span {
+  color: rgba(17, 17, 17, 0.68);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.apk-app-live-total-card strong {
+  color: #111111;
+  font-size: 1rem;
+  font-weight: 800;
 }
 
 .apk-app-feedback {

@@ -156,7 +156,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
     setSelectedVariantId(product.variants[0]?.id || '');
     setCheckoutFeedback({
       tone: 'idle',
-      text: `Produk "${product.title}" siap dilanjutkan ke order website.`,
+      text: `Produk "${product.title}" siap dilanjutkan ke order.`,
     });
     setActiveTab('apprem');
     setAppremMode('order');
@@ -175,7 +175,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
     setCheckoutForm((current) => ({ ...current, quantity: '1' }));
     setCheckoutFeedback({
       tone: 'idle',
-      text: `Varian "${variant.title}" siap dilanjutkan ke order website.`,
+      text: `Varian "${variant.title}" siap dilanjutkan ke order.`,
     });
   };
 
@@ -186,7 +186,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
     }
 
     startOrderSubmit(async () => {
-      setCheckoutFeedback({ tone: 'idle', text: 'Membuat order website APK premium...' });
+      setCheckoutFeedback({ tone: 'idle', text: 'Membuat order APK premium...' });
 
       try {
         const response = await fetch('/api/apk-premium/order', {
@@ -217,7 +217,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
         if (!response.ok || !result.status || !result.data?.orderCode) {
           setCheckoutFeedback({
             tone: 'error',
-            text: result.data?.msg || 'Order website belum berhasil dibuat.',
+            text: result.data?.msg || 'Order belum berhasil dibuat.',
           });
           return;
         }
@@ -230,13 +230,13 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
         pushHistory({
           type: 'order',
           title: `${selectedProduct.title} - ${selectedVariant.title}`,
-          detail: `Order website ${result.data.orderCode}`,
+          detail: `Order ${result.data.orderCode}`,
           amountLabel: `Rp ${String(result.data.totalPriceLabel || '0')}`,
         });
       } catch (error) {
         setCheckoutFeedback({
           tone: 'error',
-          text: error instanceof Error ? error.message : 'Order website gagal dibuat.',
+          text: error instanceof Error ? error.message : 'Order gagal dibuat.',
         });
       }
     });
@@ -329,12 +329,6 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                     </div>
                   </div>
 
-                  <div className="apk-app-selected-tags">
-                    <span>{selectedProduct.category}</span>
-                    <span>{selectedProduct.delivery}</span>
-                    <span>{selectedProduct.guarantee}</span>
-                  </div>
-
                   <div className="apk-app-variant-list">
                     {selectedProduct.variants.map((variant) => {
                       const active = selectedVariant.id === variant.id;
@@ -381,13 +375,13 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                       <strong>{selectedQuantity}</strong>
                     </div>
                     <div>
-                      <span>Total Live</span>
+                      <span>Total Bayar</span>
                       <strong>Rp {formatRupiah(selectedTotal)}</strong>
                     </div>
                   </div>
 
                   <div className="apk-app-form-card">
-                    <span className="apk-app-section-label">Order website</span>
+                    <span className="apk-app-section-label">Order</span>
                     <div className="apk-app-form-note">
                       Total akan otomatis berubah mengikuti jumlah yang kamu isi di bawah.
                     </div>
@@ -425,6 +419,11 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                           placeholder="Catatan tambahan"
                         />
                       </label>
+                    </div>
+
+                    <div className="apk-app-live-total-card">
+                      <span>Total Bayar Saat Ini</span>
+                      <strong>Rp {formatRupiah(selectedTotal)}</strong>
                     </div>
 
                     <div className={`apk-app-feedback apk-app-feedback--${checkoutFeedback.tone}`}>
@@ -478,7 +477,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
               <div className="apk-app-panel-head">
                 <div>
                   <span className="apk-app-section-label">Riwayat Transaksi</span>
-                  <h3>Aktivitas order website</h3>
+                  <h3>Aktivitas order</h3>
                 </div>
               </div>
 
@@ -495,7 +494,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                   ))}
                 </div>
               ) : (
-                <div className="apk-app-empty">Belum ada riwayat transaksi. Aktivitas order website akan muncul di sini.</div>
+                <div className="apk-app-empty">Belum ada riwayat transaksi. Aktivitas order akan muncul di sini.</div>
               )}
             </section>
           ) : null}
