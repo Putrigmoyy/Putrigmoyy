@@ -48,6 +48,42 @@ type HistoryItem = {
   updatedAt: string;
 };
 
+type SocialPlatformVisual = {
+  label: string;
+  accent: string;
+  text: string;
+  glyph: string;
+};
+
+type PlatformGroup = SocialPlatformVisual & {
+  key: string;
+  services: NormalizedPusatPanelService[];
+  categories: string[];
+};
+
+const PLATFORM_VISUALS: Array<{ matchers: string[]; visual: SocialPlatformVisual }> = [
+  { matchers: ['instagram', 'ig'], visual: { label: 'Instagram', accent: '#e4408b', text: '#e4408b', glyph: 'IG' } },
+  { matchers: ['tiktok'], visual: { label: 'TikTok', accent: '#111111', text: '#111111', glyph: 'TT' } },
+  { matchers: ['facebook', 'fb'], visual: { label: 'Facebook', accent: '#1877f2', text: '#1877f2', glyph: 'f' } },
+  { matchers: ['whatsapp', 'wa'], visual: { label: 'WhatsApp', accent: '#25d366', text: '#25d366', glyph: 'WA' } },
+  { matchers: ['threads'], visual: { label: 'Threads', accent: '#111111', text: '#111111', glyph: '@' } },
+  { matchers: ['twitter', 'x.com', 'twitter / x', ' x '], visual: { label: 'Twitter / X', accent: '#1d9bf0', text: '#1d9bf0', glyph: 'X' } },
+  { matchers: ['spotify'], visual: { label: 'Spotify', accent: '#1db954', text: '#1db954', glyph: 'SP' } },
+  { matchers: ['discord'], visual: { label: 'Discord', accent: '#5865f2', text: '#5865f2', glyph: 'DS' } },
+  { matchers: ['soundcloud'], visual: { label: 'SoundCloud', accent: '#ff7700', text: '#ff7700', glyph: 'SC' } },
+  { matchers: ['pinterest'], visual: { label: 'Pinterest', accent: '#e60023', text: '#e60023', glyph: 'P' } },
+  { matchers: ['quora'], visual: { label: 'Quora', accent: '#b92b27', text: '#b92b27', glyph: 'Q' } },
+  { matchers: ['mobile app install', 'app install'], visual: { label: 'Mobile App Install', accent: '#17a65b', text: '#17a65b', glyph: 'AI' } },
+  { matchers: ['linkedin'], visual: { label: 'LinkedIn', accent: '#0a66c2', text: '#0a66c2', glyph: 'in' } },
+  { matchers: ['likee'], visual: { label: 'Likee', accent: '#ff6680', text: '#ff6680', glyph: 'LK' } },
+  { matchers: ['dailymotion'], visual: { label: 'Dailymotion', accent: '#0066dc', text: '#0066dc', glyph: 'dm' } },
+  { matchers: ['audiomack'], visual: { label: 'Audiomack', accent: '#ff9900', text: '#ff9900', glyph: 'AM' } },
+  { matchers: ['youtube', 'yt'], visual: { label: 'YouTube', accent: '#ff0000', text: '#ff0000', glyph: 'YT' } },
+  { matchers: ['telegram'], visual: { label: 'Telegram', accent: '#27a7e7', text: '#27a7e7', glyph: 'TG' } },
+  { matchers: ['shopee'], visual: { label: 'Shopee', accent: '#ee4d2d', text: '#ee4d2d', glyph: 'SH' } },
+  { matchers: ['tokopedia'], visual: { label: 'Tokopedia', accent: '#03ac0e', text: '#03ac0e', glyph: 'TP' } },
+];
+
 function buildMenuTypeTitle(menuType: string) {
   if (menuType === '2') return 'Custom Comments';
   if (menuType === '3') return 'Comment Likes';
@@ -70,6 +106,40 @@ function createInitialOrderForm(service?: NormalizedPusatPanelService | null) {
     quantity: service ? String(Math.max(0, service.min || 0)) : '',
     username: '',
     comments: '',
+    emailNotification: '',
+  };
+}
+
+function titleCaseWords(value: string) {
+  return String(value || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function detectPlatformVisual(service: NormalizedPusatPanelService): SocialPlatformVisual {
+  const haystack = `${service.category} ${service.name} ${service.note}`.toLowerCase();
+  const match = PLATFORM_VISUALS.find((entry) => entry.matchers.some((matcher) => haystack.includes(matcher)));
+  if (match) {
+    return match.visual;
+  }
+
+  const source = service.category || service.name || 'General';
+  const primaryLabel = titleCaseWords(source.split(/[-|/]/)[0] || source) || 'General';
+  const glyph = primaryLabel
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('')
+    .slice(0, 2);
+
+  return {
+    label: primaryLabel,
+    accent: '#1799f2',
+    text: '#1799f2',
+    glyph: glyph || 'SM',
   };
 }
 
@@ -131,10 +201,9 @@ function SocialNavGlyph({ type }: { type: SocialTab }) {
 export function SocialMediaBrowser({ profile, providerMeta, services, categories }: Props) {
   const [activeTab, setActiveTab] = useState<SocialTab>('sosmed');
   const [query, setQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('Semua');
-  const [activeMenuType, setActiveMenuType] = useState('Semua');
-  const [sosmedMode, setSosmedMode] = useState<'catalog' | 'order'>('catalog');
-  const [selectedServiceId, setSelectedServiceId] = useState(services[0]?.id || '');
+  const [selectedPlatformKey, setSelectedPlatformKey] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedServiceId, setSelectedServiceId] = useState('');
   const [orderForm, setOrderForm] = useState(createInitialOrderForm(services[0] || null));
   const [orderFeedback, setOrderFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
     tone: 'idle',
@@ -152,8 +221,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const [isCheckingStatus, startStatusCheck] = useTransition();
   const [isRefreshingHistory, startHistoryRefresh] = useTransition();
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
-
-  const menuTypeOptions = useMemo(() => ['Semua', ...Array.from(new Set(services.map((service) => service.menuType).filter(Boolean)))], [services]);
 
   useEffect(() => {
     const previousPaddingBottom = document.body.style.paddingBottom;
@@ -195,45 +262,102 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     refreshHistory();
   }, []);
 
-  const filteredServices = services.filter((service) => {
-    const matchesCategory = activeCategory === 'Semua' || service.category === activeCategory;
-    const matchesMenuType = activeMenuType === 'Semua' || service.menuType === activeMenuType;
-    const haystack = [service.name, service.category, service.note, service.logoType, service.speed].join(' ').toLowerCase();
-    const matchesQuery = !deferredQuery || haystack.includes(deferredQuery);
-    return matchesCategory && matchesMenuType && matchesQuery;
-  });
+  const platformGroups = useMemo<PlatformGroup[]>(() => {
+    const buckets = new Map<string, PlatformGroup>();
+    for (const service of services) {
+      const visual = detectPlatformVisual(service);
+      const key = visual.label.toLowerCase();
+      const existing = buckets.get(key);
+      if (existing) {
+        existing.services.push(service);
+        if (!existing.categories.includes(service.category)) {
+          existing.categories.push(service.category);
+        }
+      } else {
+        buckets.set(key, {
+          key,
+          ...visual,
+          services: [service],
+          categories: [service.category],
+        });
+      }
+    }
+
+    return Array.from(buckets.values())
+      .map((group) => ({
+        ...group,
+        categories: group.categories.sort((left, right) => left.localeCompare(right, 'id')),
+        services: group.services.sort((left, right) => left.name.localeCompare(right.name, 'id')),
+      }))
+      .sort((left, right) => left.label.localeCompare(right.label, 'id'));
+  }, [services]);
+
+  useEffect(() => {
+    if (!platformGroups.length) {
+      setSelectedPlatformKey('');
+      return;
+    }
+    setSelectedPlatformKey((current) => (platformGroups.some((group) => group.key === current) ? current : platformGroups[0].key));
+  }, [platformGroups]);
+
+  const activePlatform = platformGroups.find((group) => group.key === selectedPlatformKey) || platformGroups[0] || null;
+
+  useEffect(() => {
+    if (!activePlatform) {
+      setSelectedCategory('');
+      return;
+    }
+    setSelectedCategory((current) => (current && activePlatform.categories.includes(current) ? current : activePlatform.categories[0] || ''));
+  }, [activePlatform]);
+
+  const platformServices = useMemo(() => {
+    if (!activePlatform) return [];
+    return activePlatform.services.filter((service) => {
+      const matchesCategory = !selectedCategory || service.category === selectedCategory;
+      const haystack = [service.name, service.category, service.note, service.logoType, service.speed].join(' ').toLowerCase();
+      const matchesQuery = !deferredQuery || haystack.includes(deferredQuery);
+      return matchesCategory && matchesQuery;
+    });
+  }, [activePlatform, selectedCategory, deferredQuery]);
+
+  useEffect(() => {
+    const nextService = platformServices.find((service) => service.id === selectedServiceId) || platformServices[0] || null;
+    setSelectedServiceId(nextService?.id || '');
+    if (nextService) {
+      setOrderForm((prev) => ({
+        ...prev,
+        quantity: nextService.menuType === '4' ? '' : prev.quantity && nextService.id === selectedServiceId ? prev.quantity : String(Math.max(0, nextService.min || 0)),
+      }));
+    }
+  }, [platformServices, selectedServiceId]);
 
   const selectedService =
-    filteredServices.find((service) => service.id === selectedServiceId) ||
+    platformServices.find((service) => service.id === selectedServiceId) ||
     services.find((service) => service.id === selectedServiceId) ||
-    filteredServices[0] ||
+    platformServices[0] ||
     services[0] ||
     null;
 
-  const summaryStats = {
-    totalServices: services.length,
-    totalCategories: categories.length,
-    avgPrice: services.length ? Math.round(services.reduce((sum, service) => sum + service.price, 0) / services.length) : 0,
-  };
+  const calculatedQuantity = useMemo(() => {
+    if (!selectedService) return 0;
+    if (selectedService.menuType === '4') return 1;
+    if (selectedService.menuType === '2') {
+      const totalComments = orderForm.comments
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean).length;
+      return totalComments || 0;
+    }
+    const parsed = Number(orderForm.quantity || 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }, [orderForm.comments, orderForm.quantity, selectedService]);
 
-  const pickService = (service: NormalizedPusatPanelService) => {
-    setSelectedServiceId(service.id);
-    setOrderForm(createInitialOrderForm(service));
-    setOrderFeedback({
-      tone: 'idle',
-      text: `Layanan "${service.name}" siap dilanjutkan ke order provider.`,
-    });
-    setActiveTab('sosmed');
-    setSosmedMode('order');
-  };
-
-  const backToCatalog = () => {
-    setSosmedMode('catalog');
-    setOrderFeedback({
-      tone: 'idle',
-      text: 'Pilih layanan social media langsung dari katalog live provider.',
-    });
-  };
+  const liveTotal = useMemo(() => {
+    if (!selectedService) return 0;
+    if (selectedService.menuType === '4') return selectedService.price;
+    const units = Math.max(0, calculatedQuantity);
+    return selectedService.price * units;
+  }, [calculatedQuantity, selectedService]);
 
   const submitOrder = () => {
     if (!selectedService) {
@@ -358,213 +482,184 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
         <div className="apk-app-content apk-app-content--tight">
           {activeTab === 'sosmed' ? (
             <section className="apk-app-panel apk-app-panel--plain">
-              {sosmedMode === 'catalog' ? (
+              {activePlatform ? (
                 <>
-                  <label className="apk-app-search apk-app-search--top">
-                    <span>Cari layanan social media</span>
-                    <input
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Cari followers, views, likes, subscribers"
-                    />
-                  </label>
-
-                  <div className="apk-app-inline-stats">
-                    {categories.slice(0, 8).map((category) => (
-                      <span key={category}>{category}</span>
-                    ))}
-                  </div>
-
-                  <div className="smm-mini-summary">
+                  <div className="apk-app-panel-head">
                     <div>
-                      <span>Total layanan</span>
-                      <strong>{summaryStats.totalServices.toLocaleString('id-ID')}</strong>
-                    </div>
-                    <div>
-                      <span>Kategori</span>
-                      <strong>{summaryStats.totalCategories.toLocaleString('id-ID')}</strong>
-                    </div>
-                    <div>
-                      <span>Avg harga</span>
-                      <strong>Rp {summaryStats.avgPrice.toLocaleString('id-ID')}</strong>
-                    </div>
-                  </div>
-
-                  <div className="chip-scroller">
-                    <button
-                      type="button"
-                      className={activeCategory === 'Semua' ? 'catalog-chip catalog-chip--active' : 'catalog-chip'}
-                      onClick={() => setActiveCategory('Semua')}
-                    >
-                      Semua
-                    </button>
-                    {categories.map((category) => (
-                      <button
-                        key={category}
-                        type="button"
-                        className={activeCategory === category ? 'catalog-chip catalog-chip--active' : 'catalog-chip'}
-                        onClick={() => setActiveCategory(category)}
-                      >
-                        {category}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="chip-scroller chip-scroller--secondary">
-                    {menuTypeOptions.map((menuType) => (
-                      <button
-                        key={menuType}
-                        type="button"
-                        className={activeMenuType === menuType ? 'catalog-chip catalog-chip--secondary-active' : 'catalog-chip catalog-chip--secondary'}
-                        onClick={() => setActiveMenuType(menuType)}
-                      >
-                        {menuType === 'Semua' ? 'Semua Menu' : `Menu ${menuType}`}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="smm-app-service-list">
-                    {filteredServices.map((service) => (
-                      <button
-                        key={service.id}
-                        type="button"
-                        className="smm-app-service-card"
-                        onClick={() => pickService(service)}
-                      >
-                        <div className="smm-app-service-top">
-                          <span className="service-logo-pill">{service.logoType}</span>
-                          <span className="service-id-pill">ID {service.id}</span>
-                        </div>
-                        <strong>{service.name}</strong>
-                        <small>{service.category}</small>
-                        <div className="smm-app-service-meta">
-                          <span>{buildMenuTypeTitle(service.menuType)}</span>
-                          <span>{service.speed}</span>
-                        </div>
-                        <div className="smm-app-service-stats">
-                          <div>
-                            <span>Harga</span>
-                            <strong>Rp {service.priceLabel}</strong>
-                          </div>
-                          <div>
-                            <span>Min</span>
-                            <strong>{service.min.toLocaleString('id-ID')}</strong>
-                          </div>
-                          <div>
-                            <span>Max</span>
-                            <strong>{service.max.toLocaleString('id-ID')}</strong>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-
-                  {filteredServices.length === 0 ? <div className="apk-app-empty">Tidak ada layanan yang cocok dengan pencarian ini.</div> : null}
-                </>
-              ) : selectedService ? (
-                <>
-                  <div className="apk-app-order-head">
-                    <button type="button" className="apk-app-back-button" onClick={backToCatalog}>
-                      Kembali
-                    </button>
-                    <div className="apk-app-order-head-copy">
                       <span className="apk-app-section-label">Kebutuhan Social Media</span>
-                      <h3>{selectedService.name}</h3>
+                      <h3>Pilih Platform & Layanan</h3>
+                      <p className="smm-platform-copy">Klik salah satu logo platform untuk memuat kategori layanan dari API provider secara langsung.</p>
                     </div>
                   </div>
 
-                  <div className="apk-app-selected-card">
-                    <div className="apk-app-selected-copy apk-app-selected-copy--wide">
-                      <strong>{selectedService.name}</strong>
-                      <small>{selectedService.category} - Menu {selectedService.menuType}</small>
-                    </div>
+                  <div className="smm-platform-grid">
+                    {platformGroups.map((platform) => (
+                      <button
+                        key={platform.key}
+                        type="button"
+                        className={platform.key === activePlatform.key ? 'smm-platform-card smm-platform-card--active' : 'smm-platform-card'}
+                        onClick={() => setSelectedPlatformKey(platform.key)}
+                      >
+                        <span className="smm-platform-icon" style={{ background: platform.accent, boxShadow: `0 12px 28px ${platform.accent}28` }}>
+                          {platform.glyph}
+                        </span>
+                        <span className="smm-platform-label">{platform.label}</span>
+                      </button>
+                    ))}
                   </div>
 
-                  <div className="apk-app-info-card smm-order-summary">
-                    <div>
-                      <span>Harga</span>
-                      <strong>Rp {selectedService.priceLabel}</strong>
+                  <div className="smm-stage-card">
+                    <div className="smm-stage-platform">
+                      <span className="smm-platform-icon smm-platform-icon--large" style={{ background: activePlatform.accent, boxShadow: `0 12px 28px ${activePlatform.accent}28` }}>
+                        {activePlatform.glyph}
+                      </span>
+                      <strong>{activePlatform.label}</strong>
                     </div>
-                    <div>
-                      <span>Min</span>
-                      <strong>{selectedService.min.toLocaleString('id-ID')}</strong>
-                    </div>
-                    <div>
-                      <span>Max</span>
-                      <strong>{selectedService.max.toLocaleString('id-ID')}</strong>
-                    </div>
-                    <div>
-                      <span>Tipe</span>
-                      <strong>{buildMenuTypeTitle(selectedService.menuType)}</strong>
-                    </div>
-                  </div>
 
-                  <div className="apk-app-inline-helper">
-                    {buildMenuTypeHint(selectedService.menuType)}
+                    <label className="apk-app-search apk-app-search--top">
+                      <span>Cari layanan di platform ini</span>
+                      <input
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder={`Cari ${activePlatform.label.toLowerCase()} followers, likes, views`}
+                      />
+                    </label>
                   </div>
 
                   <div className="apk-app-form-card">
-                    <span className="apk-app-section-label">Order</span>
-                    <div className="apk-app-form-grid">
+                    <span className="apk-app-section-label">Kategori Layanan</span>
+                    <div className="smm-select-stack">
                       <label className="apk-app-form-field">
-                        <span>Target / data</span>
-                        <input
-                          value={orderForm.data}
-                          onChange={(event) => setOrderForm((prev) => ({ ...prev, data: event.target.value }))}
-                          placeholder="Link post, username, atau target layanan"
-                        />
+                        <span>Pilih kategori layanan</span>
+                        <select
+                          value={selectedCategory}
+                          onChange={(event) => setSelectedCategory(event.target.value)}
+                          className="smm-select"
+                        >
+                          {activePlatform.categories.map((category) => (
+                            <option key={category} value={category}>
+                              {category}
+                            </option>
+                          ))}
+                        </select>
                       </label>
-
-                      {selectedService.menuType !== '4' && selectedService.menuType !== '2' ? (
-                        <label className="apk-app-form-field">
-                          <span>Quantity</span>
-                          <input
-                            value={orderForm.quantity}
-                            onChange={(event) => setOrderForm((prev) => ({ ...prev, quantity: event.target.value.replace(/[^\d]/g, '') }))}
-                            placeholder={`Minimal ${selectedService.min}`}
-                          />
-                        </label>
-                      ) : null}
-
-                      {selectedService.menuType === '3' ? (
-                        <label className="apk-app-form-field">
-                          <span>Username komentar</span>
-                          <input
-                            value={orderForm.username}
-                            onChange={(event) => setOrderForm((prev) => ({ ...prev, username: event.target.value }))}
-                            placeholder="Username pemilik komentar"
-                          />
-                        </label>
-                      ) : null}
-
-                      {selectedService.menuType === '2' || selectedService.menuType === '5' ? (
-                        <label className="apk-app-form-field">
-                          <span>{selectedService.menuType === '2' ? 'Daftar komentar' : 'Daftar keyword / komen'}</span>
-                          <textarea
-                            value={orderForm.comments}
-                            onChange={(event) => setOrderForm((prev) => ({ ...prev, comments: event.target.value }))}
-                            rows={6}
-                            placeholder={selectedService.menuType === '2' ? 'Satu komentar per baris' : 'Satu keyword per baris'}
-                          />
-                        </label>
-                      ) : null}
-                    </div>
-
-                    {orderFeedback.tone !== 'idle' ? (
-                      <div className={`apk-app-feedback apk-app-feedback--${orderFeedback.tone}`}>
-                        {orderFeedback.text}
-                      </div>
-                    ) : null}
-
-                    <div className="apk-app-action-row">
-                      <button type="button" className="apk-app-primary-button" onClick={submitOrder} disabled={isOrdering}>
-                        {isOrdering ? 'Mengirim...' : 'Kirim Order'}
-                      </button>
-                      <button type="button" className="apk-app-ghost-button" onClick={backToCatalog}>
-                        Pilih Layanan Lain
-                      </button>
                     </div>
                   </div>
+
+                  <div className="apk-app-form-card">
+                    <span className="apk-app-section-label">Pilih Layanan</span>
+                    <div className="smm-select-stack">
+                      <label className="apk-app-form-field">
+                        <span>Pilih layanan</span>
+                        <select
+                          value={selectedService?.id || ''}
+                          onChange={(event) => setSelectedServiceId(event.target.value)}
+                          className="smm-select"
+                        >
+                          {platformServices.map((service) => (
+                            <option key={service.id} value={service.id}>
+                              {service.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    {platformServices.length === 0 ? <div className="apk-app-empty">Tidak ada layanan yang cocok di platform ini.</div> : null}
+                  </div>
+
+                  {selectedService ? (
+                    <div className="apk-app-form-card">
+                      <span className="apk-app-section-label">Data Pesanan</span>
+                      <div className="apk-app-form-grid">
+                        <label className="apk-app-form-field">
+                          <span>Target (URL/Username)</span>
+                          <input
+                            value={orderForm.data}
+                            onChange={(event) => setOrderForm((prev) => ({ ...prev, data: event.target.value }))}
+                            placeholder="Masukkan link/username target"
+                          />
+                        </label>
+
+                        {selectedService.menuType !== '4' && selectedService.menuType !== '2' ? (
+                          <label className="apk-app-form-field">
+                            <span>Jumlah</span>
+                            <input
+                              value={orderForm.quantity}
+                              onChange={(event) => setOrderForm((prev) => ({ ...prev, quantity: event.target.value.replace(/[^\d]/g, '') }))}
+                              placeholder={`Minimal ${selectedService.min.toLocaleString('id-ID')}`}
+                            />
+                          </label>
+                        ) : null}
+
+                        <label className="apk-app-form-field">
+                          <span>Email Notifikasi</span>
+                          <input
+                            value={orderForm.emailNotification}
+                            onChange={(event) => setOrderForm((prev) => ({ ...prev, emailNotification: event.target.value }))}
+                            placeholder="Masukkan email penerima notifikasi"
+                          />
+                        </label>
+
+                        {selectedService.menuType === '3' ? (
+                          <label className="apk-app-form-field">
+                            <span>Username komentar</span>
+                            <input
+                              value={orderForm.username}
+                              onChange={(event) => setOrderForm((prev) => ({ ...prev, username: event.target.value }))}
+                              placeholder="Username pemilik komentar"
+                            />
+                          </label>
+                        ) : null}
+
+                        {selectedService.menuType === '2' || selectedService.menuType === '5' ? (
+                          <label className="apk-app-form-field">
+                            <span>{selectedService.menuType === '2' ? 'Daftar komentar' : 'Daftar keyword / komen'}</span>
+                            <textarea
+                              value={orderForm.comments}
+                              onChange={(event) => setOrderForm((prev) => ({ ...prev, comments: event.target.value }))}
+                              rows={6}
+                              placeholder={selectedService.menuType === '2' ? 'Satu komentar per baris' : 'Satu keyword per baris'}
+                            />
+                          </label>
+                        ) : null}
+                      </div>
+
+                      <div className="smm-order-summary-card">
+                        <div>
+                          <span>Harga per unit</span>
+                          <strong>Rp {selectedService.priceLabel}</strong>
+                        </div>
+                        <div>
+                          <span>Tipe layanan</span>
+                          <strong>{buildMenuTypeTitle(selectedService.menuType)}</strong>
+                        </div>
+                        <div>
+                          <span>Min / Max</span>
+                          <strong>
+                            {selectedService.min.toLocaleString('id-ID')} / {selectedService.max.toLocaleString('id-ID')}
+                          </strong>
+                        </div>
+                        <div>
+                          <span>Total Harga</span>
+                          <strong>Rp {liveTotal.toLocaleString('id-ID')}</strong>
+                        </div>
+                      </div>
+
+                      <div className="apk-app-inline-helper">{buildMenuTypeHint(selectedService.menuType)}</div>
+
+                      {orderFeedback.tone !== 'idle' ? (
+                        <div className={`apk-app-feedback apk-app-feedback--${orderFeedback.tone}`}>
+                          {orderFeedback.text}
+                        </div>
+                      ) : null}
+
+                      <div className="apk-app-action-row">
+                        <button type="button" className="apk-app-primary-button" onClick={submitOrder} disabled={isOrdering}>
+                          {isOrdering ? 'Mengirim...' : 'Lanjutkan Pembayaran'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </>
               ) : (
                 <div className="apk-app-empty">Belum ada layanan dari provider yang bisa dipilih.</div>

@@ -891,6 +891,155 @@ a {
   margin-top: 14px;
 }
 
+.smm-platform-copy {
+  margin: 10px 0 0;
+  color: rgba(17, 17, 17, 0.68);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.smm-platform-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.smm-platform-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 14px;
+  border: 1px solid rgba(17, 17, 17, 0.1);
+  border-radius: 18px;
+  background: #ffffff;
+  color: #111111;
+  text-align: left;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.smm-platform-card:active {
+  transform: scale(0.985);
+}
+
+.smm-platform-card--active {
+  border-color: rgba(82, 92, 255, 0.5);
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.08), rgba(210, 9, 209, 0.08));
+  box-shadow: 0 16px 30px rgba(23, 153, 242, 0.12);
+}
+
+.smm-platform-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+.smm-platform-icon--large {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  font-size: 0.96rem;
+}
+
+.smm-platform-label {
+  color: #111111;
+  font-size: 0.96rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.smm-stage-card {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(23, 153, 242, 0.03), rgba(210, 9, 209, 0.03));
+}
+
+.smm-stage-platform {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.smm-stage-platform strong {
+  color: #111111;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.smm-select-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.smm-select {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 42px 0 14px;
+  border: 1px solid rgba(23, 153, 242, 0.14);
+  border-radius: 18px;
+  background:
+    linear-gradient(45deg, transparent 50%, #8aa0b8 50%),
+    linear-gradient(135deg, #8aa0b8 50%, transparent 50%),
+    linear-gradient(to right, transparent, transparent);
+  background-position:
+    calc(100% - 22px) calc(50% - 3px),
+    calc(100% - 14px) calc(50% - 3px),
+    100% 0;
+  background-size: 8px 8px, 8px 8px, 2.5em 2.5em;
+  background-repeat: no-repeat;
+  appearance: none;
+  color: #111111;
+  font: inherit;
+  font-size: 0.98rem;
+  outline: none;
+}
+
+.smm-select:focus {
+  border-color: rgba(210, 9, 209, 0.38);
+  box-shadow: 0 0 0 4px rgba(23, 153, 242, 0.08);
+}
+
+.smm-order-summary-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.smm-order-summary-card div {
+  padding: 14px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.smm-order-summary-card span {
+  display: block;
+  color: rgba(17, 17, 17, 0.64);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.smm-order-summary-card strong {
+  display: block;
+  margin-top: 6px;
+  color: #111111;
+  font-size: 0.94rem;
+}
+
 .smm-app-service-card {
   display: grid;
   gap: 10px;
@@ -1186,7 +1335,8 @@ a {
 
   .smm-order-summary,
   .smm-status-grid,
-  .smm-provider-grid {
+  .smm-provider-grid,
+  .smm-order-summary-card {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
