@@ -166,22 +166,6 @@ const REMOTE_LOGO_MAP: Record<string, string> = {
 };
 const WEBSITE_ACCOUNT_SESSION_KEY = 'putrigmoyy_apk_account_session_v1';
 
-function buildMenuTypeTitle(menuType: string) {
-  if (menuType === '2') return 'Custom Comments';
-  if (menuType === '3') return 'Comment Likes';
-  if (menuType === '4') return 'Package';
-  if (menuType === '5') return 'SEO';
-  return 'Default';
-}
-
-function buildMenuTypeHint(menuType: string) {
-  if (menuType === '2') return 'Isi target lalu komentar dipisah per baris.';
-  if (menuType === '3') return 'Isi target, quantity, dan username pemilik komentar.';
-  if (menuType === '4') return 'Isi target tanpa quantity tambahan.';
-  if (menuType === '5') return 'Isi target, quantity, lalu keyword per baris.';
-  return 'Isi target dan quantity sesuai batas min dan max.';
-}
-
 function createInitialOrderForm(service?: NormalizedPusatPanelService | null) {
   return {
     data: '',
@@ -320,6 +304,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const [selectedPlatformKey, setSelectedPlatformKey] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedServiceId, setSelectedServiceId] = useState('');
+  const [categoryQuery, setCategoryQuery] = useState('');
+  const [serviceQuery, setServiceQuery] = useState('');
   const [orderForm, setOrderForm] = useState(createInitialOrderForm(services[0] || null));
   const [orderFeedback, setOrderFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
     tone: 'idle',
@@ -502,6 +488,21 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     setSelectedCategory((current) => (current && activePlatform.categories.includes(current) ? current : activePlatform.categories[0] || ''));
   }, [activePlatform]);
 
+  useEffect(() => {
+    setCategoryQuery('');
+    setServiceQuery('');
+  }, [selectedPlatformKey]);
+
+  useEffect(() => {
+    setServiceQuery('');
+  }, [selectedCategory]);
+
+  const filteredCategories = useMemo(() => {
+    if (!activePlatform) return [];
+    const query = categoryQuery.trim().toLowerCase();
+    return activePlatform.categories.filter((category) => !query || category.toLowerCase().includes(query));
+  }, [activePlatform, categoryQuery]);
+
   const platformServices = useMemo(() => {
     if (!activePlatform) return [];
     return activePlatform.services.filter((service) => {
@@ -510,8 +511,17 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     });
   }, [activePlatform, selectedCategory]);
 
+  const filteredServices = useMemo(() => {
+    const query = serviceQuery.trim().toLowerCase();
+    return platformServices.filter((service) => {
+      if (!query) return true;
+      const haystack = `${service.name} ${service.category} ${service.note}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [platformServices, serviceQuery]);
+
   useEffect(() => {
-    const nextService = platformServices.find((service) => service.id === selectedServiceId) || platformServices[0] || null;
+    const nextService = filteredServices.find((service) => service.id === selectedServiceId) || filteredServices[0] || null;
     setSelectedServiceId(nextService?.id || '');
     if (nextService) {
       setOrderForm((prev) => ({
@@ -519,13 +529,12 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
         quantity: nextService.menuType === '4' ? '' : prev.quantity && nextService.id === selectedServiceId ? prev.quantity : String(Math.max(0, nextService.min || 0)),
       }));
     }
-  }, [platformServices, selectedServiceId]);
+  }, [filteredServices, selectedServiceId]);
 
   const selectedService =
+    filteredServices.find((service) => service.id === selectedServiceId) ||
     platformServices.find((service) => service.id === selectedServiceId) ||
-    services.find((service) => service.id === selectedServiceId) ||
-    platformServices[0] ||
-    services[0] ||
+    filteredServices[0] ||
     null;
 
   const calculatedQuantity = useMemo(() => {
@@ -732,19 +741,35 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                     </div>
                     <div className="smm-select-stack">
                       <label className="apk-app-form-field">
-                        <span>Pilih kategori layanan</span>
-                        <select
-                          value={selectedCategory}
-                          onChange={(event) => setSelectedCategory(event.target.value)}
-                          className="smm-select"
-                        >
-                          {activePlatform.categories.map((category) => (
-                            <option key={category} value={category}>
-                              {category}
-                            </option>
-                          ))}
-                        </select>
+                        <span>Cari kategori layanan</span>
+                        <input
+                          value={categoryQuery}
+                          onChange={(event) => setCategoryQuery(event.target.value)}
+                          placeholder="Cari kategori yang sesuai"
+                        />
                       </label>
+                      <div className="smm-manual-list">
+                        {filteredCategories.length ? (
+                          filteredCategories.map((category) => {
+                            const totalServices = activePlatform.services.filter((service) => service.category === category).length;
+                            return (
+                              <button
+                                key={category}
+                                type="button"
+                                className={selectedCategory === category ? 'smm-manual-item smm-manual-item--active' : 'smm-manual-item'}
+                                onClick={() => setSelectedCategory(category)}
+                              >
+                                <div className="smm-manual-item-copy">
+                                  <strong>{category}</strong>
+                                  <span>{totalServices.toLocaleString('id-ID')} layanan</span>
+                                </div>
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <div className="apk-app-empty">Kategori yang kamu cari belum ada di platform ini.</div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -752,19 +777,35 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                     <span className="apk-app-section-label">Pilih Layanan</span>
                     <div className="smm-select-stack">
                       <label className="apk-app-form-field">
-                        <span>Pilih layanan</span>
-                        <select
-                          value={selectedService?.id || ''}
-                          onChange={(event) => setSelectedServiceId(event.target.value)}
-                          className="smm-select"
-                        >
-                          {platformServices.map((service) => (
-                            <option key={service.id} value={service.id}>
-                              {service.name}
-                            </option>
-                          ))}
-                        </select>
+                        <span>Cari layanan</span>
+                        <input
+                          value={serviceQuery}
+                          onChange={(event) => setServiceQuery(event.target.value)}
+                          placeholder="Cari nama layanan"
+                        />
                       </label>
+                      <div className="smm-manual-list smm-manual-list--service">
+                        {filteredServices.length ? (
+                          filteredServices.map((service) => (
+                            <button
+                              key={service.id}
+                              type="button"
+                              className={selectedService?.id === service.id ? 'smm-manual-item smm-manual-item--active' : 'smm-manual-item'}
+                              onClick={() => setSelectedServiceId(service.id)}
+                            >
+                              <div className="smm-manual-item-copy">
+                                <strong>{service.name}</strong>
+                                <span>Rp {service.priceLabel} / 1000</span>
+                              </div>
+                              <small>
+                                Min {service.min.toLocaleString('id-ID')} • Max {service.max.toLocaleString('id-ID')}
+                              </small>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="apk-app-empty">Layanan yang kamu cari belum ada di kategori ini.</div>
+                        )}
+                      </div>
                     </div>
                     {platformServices.length === 0 ? <div className="apk-app-empty">Tidak ada layanan yang cocok di platform ini.</div> : null}
                   </div>
@@ -772,6 +813,26 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                   {selectedService ? (
                     <div className="apk-app-form-card">
                       <span className="apk-app-section-label">Data Pesanan</span>
+                      <div className="smm-order-summary-card">
+                        <div>
+                          <span>Harga / 1000</span>
+                          <strong>Rp {selectedService.priceLabel}</strong>
+                        </div>
+                        <div>
+                          <span>Min Order</span>
+                          <strong>{selectedService.min.toLocaleString('id-ID')}</strong>
+                        </div>
+                        <div>
+                          <span>Max Order</span>
+                          <strong>{selectedService.max.toLocaleString('id-ID')}</strong>
+                        </div>
+                      </div>
+
+                      <div className="smm-service-note-card">
+                        <span>Deskripsi Layanan</span>
+                        <p>{selectedService.note || 'Deskripsi layanan belum tersedia dari provider.'}</p>
+                      </div>
+
                       <div className="apk-app-form-grid">
                         <label className="apk-app-form-field">
                           <span>Target (URL/Username)</span>
@@ -802,6 +863,11 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                           />
                         </label>
 
+                        <label className="apk-app-form-field">
+                          <span>Total Harga</span>
+                          <input value={`Rp ${liveTotal.toLocaleString('id-ID')}`} readOnly className="smm-readonly-input" />
+                        </label>
+
                         {selectedService.menuType === '3' ? (
                           <label className="apk-app-form-field">
                             <span>Username komentar</span>
@@ -825,29 +891,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                           </label>
                         ) : null}
                       </div>
-
-                      <div className="smm-order-summary-card">
-                        <div>
-                          <span>Harga per unit</span>
-                          <strong>Rp {selectedService.priceLabel}</strong>
-                        </div>
-                        <div>
-                          <span>Tipe layanan</span>
-                          <strong>{buildMenuTypeTitle(selectedService.menuType)}</strong>
-                        </div>
-                        <div>
-                          <span>Min / Max</span>
-                          <strong>
-                            {selectedService.min.toLocaleString('id-ID')} / {selectedService.max.toLocaleString('id-ID')}
-                          </strong>
-                        </div>
-                        <div>
-                          <span>Total Harga</span>
-                          <strong>Rp {liveTotal.toLocaleString('id-ID')}</strong>
-                        </div>
-                      </div>
-
-                      <div className="apk-app-inline-helper">{buildMenuTypeHint(selectedService.menuType)}</div>
 
                       {orderFeedback.tone !== 'idle' ? (
                         <div className={`apk-app-feedback apk-app-feedback--${orderFeedback.tone}`}>

@@ -1001,18 +1001,18 @@ a {
 .smm-platform-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 14px;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .smm-platform-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 64px;
-  padding: 12px 14px;
+  gap: 10px;
+  min-height: 54px;
+  padding: 10px 11px;
   border: 1px solid rgba(17, 17, 17, 0.1);
-  border-radius: 18px;
+  border-radius: 16px;
   background: #ffffff;
   color: #111111;
   text-align: left;
@@ -1026,53 +1026,53 @@ a {
 .smm-platform-card--active {
   border-color: rgba(82, 92, 255, 0.5);
   background: linear-gradient(135deg, rgba(23, 153, 242, 0.08), rgba(210, 9, 209, 0.08));
-  box-shadow: 0 16px 30px rgba(23, 153, 242, 0.12);
+  box-shadow: 0 12px 24px rgba(23, 153, 242, 0.1);
 }
 
 .smm-platform-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   color: #ffffff;
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   flex-shrink: 0;
 }
 
 .smm-platform-icon svg {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   display: block;
 }
 
 .smm-platform-icon img {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   display: block;
   object-fit: contain;
-  border-radius: 6px;
+  border-radius: 5px;
   background: #ffffff;
 }
 
 .smm-platform-icon--large {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   font-size: 0.96rem;
 }
 
 .smm-platform-icon--large svg {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
 }
 
 .smm-platform-icon--large img {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
 }
 
 .smm-platform-fallback {
@@ -1085,7 +1085,7 @@ a {
 
 .smm-platform-label {
   color: #111111;
-  font-size: 0.96rem;
+  font-size: 0.86rem;
   font-weight: 700;
   line-height: 1.3;
 }
@@ -1107,7 +1107,10 @@ a {
 }
 
 .smm-stage-platform--inline {
-  margin-bottom: 16px;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  justify-items: start;
+  margin-bottom: 14px;
 }
 
 .smm-stage-platform strong {
@@ -1119,6 +1122,72 @@ a {
 .smm-select-stack {
   display: grid;
   gap: 14px;
+}
+
+.smm-manual-list {
+  display: grid;
+  gap: 10px;
+  max-height: 232px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.smm-manual-list--service {
+  max-height: 284px;
+}
+
+.smm-manual-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 58px;
+  padding: 12px 14px;
+  border: 1px solid rgba(23, 153, 242, 0.14);
+  border-radius: 18px;
+  background: #ffffff;
+  color: #111111;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.smm-manual-item:active {
+  transform: scale(0.986);
+}
+
+.smm-manual-item--active {
+  border-color: rgba(210, 9, 209, 0.24);
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.07), rgba(210, 9, 209, 0.08));
+  box-shadow: 0 12px 22px rgba(23, 153, 242, 0.08);
+}
+
+.smm-manual-item-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.smm-manual-item-copy strong,
+.smm-manual-item small {
+  color: #111111;
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.smm-manual-item-copy span {
+  color: rgba(17, 17, 17, 0.62);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.smm-manual-item small {
+  color: rgba(17, 17, 17, 0.62);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: right;
 }
 
 .smm-select {
@@ -1151,7 +1220,7 @@ a {
 
 .smm-order-summary-card {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
   margin-top: 16px;
 }
@@ -1175,6 +1244,40 @@ a {
   margin-top: 6px;
   color: #111111;
   font-size: 0.94rem;
+}
+
+.smm-service-note-card {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.05), rgba(210, 9, 209, 0.05));
+}
+
+.smm-service-note-card span {
+  display: block;
+  color: rgba(17, 17, 17, 0.64);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.smm-service-note-card p {
+  margin: 8px 0 0;
+  color: #111111;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.apk-app-form-field input.smm-readonly-input {
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.05), rgba(210, 9, 209, 0.05));
+  font-weight: 800;
+  cursor: default;
+}
+
+.apk-app-form-field input.smm-readonly-input:focus {
+  border-color: rgba(23, 153, 242, 0.14);
+  box-shadow: none;
 }
 
 .smm-status-order-note {
@@ -1589,9 +1692,12 @@ a {
 
   .smm-order-summary,
   .smm-status-grid,
-  .smm-provider-grid,
-  .smm-order-summary-card {
+  .smm-provider-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .smm-order-summary-card {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .smm-status-filter-grid {
