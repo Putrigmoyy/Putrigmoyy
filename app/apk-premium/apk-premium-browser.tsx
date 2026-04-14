@@ -322,7 +322,6 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                     </div>
                     <div className="apk-app-selected-copy">
                       <strong>{selectedProduct.title}</strong>
-                      <span>{selectedProduct.subtitle}</span>
                       <small>
                         {getTotalVariantStock(selectedProduct)} stock - {selectedProduct.sold} terjual
                       </small>
@@ -355,9 +354,6 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
 
                   <div className="apk-app-form-card">
                     <span className="apk-app-section-label">Order</span>
-                    <div className="apk-app-form-note">
-                      Total akan otomatis berubah mengikuti jumlah yang kamu isi di bawah.
-                    </div>
 
                     <div className="apk-app-form-grid">
                       <label className="apk-app-form-field">
@@ -399,9 +395,11 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                       <strong>Rp {formatRupiah(selectedTotal)}</strong>
                     </div>
 
-                    <div className={`apk-app-feedback apk-app-feedback--${checkoutFeedback.tone}`}>
-                      {checkoutFeedback.text}
-                    </div>
+                    {checkoutFeedback.tone !== 'idle' ? (
+                      <div className={`apk-app-feedback apk-app-feedback--${checkoutFeedback.tone}`}>
+                        {checkoutFeedback.text}
+                      </div>
+                    ) : null}
 
                     <div className="apk-app-action-row">
                       <button type="button" className="apk-app-primary-button" onClick={submitWebsiteOrder} disabled={isSubmittingOrder}>
