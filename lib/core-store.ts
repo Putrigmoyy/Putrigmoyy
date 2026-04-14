@@ -384,6 +384,41 @@ export async function recordCoreOrderHistory(input: {
   });
 }
 
+export async function updateCoreOrderHistoryStatusByReference(input: {
+  reference: string;
+  statusLabel: string;
+  status: 'pending' | 'success' | 'failed';
+  methodLabel?: string;
+  detailAppend?: string;
+}) {
+  if (!isCoreConfigured()) {
+    return;
+  }
+
+  const reference = String(input.reference || '').trim();
+  if (!reference) {
+    return;
+  }
+
+  const sql = getNeonClient('core');
+  await sql`
+    update core_transaction_history
+    set
+      status_label = ${String(input.statusLabel || '').trim() || 'Pending'},
+      status = ${input.status},
+      method_label = case
+        when ${String(input.methodLabel || '').trim()} <> '' then ${String(input.methodLabel || '').trim()}
+        else method_label
+      end,
+      detail = case
+        when ${String(input.detailAppend || '').trim()} <> '' then concat(detail, E'\n', ${String(input.detailAppend || '').trim()})
+        else detail
+      end
+    where reference = ${reference}
+      and kind = 'order'
+  `;
+}
+
 export async function spendCoreWalletBalanceForOrder(input: {
   accountContact: string;
   amount: number;

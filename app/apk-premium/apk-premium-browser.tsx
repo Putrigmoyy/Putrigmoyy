@@ -62,6 +62,21 @@ type CoreDepositResult = {
   };
 };
 
+type AppremQrisState = {
+  orderCode: string;
+  totalPriceLabel: string;
+  orderStatus: string;
+  paymentStatus: string;
+  nextStep: string;
+  qris: {
+    transactionId: string;
+    qrUrl: string;
+    qrString: string;
+    deeplinkUrl: string;
+    expiryTime: string;
+  } | null;
+};
+
 const APK_ACCOUNT_SESSION_KEY = 'putrigmoyy_apk_account_session_v1';
 
 const productArtwork: Record<string, string> = {
@@ -170,9 +185,11 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
     tone: 'idle',
     text: 'Pilih aplikasi premium lalu lanjutkan order langsung dari menu apprem.',
   });
+  const [activeQrisOrder, setActiveQrisOrder] = useState<AppremQrisState | null>(null);
   const [isSubmittingOrder, startOrderSubmit] = useTransition();
   const [isSubmittingProfile, startProfileSubmit] = useTransition();
   const [isSubmittingDeposit, startDepositSubmit] = useTransition();
+  const [isRefreshingQris, startRefreshQris] = useTransition();
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
   useEffect(() => {
@@ -296,6 +313,49 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
     }
   }, [walletProfile.loggedIn]);
 
+  useEffect(() => {
+    if (!activeQrisOrder || activeQrisOrder.paymentStatus === 'paid' || activeQrisOrder.paymentStatus === 'expire' || activeQrisOrder.paymentStatus === 'cancel' || activeQrisOrder.paymentStatus === 'deny') {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      startRefreshQris(async () => {
+        try {
+          const response = await fetch(`/api/apk-premium/order-status?orderCode=${encodeURIComponent(activeQrisOrder.orderCode)}`, {
+            method: 'GET',
+            cache: 'no-store',
+          });
+          const result = await response.json() as {
+            status?: boolean;
+            data?: AppremQrisState | { msg?: string };
+          };
+          if (response.ok && result.status && result.data && 'orderCode' in result.data) {
+            setActiveQrisOrder(result.data);
+            if (result.data.paymentStatus === 'paid') {
+              setCheckoutFeedback({
+                tone: 'success',
+                text: `Pembayaran ${result.data.orderCode} berhasil. Owner akan melanjutkan fulfillment order ini.`,
+              });
+              if (walletProfile.loggedIn && walletProfile.contact) {
+                try {
+                  await syncAccountBundle(walletProfile.contact);
+                } catch {
+                  // ignore history refresh issue
+                }
+              }
+            }
+          }
+        } catch {
+          // swallow polling errors to keep UI calm
+        }
+      });
+    }, 10000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [activeQrisOrder, startRefreshQris, walletProfile.contact, walletProfile.loggedIn]);
+
   const openProduct = (product: ApkPremiumProduct) => {
     setSelectedProductId(product.id);
     setSelectedVariantId(product.variants[0]?.id || '');
@@ -360,6 +420,8 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
             nextStep?: string;
             paymentMethod?: OrderPaymentMethod;
             orderStatus?: 'pending' | 'paid';
+            paymentStatus?: string;
+            qris?: AppremQrisState['qris'];
           };
         };
 
@@ -378,6 +440,18 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
               ? `Order ${result.data.orderCode} berhasil dibayar dengan saldo akun. ${result.data.nextStep || ''}`.trim()
               : `Order ${result.data.orderCode} berhasil dibuat. ${result.data.nextStep || ''}`.trim(),
         });
+        setActiveQrisOrder(
+          result.data.qris
+            ? {
+                orderCode: String(result.data.orderCode || ''),
+                totalPriceLabel: String(result.data.totalPriceLabel || ''),
+                orderStatus: String(result.data.orderStatus || 'pending'),
+                paymentStatus: String(result.data.paymentStatus || 'awaiting-payment'),
+                nextStep: String(result.data.nextStep || ''),
+                qris: result.data.qris,
+              }
+            : null,
+        );
         if (walletProfile.loggedIn && walletProfile.contact) {
           try {
             await syncAccountBundle(walletProfile.contact);
@@ -553,6 +627,52 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
     });
   };
 
+  const refreshQrisStatus = () => {
+    if (!activeQrisOrder?.orderCode) {
+      return;
+    }
+    startRefreshQris(async () => {
+      try {
+        const response = await fetch(`/api/apk-premium/order-status?orderCode=${encodeURIComponent(activeQrisOrder.orderCode)}`, {
+          method: 'GET',
+          cache: 'no-store',
+        });
+        const result = await response.json() as {
+          status?: boolean;
+          data?: AppremQrisState | { msg?: string };
+        };
+        if (!response.ok || !result.status || !result.data || !('orderCode' in result.data)) {
+          setCheckoutFeedback({
+            tone: 'error',
+            text: result.data && 'msg' in result.data ? String(result.data.msg || 'Status pembayaran belum bisa dimuat.') : 'Status pembayaran belum bisa dimuat.',
+          });
+          return;
+        }
+
+        setActiveQrisOrder(result.data);
+        setCheckoutFeedback({
+          tone: result.data.paymentStatus === 'paid' ? 'success' : 'idle',
+          text:
+            result.data.paymentStatus === 'paid'
+              ? `Pembayaran ${result.data.orderCode} berhasil. Owner akan melanjutkan fulfillment order ini.`
+              : `Status ${result.data.orderCode} masih ${result.data.paymentStatus}.`,
+        });
+        if (result.data.paymentStatus === 'paid' && walletProfile.loggedIn && walletProfile.contact) {
+          try {
+            await syncAccountBundle(walletProfile.contact);
+          } catch {
+            // ignore sync failure
+          }
+        }
+      } catch (error) {
+        setCheckoutFeedback({
+          tone: 'error',
+          text: error instanceof Error ? error.message : 'Status pembayaran belum bisa dimuat.',
+        });
+      }
+    });
+  };
+
   return (
     <div className="apk-app-shell">
       <div className="apk-app-phone">
@@ -705,6 +825,45 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                       <span>Total Bayar Saat Ini</span>
                       <strong>Rp {formatRupiah(selectedTotal)}</strong>
                     </div>
+
+                    {activeQrisOrder ? (
+                      <div className="apk-app-qris-shell">
+                        <div className="apk-app-qris-head">
+                          <div>
+                            <span className="apk-app-section-label">QRIS Payment</span>
+                            <strong>{activeQrisOrder.orderCode}</strong>
+                          </div>
+                          <div className={`apk-app-order-pill apk-app-order-pill--${activeQrisOrder.paymentStatus === 'paid' ? 'success' : activeQrisOrder.paymentStatus === 'awaiting-payment' ? 'pending' : 'failed'}`}>
+                            {activeQrisOrder.paymentStatus === 'awaiting-payment' ? 'Menunggu bayar' : activeQrisOrder.paymentStatus}
+                          </div>
+                        </div>
+                        <div className="apk-app-qris-card">
+                          {activeQrisOrder.qris?.qrUrl ? (
+                            <img src={activeQrisOrder.qris.qrUrl} alt={`QRIS ${activeQrisOrder.orderCode}`} className="apk-app-qris-image" />
+                          ) : (
+                            <div className="apk-app-qris-fallback">QRIS siap, tetapi gambar belum tersedia.</div>
+                          )}
+                          <div className="apk-app-qris-copy">
+                            <div className="apk-app-live-total-card apk-app-live-total-card--compact">
+                              <span>Total Bayar</span>
+                              <strong>Rp {activeQrisOrder.totalPriceLabel}</strong>
+                            </div>
+                            <p>{activeQrisOrder.nextStep}</p>
+                            {activeQrisOrder.qris?.expiryTime ? <small>Berlaku sampai {new Date(activeQrisOrder.qris.expiryTime).toLocaleString('id-ID')}</small> : null}
+                            <div className="apk-app-action-row apk-app-action-row--compact">
+                              <button type="button" className="apk-app-primary-button" onClick={refreshQrisStatus} disabled={isRefreshingQris}>
+                                {isRefreshingQris ? 'Memuat...' : 'Cek Status'}
+                              </button>
+                              {activeQrisOrder.qris?.deeplinkUrl ? (
+                                <a className="apk-app-ghost-button apk-app-link-button" href={activeQrisOrder.qris.deeplinkUrl} target="_blank" rel="noreferrer">
+                                  Buka Pembayaran
+                                </a>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
 
                     <div className="apk-app-payment-methods">
                       <button
