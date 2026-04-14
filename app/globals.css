@@ -177,6 +177,106 @@ a {
   overflow-x: hidden;
 }
 
+.apk-app-top-strip {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.site-mini-account {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.site-mini-account__balance {
+  display: grid;
+  gap: 2px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 14px 32px rgba(23, 153, 242, 0.1);
+}
+
+.site-mini-account__balance span {
+  color: rgba(17, 17, 17, 0.56);
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.site-mini-account__balance strong {
+  color: #111111;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.site-mini-account__profile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(14px);
+  color: #111111;
+  font-size: 0.8rem;
+  font-weight: 800;
+  box-shadow: 0 14px 32px rgba(23, 153, 242, 0.1);
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.site-mini-account__profile:active {
+  transform: scale(0.96);
+}
+
+.site-mini-account__profile--open {
+  border-color: rgba(210, 9, 209, 0.24);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.site-mini-account__menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: 8px;
+  min-width: 170px;
+  padding: 10px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 22px 48px rgba(17, 17, 17, 0.12);
+  animation: apk-app-fade-up 0.22s ease;
+}
+
+.site-mini-account__link {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid rgba(23, 153, 242, 0.08);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.04), rgba(210, 9, 209, 0.04));
+  color: #111111;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.site-mini-account__link--disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 .apk-app-header {
   display: grid;
   grid-template-columns: auto 1fr auto;

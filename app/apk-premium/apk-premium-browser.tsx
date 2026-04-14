@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useDeferredValue, useEffect, useState, useTransition } from 'react';
 import type { ApkPremiumProduct, ApkPremiumVariant } from '@/lib/apk-premium';
 import { formatRupiah } from '@/lib/apk-premium';
+import { TopAccountMenu } from '@/app/components/top-account-menu';
 
 type Props = {
   products: ApkPremiumProduct[];
@@ -289,6 +290,11 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
   const canPayOrderWithBalance = walletProfile.loggedIn && selectedTotal > 0 && walletProfile.balance >= selectedTotal;
   const orderHistoryEntries = historyEntries.filter((entry) => entry.kind === 'order');
   const depositHistoryEntries = historyEntries.filter((entry) => entry.kind === 'deposit');
+  const switchTargets = [
+    { label: 'Sosmed', href: '/social-media' },
+    { label: 'OTP Nokos', href: process.env.NEXT_PUBLIC_OTP_URL || '#', external: true },
+    { label: 'Sewa Bot', href: process.env.NEXT_PUBLIC_BOT_RENTAL_URL || '#', external: true },
+  ];
 
   useEffect(() => {
     if (depositLocked || !canUseBalance) {
@@ -676,6 +682,13 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
   return (
     <div className="apk-app-shell">
       <div className="apk-app-phone">
+        <div className="apk-app-top-strip">
+          <TopAccountMenu
+            displayName={walletProfile.loggedIn ? walletProfile.name : 'Profil'}
+            balance={walletProfile.balance}
+            targets={switchTargets}
+          />
+        </div>
         <div className="apk-app-content apk-app-content--tight">
           {activeTab === 'apprem' ? (
             <section className="apk-app-panel apk-app-panel--plain">

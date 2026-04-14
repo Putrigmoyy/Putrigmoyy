@@ -26,6 +26,7 @@ import {
   siYoutube,
 } from 'simple-icons';
 import type { NormalizedPusatPanelProfile, NormalizedPusatPanelService } from '@/lib/pusatpanel';
+import { TopAccountMenu } from '@/app/components/top-account-menu';
 
 type Props = {
   profile: NormalizedPusatPanelProfile | null;
@@ -53,6 +54,23 @@ type ProviderStatusResult = {
     status?: string;
     start_count?: number;
     remains?: number;
+    msg?: string;
+  };
+};
+
+type CoreBundlePayload = {
+  account?: {
+    registered?: boolean;
+    loggedIn?: boolean;
+    name?: string;
+    contact?: string;
+    balance?: number;
+  };
+};
+
+type CoreBundleResult = {
+  status?: boolean;
+  data?: CoreBundlePayload | {
     msg?: string;
   };
 };
@@ -85,23 +103,23 @@ type PlatformGroup = SocialPlatformVisual & {
 };
 
 const PLATFORM_VISUALS: Array<{ matchers: string[]; visual: SocialPlatformVisual }> = [
-  { matchers: ['instagram', 'ig'], visual: { label: 'Instagram', accent: '#e4408b', icon: 'instagram' } },
+  { matchers: ['instagram'], visual: { label: 'Instagram', accent: '#e4408b', icon: 'instagram' } },
   { matchers: ['tiktok'], visual: { label: 'TikTok', accent: '#111111', icon: 'tiktok' } },
-  { matchers: ['facebook', 'fb'], visual: { label: 'Facebook', accent: '#1877f2', icon: 'facebook' } },
-  { matchers: ['whatsapp', 'wa'], visual: { label: 'WhatsApp', accent: '#25d366', icon: 'whatsapp' } },
+  { matchers: ['facebook'], visual: { label: 'Facebook', accent: '#1877f2', icon: 'facebook' } },
+  { matchers: ['whatsapp'], visual: { label: 'WhatsApp', accent: '#25d366', icon: 'whatsapp' } },
   { matchers: ['threads'], visual: { label: 'Threads', accent: '#111111', icon: 'threads' } },
-  { matchers: ['twitter', 'x.com', 'twitter / x', ' x '], visual: { label: 'Twitter / X', accent: '#1d9bf0', icon: 'x' } },
+  { matchers: ['twitter / x', 'twitter', 'x.com'], visual: { label: 'Twitter / X', accent: '#1d9bf0', icon: 'x' } },
   { matchers: ['spotify'], visual: { label: 'Spotify', accent: '#1db954', icon: 'spotify' } },
   { matchers: ['discord'], visual: { label: 'Discord', accent: '#5865f2', icon: 'discord' } },
   { matchers: ['soundcloud'], visual: { label: 'SoundCloud', accent: '#ff7700', icon: 'soundcloud' } },
   { matchers: ['pinterest'], visual: { label: 'Pinterest', accent: '#e60023', icon: 'pinterest' } },
   { matchers: ['quora'], visual: { label: 'Quora', accent: '#b92b27', icon: 'quora' } },
-  { matchers: ['mobile app install', 'app install'], visual: { label: 'Mobile App Install', accent: '#17a65b', icon: 'install' } },
+  { matchers: ['mobile app install', 'mobile app installs', 'app install', 'app installs'], visual: { label: 'Mobile App Install', accent: '#17a65b', icon: 'install' } },
   { matchers: ['linkedin'], visual: { label: 'LinkedIn', accent: '#0a66c2', icon: 'linkedin' } },
   { matchers: ['likee'], visual: { label: 'Likee', accent: '#ff6680', icon: 'likee' } },
   { matchers: ['dailymotion'], visual: { label: 'Dailymotion', accent: '#0066dc', icon: 'dailymotion' } },
   { matchers: ['audiomack'], visual: { label: 'Audiomack', accent: '#ff9900', icon: 'audiomack' } },
-  { matchers: ['youtube', 'yt'], visual: { label: 'YouTube', accent: '#ff0000', icon: 'youtube' } },
+  { matchers: ['youtube'], visual: { label: 'YouTube', accent: '#ff0000', icon: 'youtube' } },
   { matchers: ['telegram'], visual: { label: 'Telegram', accent: '#27a7e7', icon: 'telegram' } },
   { matchers: ['shopee'], visual: { label: 'Shopee', accent: '#ee4d2d', icon: 'shopee' } },
   { matchers: ['tokopedia'], visual: { label: 'Tokopedia', accent: '#03ac0e', icon: 'tokopedia' } },
@@ -144,6 +162,7 @@ const REMOTE_LOGO_MAP: Record<string, string> = {
   tokopedia: 'https://logo.clearbit.com/tokopedia.com',
   snackvideo: 'https://logo.clearbit.com/snackvideo.com',
 };
+const WEBSITE_ACCOUNT_SESSION_KEY = 'putrigmoyy_apk_account_session_v1';
 
 function buildMenuTypeTitle(menuType: string) {
   if (menuType === '2') return 'Custom Comments';
@@ -180,9 +199,21 @@ function titleCaseWords(value: string) {
     .join(' ');
 }
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function containsPlatformPhrase(value: string, phrase: string) {
+  const pattern = new RegExp(`(^|[^a-z0-9])${escapeRegex(phrase.toLowerCase())}([^a-z0-9]|$)`, 'i');
+  return pattern.test(value.toLowerCase());
+}
+
 function detectPlatformVisual(service: NormalizedPusatPanelService): SocialPlatformVisual {
-  const haystack = `${service.category} ${service.name} ${service.note}`.toLowerCase();
-  const match = PLATFORM_VISUALS.find((entry) => entry.matchers.some((matcher) => haystack.includes(matcher)));
+  const categoryText = String(service.category || '').toLowerCase();
+  const nameText = String(service.name || '').toLowerCase();
+  const match =
+    PLATFORM_VISUALS.find((entry) => entry.matchers.some((matcher) => containsPlatformPhrase(categoryText, matcher))) ||
+    PLATFORM_VISUALS.find((entry) => entry.matchers.some((matcher) => containsPlatformPhrase(nameText, matcher)));
   if (match) {
     return match.visual;
   }
@@ -278,6 +309,12 @@ function SocialNavGlyph({ type }: { type: SocialTab }) {
 
 export function SocialMediaBrowser({ profile, providerMeta, services, categories }: Props) {
   const [activeTab, setActiveTab] = useState<SocialTab>('sosmed');
+  const [accountProfile, setAccountProfile] = useState({
+    loggedIn: false,
+    name: '',
+    contact: '',
+    balance: 0,
+  });
   const [selectedPlatformKey, setSelectedPlatformKey] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedServiceId, setSelectedServiceId] = useState('');
@@ -297,6 +334,36 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const [isOrdering, startOrdering] = useTransition();
   const [isCheckingStatus, startStatusCheck] = useTransition();
   const [isRefreshingHistory, startHistoryRefresh] = useTransition();
+  const switchTargets = [
+    { label: 'Apprem', href: '/apk-premium' },
+    { label: 'OTP Nokos', href: process.env.NEXT_PUBLIC_OTP_URL || '#', external: true },
+    { label: 'Sewa Bot', href: process.env.NEXT_PUBLIC_BOT_RENTAL_URL || '#', external: true },
+  ];
+
+  const syncAccountBundle = async (contact: string) => {
+    const normalizedContact = String(contact || '').trim();
+    if (!normalizedContact) return false;
+    const response = await fetch(`/api/core/account?contact=${encodeURIComponent(normalizedContact)}`, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    const result = (await response.json()) as CoreBundleResult;
+    if (!response.ok || !result.status || !result.data || !('account' in result.data)) {
+      throw new Error(
+        result.data && 'msg' in result.data && result.data.msg ? String(result.data.msg) : 'Gagal memuat data akun.',
+      );
+    }
+
+    const account = result.data.account || {};
+    setAccountProfile({
+      loggedIn: account.loggedIn === true,
+      name: String(account.name || ''),
+      contact: String(account.contact || ''),
+      balance: Math.max(0, Number(account.balance || 0)),
+    });
+    return true;
+  };
+
   useEffect(() => {
     const previousPaddingBottom = document.body.style.paddingBottom;
     const previousOverflowX = document.body.style.overflowX;
@@ -335,6 +402,21 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
   useEffect(() => {
     refreshHistory();
+  }, []);
+
+  useEffect(() => {
+    const hydrateSession = async () => {
+      try {
+        const savedContact = window.localStorage.getItem(WEBSITE_ACCOUNT_SESSION_KEY);
+        if (savedContact) {
+          await syncAccountBundle(savedContact);
+        }
+      } catch {
+        // ignore session hydration issues
+      }
+    };
+
+    void hydrateSession();
   }, []);
 
   const platformGroups = useMemo<PlatformGroup[]>(() => {
@@ -552,6 +634,13 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   return (
     <div className="apk-app-shell">
       <div className="apk-app-phone">
+        <div className="apk-app-top-strip">
+          <TopAccountMenu
+            displayName={accountProfile.loggedIn ? accountProfile.name : 'Profil'}
+            balance={accountProfile.balance}
+            targets={switchTargets}
+          />
+        </div>
         <div className="apk-app-content apk-app-content--tight">
           {activeTab === 'sosmed' ? (
             <section className="apk-app-panel apk-app-panel--plain">
