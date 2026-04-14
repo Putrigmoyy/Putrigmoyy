@@ -1,5 +1,8 @@
+'use client';
+
 import Image from 'next/image';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 type DashboardItem = {
   title: string;
@@ -14,6 +17,40 @@ type Props = {
 };
 
 export function DashboardHome({ items }: Props) {
+  const router = useRouter();
+  const [activeItem, setActiveItem] = useState<string | null>(null);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingBottom = document.body.style.paddingBottom;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.paddingBottom = '0';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.paddingBottom = previousPaddingBottom;
+    };
+  }, []);
+
+  const handleOpen = (item: DashboardItem) => {
+    if (activeItem) return;
+    setActiveItem(item.title);
+
+    window.setTimeout(() => {
+      if (item.external) {
+        if (item.href && item.href !== '#') {
+          window.location.href = item.href;
+        } else {
+          setActiveItem(null);
+        }
+        return;
+      }
+
+      router.push(item.href);
+    }, 420);
+  };
+
   return (
     <main className="dashboard-shell">
       <div className="dashboard-loading-layer">
@@ -30,49 +67,54 @@ export function DashboardHome({ items }: Props) {
       </div>
 
       <section className="dashboard-mobile">
-        <div className="dashboard-head">
-          <span className="dashboard-kicker">PUTRI GMOYY STORE</span>
-          <h1>Dashboard Katalog</h1>
-          <p>Pilih salah satu katalog untuk masuk ke menu mereka masing-masing.</p>
-        </div>
-
         <div className="dashboard-grid">
-          {items.map((item) => {
-            const card = (
-              <>
-                <div className="dashboard-card-media">
-                  <Image
-                    src={item.image}
-                    alt={item.title}
-                    fill
-                    sizes="(max-width: 640px) 100vw, 380px"
-                    className="dashboard-card-image"
-                  />
-                </div>
-                <div className="dashboard-card-copy">
+          {items.map((item) => (
+            <button
+              key={item.title}
+              type="button"
+              className={activeItem === item.title ? 'dashboard-card dashboard-card--active' : 'dashboard-card'}
+              onClick={() => handleOpen(item)}
+            >
+              <div className="dashboard-card-media">
+                <Image
+                  src={item.image}
+                  alt={item.title}
+                  fill
+                  sizes="(max-width: 640px) 50vw, 220px"
+                  className="dashboard-card-image"
+                  priority
+                />
+                <div className="dashboard-card-overlay">
                   <h2>{item.title}</h2>
-                  <p>{item.description}</p>
                 </div>
-              </>
-            );
-
-            return item.external ? (
-              <a
-                key={item.title}
-                href={item.href}
-                target="_blank"
-                rel="noreferrer"
-                className="dashboard-card"
-              >
-                {card}
-              </a>
-            ) : (
-              <Link key={item.title} href={item.href} className="dashboard-card">
-                {card}
-              </Link>
-            );
-          })}
+              </div>
+            </button>
+          ))}
         </div>
+
+        {activeItem ? (
+          <div className="dashboard-preview-layer">
+            {items
+              .filter((item) => item.title === activeItem)
+              .map((item) => (
+                <div key={item.title} className="dashboard-preview-card">
+                  <div className="dashboard-preview-media">
+                    <Image
+                      src={item.image}
+                      alt={item.title}
+                      fill
+                      sizes="80vw"
+                      className="dashboard-card-image"
+                      priority
+                    />
+                    <div className="dashboard-card-overlay">
+                      <h2>{item.title}</h2>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        ) : null}
       </section>
     </main>
   );

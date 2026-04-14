@@ -47,7 +47,8 @@ a {
 
 .dashboard-shell {
   position: relative;
-  min-height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   background: #ffffff;
 }
 
@@ -81,96 +82,98 @@ a {
 }
 
 .dashboard-mobile {
-  width: min(calc(100% - 28px), 430px);
+  position: relative;
+  width: min(calc(100% - 24px), 430px);
+  height: 100dvh;
   margin: 0 auto;
-  padding: 28px 0 48px;
+  padding: 12px 0;
   opacity: 0;
   animation: dashboard-content-show 0.45s ease 2s forwards;
 }
 
-.dashboard-head {
-  display: grid;
-  gap: 10px;
-  padding-top: 8px;
-}
-
-.dashboard-kicker {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  min-height: 34px;
-  border: 1px solid rgba(23, 153, 242, 0.18);
-  border-radius: 999px;
-  background: rgba(23, 153, 242, 0.08);
-  color: #1799f2;
-  padding: 0 14px;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.dashboard-head h1 {
-  margin: 0;
-  color: #111111;
-  font-size: clamp(1.85rem, 7vw, 2.35rem);
-  line-height: 1.02;
-  letter-spacing: -0.05em;
-}
-
-.dashboard-head p {
-  margin: 0;
-  color: rgba(17, 17, 17, 0.72);
-  font-size: 0.94rem;
-  line-height: 1.7;
-}
-
 .dashboard-grid {
   display: grid;
-  gap: 16px;
-  margin-top: 24px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  height: 100%;
 }
 
 .dashboard-card {
-  display: grid;
-  gap: 12px;
+  position: relative;
+  display: block;
   border: 1px solid rgba(23, 153, 242, 0.16);
   border-radius: 28px;
   background: #ffffff;
-  padding: 12px;
+  padding: 0;
   box-shadow: 0 16px 40px rgba(23, 153, 242, 0.08);
+  overflow: hidden;
+  appearance: none;
+  cursor: pointer;
 }
 
 .dashboard-card-media {
   position: relative;
   overflow: hidden;
-  min-height: 180px;
-  border-radius: 22px;
+  width: 100%;
+  height: 100%;
   background: linear-gradient(180deg, rgba(23, 153, 242, 0.06), rgba(210, 9, 209, 0.06));
 }
 
 .dashboard-card-image {
   object-fit: cover;
+  transition: transform 0.38s ease;
 }
 
-.dashboard-card-copy {
-  display: grid;
-  gap: 6px;
-  padding: 4px 4px 8px;
+.dashboard-card-overlay {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  align-items: flex-end;
+  min-height: 88px;
+  padding: 16px 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.92) 55%, #ffffff 100%);
 }
 
-.dashboard-card-copy h2 {
+.dashboard-card-overlay h2 {
   margin: 0;
   color: #111111;
-  font-size: 1.06rem;
-  line-height: 1.25;
+  font-size: 0.96rem;
+  line-height: 1.3;
+  text-align: left;
 }
 
-.dashboard-card-copy p {
-  margin: 0;
-  color: rgba(17, 17, 17, 0.72);
-  font-size: 0.88rem;
-  line-height: 1.65;
+.dashboard-card--active {
+  transform: scale(0.98);
+}
+
+.dashboard-card--active .dashboard-card-image {
+  transform: scale(1.08);
+}
+
+.dashboard-preview-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 998;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.94);
+  pointer-events: none;
+}
+
+.dashboard-preview-card {
+  width: min(calc(100% - 44px), 430px);
+  animation: dashboard-preview-zoom 0.42s ease forwards;
+}
+
+.dashboard-preview-media {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 0.84;
+  border: 1px solid rgba(23, 153, 242, 0.16);
+  border-radius: 34px;
+  background: #ffffff;
+  box-shadow: 0 22px 60px rgba(23, 153, 242, 0.12);
 }
 
 .promo-strip {
@@ -1286,6 +1289,18 @@ a {
   }
 }
 
+@keyframes dashboard-preview-zoom {
+  0% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @media (max-width: 1080px) {
   .hero-stage,
   .apk-stage,
@@ -1400,6 +1415,33 @@ a {
   .service-card {
     border-radius: 22px;
     padding: 18px;
+  }
+
+  .dashboard-shell {
+    height: 100svh;
+  }
+
+  .dashboard-mobile {
+    width: min(calc(100% - 20px), 430px);
+    height: 100svh;
+    padding: 10px 0;
+  }
+
+  .dashboard-grid {
+    gap: 10px;
+  }
+
+  .dashboard-card {
+    border-radius: 24px;
+  }
+
+  .dashboard-card-overlay {
+    min-height: 72px;
+    padding: 12px;
+  }
+
+  .dashboard-card-overlay h2 {
+    font-size: 0.88rem;
   }
 
   .hero-card h1,
