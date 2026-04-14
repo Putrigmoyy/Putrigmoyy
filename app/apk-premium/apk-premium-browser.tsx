@@ -33,8 +33,35 @@ type HistoryEntry = {
 
 type DepositMethod = 'midtrans' | 'balance';
 
-const APK_HISTORY_STORAGE_KEY = 'putrigmoyy_apk_history_v1';
-const APK_ACCOUNT_STORAGE_KEY = 'putrigmoyy_apk_account_v1';
+type CoreBundlePayload = {
+  account?: {
+    registered?: boolean;
+    loggedIn?: boolean;
+    name?: string;
+    contact?: string;
+    balance?: number;
+  };
+  history?: HistoryEntry[];
+};
+
+type CoreBundleResult = {
+  status?: boolean;
+  data?: CoreBundlePayload | {
+    msg?: string;
+  };
+};
+
+type CoreDepositResult = {
+  status?: boolean;
+  data?: {
+    bundle?: CoreBundlePayload;
+    amount?: number;
+    method?: DepositMethod;
+    msg?: string;
+  };
+};
+
+const APK_ACCOUNT_SESSION_KEY = 'putrigmoyy_apk_account_session_v1';
 
 const productArtwork: Record<string, string> = {
   canva: '/premium-icons/canva.jpg',
@@ -142,6 +169,8 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
     text: 'Pilih aplikasi premium lalu lanjutkan order langsung dari menu apprem.',
   });
   const [isSubmittingOrder, startOrderSubmit] = useTransition();
+  const [isSubmittingProfile, startProfileSubmit] = useTransition();
+  const [isSubmittingDeposit, startDepositSubmit] = useTransition();
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
   useEffect(() => {
@@ -156,53 +185,58 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
     };
   }, []);
 
-  useEffect(() => {
-    try {
-      const rawHistory = window.localStorage.getItem(APK_HISTORY_STORAGE_KEY);
-      if (rawHistory) {
-        const parsed = JSON.parse(rawHistory) as HistoryEntry[];
-        if (Array.isArray(parsed)) {
-          setHistoryEntries(parsed);
-        }
-      }
-      const rawAccount = window.localStorage.getItem(APK_ACCOUNT_STORAGE_KEY);
-      if (rawAccount) {
-        const parsed = JSON.parse(rawAccount) as typeof walletProfile;
-        if (parsed && typeof parsed === 'object') {
-          setWalletProfile({
-            registered: parsed.registered === true,
-            loggedIn: parsed.loggedIn === true,
-            name: String(parsed.name || ''),
-            contact: String(parsed.contact || ''),
-            pin: String(parsed.pin || ''),
-            balance: Math.max(0, Number(parsed.balance || 0)),
-          });
-          setWalletLoginDraft((current) => ({
-            ...current,
-            contact: String(parsed.contact || ''),
-          }));
-        }
-      }
-    } catch {
-      // ignore local storage hydration issues
+  const applyCoreBundle = (bundle: CoreBundlePayload) => {
+    const account = bundle.account || {};
+    setWalletProfile({
+      registered: account.registered === true,
+      loggedIn: account.loggedIn === true,
+      name: String(account.name || ''),
+      contact: String(account.contact || ''),
+      pin: '',
+      balance: Math.max(0, Number(account.balance || 0)),
+    });
+    setWalletLoginDraft({
+      contact: String(account.contact || ''),
+      pin: '',
+    });
+    setHistoryEntries(Array.isArray(bundle.history) ? bundle.history : []);
+  };
+
+  const syncAccountBundle = async (contact: string) => {
+    const normalizedContact = String(contact || '').trim();
+    if (!normalizedContact) {
+      return false;
     }
+
+    const response = await fetch(`/api/core/account?contact=${encodeURIComponent(normalizedContact)}`, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    const result = (await response.json()) as CoreBundleResult;
+    if (!response.ok || !result.status || !result.data || !('account' in result.data)) {
+      throw new Error(
+        result.data && 'msg' in result.data && result.data.msg ? String(result.data.msg) : 'Gagal memuat data akun.',
+      );
+    }
+
+    applyCoreBundle(result.data);
+    return true;
+  };
+
+  useEffect(() => {
+    const hydrateSession = async () => {
+      try {
+        const savedContact = window.localStorage.getItem(APK_ACCOUNT_SESSION_KEY);
+        if (savedContact) {
+          await syncAccountBundle(savedContact);
+        }
+      } catch {
+        // ignore session hydration issues
+      }
+    };
+
+    void hydrateSession();
   }, []);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(APK_HISTORY_STORAGE_KEY, JSON.stringify(historyEntries));
-    } catch {
-      // ignore local storage write issues
-    }
-  }, [historyEntries]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(APK_ACCOUNT_STORAGE_KEY, JSON.stringify(walletProfile));
-    } catch {
-      // ignore local storage write issues
-    }
-  }, [walletProfile]);
 
   const filteredProducts = products.filter((product) => {
     const haystack = [product.title, product.subtitle, product.category, product.note, product.delivery].join(' ').toLowerCase();
@@ -249,25 +283,6 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
       setDepositFeedback({ tone: 'idle', text: '' });
     }
   }, [walletProfile.loggedIn]);
-
-  const pushHistory = (entry: Omit<HistoryEntry, 'id' | 'createdAt' | 'createdLabel'>) => {
-    const created = new Date();
-    setHistoryEntries((current) => [
-      {
-        ...entry,
-        id: `${entry.kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        createdAt: created.toISOString(),
-        createdLabel: created.toLocaleString('id-ID', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-      },
-      ...current,
-    ].slice(0, 40));
-  };
 
   const openProduct = (product: ApkPremiumProduct) => {
     setSelectedProductId(product.id);
@@ -318,6 +333,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
             quantity: Number(checkoutForm.quantity || 0),
             customerName: checkoutForm.customerName,
             customerContact: checkoutForm.customerContact,
+            accountContact: walletProfile.loggedIn ? walletProfile.contact : '',
             note: checkoutForm.note,
           }),
         });
@@ -344,18 +360,13 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
           tone: 'success',
           text: `Order ${result.data.orderCode} berhasil dibuat. ${result.data.nextStep || ''}`.trim(),
         });
-
-        pushHistory({
-          kind: 'order',
-          title: `${selectedProduct.title} - ${selectedVariant.title}`,
-          subjectName: checkoutForm.customerName.trim() || '-',
-          amountLabel: `Rp ${String(result.data.totalPriceLabel || '0')}`,
-          statusLabel: 'Menunggu pembayaran',
-          status: 'pending',
-          detail: `Varian: ${selectedVariant.title}\nJumlah: ${selectedQuantity}\nKontak: ${checkoutForm.customerContact.trim() || '-'}\nCatatan: ${checkoutForm.note.trim() || '-'}`,
-          methodLabel: 'Order aplikasi premium',
-          reference: String(result.data.orderCode || '-'),
-        });
+        if (walletProfile.loggedIn && walletProfile.contact) {
+          try {
+            await syncAccountBundle(walletProfile.contact);
+          } catch {
+            // keep UI success state even if history refresh fails
+          }
+        }
       } catch (error) {
         setCheckoutFeedback({
           tone: 'error',
@@ -366,68 +377,100 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
   };
 
   const registerWalletAccount = () => {
-    const name = walletRegisterDraft.name.trim();
-    const contact = walletRegisterDraft.contact.trim();
-    const pin = walletRegisterDraft.pin.trim();
-    if (!name || !contact || !pin) {
-      setProfileFeedback({
-        tone: 'error',
-        text: 'Isi nama, kontak, dan PIN dulu untuk membuat akun.',
-      });
-      return;
-    }
+    startProfileSubmit(async () => {
+      const name = walletRegisterDraft.name.trim();
+      const contact = walletRegisterDraft.contact.trim();
+      const pin = walletRegisterDraft.pin.trim();
+      if (!name || !contact || !pin) {
+        setProfileFeedback({
+          tone: 'error',
+          text: 'Isi nama, kontak, dan PIN dulu untuk membuat akun.',
+        });
+        return;
+      }
 
-    setWalletProfile({
-      registered: true,
-      loggedIn: true,
-      name,
-      contact,
-      pin,
-      balance: 0,
-    });
-    setWalletLoginDraft({
-      contact,
-      pin: '',
-    });
-    setProfileFeedback({
-      tone: 'success',
-      text: 'Akun berhasil dibuat dan langsung aktif. Sekarang menu deposit sudah terbuka.',
+      try {
+        const response = await fetch('/api/core/account/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name, contact, pin }),
+        });
+        const result = (await response.json()) as CoreBundleResult;
+        if (!response.ok || !result.status || !result.data || !('account' in result.data)) {
+          setProfileFeedback({
+            tone: 'error',
+            text: result.data && 'msg' in result.data ? String(result.data.msg || 'Gagal membuat akun.') : 'Gagal membuat akun.',
+          });
+          return;
+        }
+
+        applyCoreBundle(result.data);
+        setWalletRegisterDraft({ name: '', contact: '', pin: '' });
+        window.localStorage.setItem(APK_ACCOUNT_SESSION_KEY, contact);
+        setProfileFeedback({
+          tone: 'success',
+          text: 'Akun berhasil dibuat dan langsung aktif. Sekarang menu deposit sudah terbuka.',
+        });
+      } catch (error) {
+        setProfileFeedback({
+          tone: 'error',
+          text: error instanceof Error ? error.message : 'Gagal membuat akun.',
+        });
+      }
     });
   };
 
   const loginWalletAccount = () => {
-    const contact = walletLoginDraft.contact.trim();
-    const pin = walletLoginDraft.pin.trim();
-    if (!walletProfile.registered) {
-      setProfileFeedback({
-        tone: 'error',
-        text: 'Akun belum terdaftar. Buat akun dulu di bawah.',
-      });
-      return;
-    }
-    if (!contact || !pin) {
-      setProfileFeedback({
-        tone: 'error',
-        text: 'Isi kontak dan PIN untuk masuk.',
-      });
-      return;
-    }
-    if (contact !== walletProfile.contact || pin !== walletProfile.pin) {
-      setProfileFeedback({
-        tone: 'error',
-        text: 'Kontak atau PIN tidak cocok.',
-      });
-      return;
-    }
-    setWalletProfile((current) => ({ ...current, loggedIn: true }));
-    setProfileFeedback({
-      tone: 'success',
-      text: 'Login berhasil. Deposit dan saldo akun sekarang bisa dipakai.',
+    startProfileSubmit(async () => {
+      const contact = walletLoginDraft.contact.trim();
+      const pin = walletLoginDraft.pin.trim();
+      if (!contact || !pin) {
+        setProfileFeedback({
+          tone: 'error',
+          text: 'Isi kontak dan PIN untuk masuk.',
+        });
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/core/account/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ contact, pin }),
+        });
+        const result = (await response.json()) as CoreBundleResult;
+        if (!response.ok || !result.status || !result.data || !('account' in result.data)) {
+          setProfileFeedback({
+            tone: 'error',
+            text: result.data && 'msg' in result.data ? String(result.data.msg || 'Login gagal.') : 'Login gagal.',
+          });
+          return;
+        }
+
+        applyCoreBundle(result.data);
+        window.localStorage.setItem(APK_ACCOUNT_SESSION_KEY, contact);
+        setProfileFeedback({
+          tone: 'success',
+          text: 'Login berhasil. Deposit dan saldo akun sekarang bisa dipakai.',
+        });
+      } catch (error) {
+        setProfileFeedback({
+          tone: 'error',
+          text: error instanceof Error ? error.message : 'Login gagal.',
+        });
+      }
     });
   };
 
   const logoutWalletAccount = () => {
-    setWalletProfile((current) => ({ ...current, loggedIn: false }));
+    window.localStorage.removeItem(APK_ACCOUNT_SESSION_KEY);
+    setWalletProfile((current) => ({ ...current, loggedIn: false, pin: '' }));
+    setHistoryEntries([]);
+    setWalletLoginDraft((current) => ({ ...current, pin: '' }));
     setProfileFeedback({
       tone: 'success',
       text: 'Kamu sudah logout dari akun ini.',
@@ -435,65 +478,60 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
   };
 
   const submitDepositFlow = () => {
-    if (depositLocked) {
-      setDepositFeedback({
-        tone: 'error',
-        text: 'Deposit terkunci. Daftar akun atau login dulu dari menu Profil.',
-      });
-      return;
-    }
-    if (normalizedDepositAmount <= 0) {
-      setDepositFeedback({
-        tone: 'error',
-        text: 'Masukkan jumlah deposit dulu.',
-      });
-      return;
-    }
-
-    if (depositMethod === 'balance') {
-      if (!canUseBalance) {
+    startDepositSubmit(async () => {
+      if (depositLocked) {
         setDepositFeedback({
           tone: 'error',
-          text: 'Saldo akun belum cukup. Pakai QRIS Midtrans untuk melanjutkan.',
+          text: 'Deposit terkunci. Daftar akun atau login dulu dari menu Profil.',
         });
         return;
       }
-      setDepositFeedback({
-        tone: 'success',
-        text: `Saldo akun siap dipakai untuk pembayaran Rp ${formatRupiah(normalizedDepositAmount)}.`,
-      });
-      setWalletProfile((current) => ({
-        ...current,
-        balance: Math.max(0, current.balance - normalizedDepositAmount),
-      }));
-      pushHistory({
-        kind: 'deposit',
-        title: 'Pembayaran dengan saldo akun',
-        subjectName: walletProfile.name || '-',
-        amountLabel: `Rp ${formatRupiah(normalizedDepositAmount)}`,
-        statusLabel: 'Berhasil',
-        status: 'success',
-        detail: `Metode: Saldo akun\nKontak: ${walletProfile.contact || '-'}\nSaldo terpakai: Rp ${formatRupiah(normalizedDepositAmount)}`,
-        methodLabel: 'Saldo akun',
-        reference: `SALDO-${Date.now().toString().slice(-6)}`,
-      });
-      return;
-    }
+      if (normalizedDepositAmount <= 0) {
+        setDepositFeedback({
+          tone: 'error',
+          text: 'Masukkan jumlah deposit dulu.',
+        });
+        return;
+      }
 
-    setDepositFeedback({
-      tone: 'success',
-      text: `QRIS Midtrans akan dipakai untuk nominal Rp ${formatRupiah(normalizedDepositAmount)}.`,
-    });
-    pushHistory({
-      kind: 'deposit',
-      title: 'Deposit via QRIS Midtrans',
-      subjectName: walletProfile.name || '-',
-      amountLabel: `Rp ${formatRupiah(normalizedDepositAmount)}`,
-      statusLabel: 'Menunggu pembayaran',
-      status: 'pending',
-      detail: `Metode: QRIS Midtrans\nKontak: ${walletProfile.contact || '-'}\nNominal: Rp ${formatRupiah(normalizedDepositAmount)}`,
-      methodLabel: 'QRIS Midtrans',
-      reference: `DPS-${Date.now().toString().slice(-6)}`,
+      try {
+        const response = await fetch('/api/core/deposit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            accountContact: walletProfile.contact,
+            amount: normalizedDepositAmount,
+            method: depositMethod,
+          }),
+        });
+        const result = (await response.json()) as CoreDepositResult;
+        if (!response.ok || !result.status || !result.data?.bundle) {
+          setDepositFeedback({
+            tone: 'error',
+            text:
+              result.data && 'msg' in result.data
+                ? String(result.data.msg || 'Deposit belum berhasil diproses.')
+                : 'Deposit belum berhasil diproses.',
+          });
+          return;
+        }
+
+        applyCoreBundle(result.data.bundle);
+        setDepositFeedback({
+          tone: 'success',
+          text:
+            depositMethod === 'balance'
+              ? `Saldo akun berhasil dipakai sebesar Rp ${formatRupiah(normalizedDepositAmount)}.`
+              : `Permintaan deposit QRIS Midtrans sebesar Rp ${formatRupiah(normalizedDepositAmount)} sudah dicatat.`,
+        });
+      } catch (error) {
+        setDepositFeedback({
+          tone: 'error',
+          text: error instanceof Error ? error.message : 'Deposit belum berhasil diproses.',
+        });
+      }
     });
   };
 
@@ -790,8 +828,13 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                   ) : null}
 
                   <div className="apk-app-action-row">
-                    <button type="button" className="apk-app-primary-button" onClick={submitDepositFlow} disabled={depositLocked}>
-                      Deposit
+                    <button
+                      type="button"
+                      className="apk-app-primary-button"
+                      onClick={submitDepositFlow}
+                      disabled={depositLocked || isSubmittingDeposit}
+                    >
+                      {isSubmittingDeposit ? 'Memproses...' : 'Deposit'}
                     </button>
                   </div>
                 </article>
@@ -948,8 +991,8 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                       </label>
                     </div>
                     <div className="apk-app-action-row">
-                      <button type="button" className="apk-app-primary-button" onClick={registerWalletAccount}>
-                        Daftar Akun
+                      <button type="button" className="apk-app-primary-button" onClick={registerWalletAccount} disabled={isSubmittingProfile}>
+                        {isSubmittingProfile ? 'Memproses...' : 'Daftar Akun'}
                       </button>
                     </div>
                   </article>
@@ -977,8 +1020,8 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                       </label>
                     </div>
                     <div className="apk-app-action-row">
-                      <button type="button" className="apk-app-primary-button" onClick={loginWalletAccount}>
-                        Login
+                      <button type="button" className="apk-app-primary-button" onClick={loginWalletAccount} disabled={isSubmittingProfile}>
+                        {isSubmittingProfile ? 'Memproses...' : 'Login'}
                       </button>
                     </div>
                   </article>

@@ -17,6 +17,7 @@ export function getAppDataSourceConfig() {
   const smmMode = normalizeSource(process.env.SMM_DATA_SOURCE, 'provider-live');
   const apkDatabaseUrl = String(process.env.DATABASE_URL_APK || '').trim();
   const smmDatabaseUrl = String(process.env.DATABASE_URL_SMM || '').trim();
+  const coreDatabaseUrl = String(process.env.DATABASE_URL_CORE || '').trim();
   const apkRemoteCatalogUrl = String(process.env.APK_PREMIUM_REMOTE_CATALOG_URL || '').trim();
 
   return {
@@ -30,6 +31,11 @@ export function getAppDataSourceConfig() {
       mode: smmMode,
       databaseConfigured: Boolean(smmDatabaseUrl),
       databaseUrl: smmDatabaseUrl,
+    },
+    core: {
+      mode: 'neon' as const,
+      databaseConfigured: Boolean(coreDatabaseUrl),
+      databaseUrl: coreDatabaseUrl,
     },
   };
 }

@@ -2,6 +2,7 @@ import { getAppDataSourceConfig } from '@/lib/data-sources';
 import { getNeonClient } from '@/lib/neon-clients';
 import { formatRupiah } from '@/lib/apk-premium';
 import { getApkPremiumProductById } from '@/lib/apk-premium-store';
+import { recordCoreOrderHistory } from '@/lib/core-store';
 
 type CheckoutInput = {
   productId: string;
@@ -9,6 +10,7 @@ type CheckoutInput = {
   quantity: number;
   customerName: string;
   customerContact: string;
+  accountContact?: string;
   note?: string;
 };
 
@@ -69,6 +71,7 @@ async function buildCheckoutCore(input: CheckoutInput) {
 
   const customerName = String(input.customerName || '').trim();
   const customerContact = String(input.customerContact || '').trim();
+  const accountContact = String(input.accountContact || '').trim();
   const note = String(input.note || '').trim();
 
   if (!customerName) {
@@ -89,6 +92,7 @@ async function buildCheckoutCore(input: CheckoutInput) {
     quantity,
     customerName,
     customerContact,
+    accountContact,
     note,
     unitPrice,
     totalPrice,
@@ -180,6 +184,16 @@ async function submitOrderToNeon(input: CheckoutInput): Promise<ApkSubmittedOrde
       ${'pending'}
     )
   `;
+
+  await recordCoreOrderHistory({
+    accountContact: result.accountContact,
+    subjectName: result.customerName,
+    title: `${result.product.title} - ${result.variant.title}`,
+    amount: result.totalPrice,
+    detail: `Varian: ${result.variant.title}\nJumlah: ${result.quantity}\nKontak: ${result.customerContact || '-'}\nCatatan: ${result.note || '-'}`,
+    methodLabel: 'Order aplikasi premium',
+    reference: result.orderCode,
+  });
 
   return {
     orderCode: result.orderCode,

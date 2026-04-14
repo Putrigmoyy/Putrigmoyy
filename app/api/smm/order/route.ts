@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requestPusatPanel } from '@/lib/pusatpanel';
+import { saveSmmOrder } from '@/lib/smm-store';
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,6 +9,8 @@ export async function POST(request: NextRequest) {
     const data = String(body.data || '').trim();
     const quantity = String(body.quantity || '').trim();
     const username = String(body.username || '').trim();
+    const serviceName = String(body.serviceName || '').trim();
+    const category = String(body.category || '').trim();
     const komen = Array.isArray(body.komen)
       ? body.komen.map((item) => String(item || '').trim()).filter(Boolean).join('\n')
       : String(body.komen || '').trim();
@@ -29,6 +32,20 @@ export async function POST(request: NextRequest) {
     const response = await requestPusatPanel<{ id: string }>({
       ...payload,
     });
+
+    if (response.status && response.data && 'id' in response.data && response.data.id) {
+      await saveSmmOrder({
+        providerOrderId: String(response.data.id),
+        serviceId: service,
+        serviceName: serviceName || service,
+        category,
+        targetData: data,
+        quantity: quantity ? Number(quantity) : null,
+        username,
+        comments: komen,
+        orderStatus: 'pending',
+      });
+    }
 
     return NextResponse.json(response);
   } catch (error) {

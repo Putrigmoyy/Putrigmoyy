@@ -9,6 +9,7 @@ export async function POST(request: Request) {
       quantity?: number | string;
       customerName?: string;
       customerContact?: string;
+      accountContact?: string;
       note?: string;
     };
 
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
       quantity: Number(body.quantity || 0),
       customerName: String(body.customerName || ''),
       customerContact: String(body.customerContact || ''),
+      accountContact: String(body.accountContact || ''),
       note: String(body.note || ''),
     });
 

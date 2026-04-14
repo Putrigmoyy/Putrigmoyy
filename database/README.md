@@ -1,11 +1,13 @@
 # Neon split database plan
 
-Website ini disiapkan untuk 2 database Neon terpisah supaya lebih hemat limit dan lebih gampang dikelola:
+Website ini disiapkan untuk 3 database Neon terpisah supaya lebih hemat limit dan lebih gampang dikelola:
 
 - `DATABASE_URL_APK`
   - khusus produk APK premium, varian, stock akun, dan order premium
 - `DATABASE_URL_SMM`
   - khusus cache layanan social media dan order provider
+- `DATABASE_URL_CORE`
+  - khusus akun website, login, saldo, deposit, riwayat, dan pondasi sinkron owner
 - `OWNER_APP_TOKEN`
   - token sederhana untuk polling notifikasi ke aplikasi owner
 
@@ -21,6 +23,7 @@ Saran penggunaan awal:
 3. Isi `DATABASE_URL_APK`
 4. Setelah tabel siap, ubah `APK_PREMIUM_DATA_SOURCE=neon`
 5. Lakukan hal yang sama terpisah untuk SMM
+6. Jalankan juga SQL `database/neon/core.sql` lalu isi `DATABASE_URL_CORE`
 
 Dengan pola ini storefront tetap hidup walau database belum siap penuh.
 

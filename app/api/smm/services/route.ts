@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { requestPusatPanel } from '@/lib/pusatpanel';
+import type { PusatPanelService } from '@/lib/pusatpanel';
+import { normalizePusatPanelService, requestPusatPanel } from '@/lib/pusatpanel';
+import { syncSmmServicesCache } from '@/lib/smm-store';
 
 export async function POST() {
   try {
@@ -14,6 +16,14 @@ export async function POST() {
     }>>({
       action: 'services',
     });
+
+    if (response.status && Array.isArray(response.data)) {
+      try {
+        await syncSmmServicesCache(response.data.map((service) => normalizePusatPanelService(service as PusatPanelService)));
+      } catch {
+        // ignore cache sync failure
+      }
+    }
 
     return NextResponse.json(response);
   } catch (error) {

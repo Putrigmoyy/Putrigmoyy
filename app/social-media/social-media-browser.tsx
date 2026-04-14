@@ -147,6 +147,8 @@ export function SocialMediaBrowser({ services, categories }: Props) {
           },
           body: JSON.stringify({
             service: selectedService.id,
+            serviceName: selectedService.name,
+            category: selectedService.category,
             data,
             quantity,
             username,

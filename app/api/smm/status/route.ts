@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requestPusatPanel } from '@/lib/pusatpanel';
+import { updateSmmOrderStatus } from '@/lib/smm-store';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +19,10 @@ export async function POST(request: NextRequest) {
       action: 'status',
       id,
     });
+
+    if (response.status && response.data && 'status' in response.data && response.data.status) {
+      await updateSmmOrderStatus(id, String(response.data.status));
+    }
 
     return NextResponse.json(response);
   } catch (error) {
