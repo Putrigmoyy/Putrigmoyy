@@ -44,6 +44,43 @@ function getTotalVariantStock(product: ApkPremiumProduct) {
   return product.variants.reduce((sum, variant) => sum + variant.stock, 0);
 }
 
+function NavGlyph({ type }: { type: PremiumTab }) {
+  if (type === 'apprem') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="4" y="5" width="16" height="14" rx="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M8 9h8M8 12h8M8 15h5" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+
+  if (type === 'deposit') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 8h16v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
+        <path d="M4 10h16M8 6h8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+
+  if (type === 'riwayat') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 7v5l3 2" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+        <path d="M20 12a8 8 0 1 1-2.34-5.66" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+        <path d="M20 5v3h-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="9" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M6.5 18a5.5 5.5 0 0 1 11 0" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 export function ApkPremiumBrowser({ products, categories }: Props) {
   const [activeTab, setActiveTab] = useState<PremiumTab>('apprem');
   const [query, setQuery] = useState('');
@@ -609,7 +646,9 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
             className={activeTab === 'apprem' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
             onClick={() => setActiveTab('apprem')}
           >
-            <span className="apk-app-nav-icon">A</span>
+            <span className="apk-app-nav-icon">
+              <NavGlyph type="apprem" />
+            </span>
             <span>Apprem</span>
           </button>
           <button
@@ -617,7 +656,9 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
             className={activeTab === 'deposit' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
             onClick={() => setActiveTab('deposit')}
           >
-            <span className="apk-app-nav-icon">D</span>
+            <span className="apk-app-nav-icon">
+              <NavGlyph type="deposit" />
+            </span>
             <span>Deposit</span>
           </button>
           <button
@@ -625,7 +666,9 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
             className={activeTab === 'riwayat' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
             onClick={() => setActiveTab('riwayat')}
           >
-            <span className="apk-app-nav-icon">R</span>
+            <span className="apk-app-nav-icon">
+              <NavGlyph type="riwayat" />
+            </span>
             <span>Riwayat</span>
           </button>
           <button
@@ -633,7 +676,9 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
             className={activeTab === 'profil' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
             onClick={() => setActiveTab('profil')}
           >
-            <span className="apk-app-nav-icon">P</span>
+            <span className="apk-app-nav-icon">
+              <NavGlyph type="profil" />
+            </span>
             <span>Profil</span>
           </button>
         </nav>
