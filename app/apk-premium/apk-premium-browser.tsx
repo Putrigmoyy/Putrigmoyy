@@ -108,6 +108,9 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
     totalSold: products.reduce((sum, product) => sum + product.sold, 0),
   };
 
+  const selectedQuantity = Math.max(1, Number(checkoutForm.quantity || 1));
+  const selectedTotal = selectedVariant ? selectedVariant.price * selectedQuantity : 0;
+
   const pushHistory = (entry: Omit<HistoryEntry, 'id' | 'createdAt'>) => {
     setHistoryEntries((current) => [
       {
@@ -159,6 +162,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
     startPreview(async () => {
       setCheckoutFeedback({ tone: 'idle', text: 'Menyiapkan preview checkout website...' });
       setCheckoutPreview(null);
+
       try {
         const response = await fetch('/api/apk-premium/checkout', {
           method: 'POST',
@@ -174,6 +178,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
             note: checkoutForm.note,
           }),
         });
+
         const result = await response.json() as {
           status?: boolean;
           data?: {
@@ -201,13 +206,15 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
           totalPriceLabel: String(result.data.totalPriceLabel || '0'),
           dataSource: String(result.data.dataSource || '-'),
         });
+
         setCheckoutFeedback({
           tone: 'success',
           text: `Preview checkout siap. Kode order: ${result.data.orderCode}`,
         });
+
         pushHistory({
           type: 'preview',
-          title: `${selectedProduct.title} • ${selectedVariant.title}`,
+          title: `${selectedProduct.title} - ${selectedVariant.title}`,
           detail: `Preview checkout ${result.data.orderCode}`,
           amountLabel: `Rp ${String(result.data.totalPriceLabel || '0')}`,
         });
@@ -228,6 +235,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
 
     startOrderSubmit(async () => {
       setCheckoutFeedback({ tone: 'idle', text: 'Membuat order website APK premium...' });
+
       try {
         const response = await fetch('/api/apk-premium/order', {
           method: 'POST',
@@ -243,6 +251,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
             note: checkoutForm.note,
           }),
         });
+
         const result = await response.json() as {
           status?: boolean;
           data?: {
@@ -265,9 +274,10 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
           tone: 'success',
           text: `Order ${result.data.orderCode} berhasil dibuat. ${result.data.nextStep || ''}`.trim(),
         });
+
         pushHistory({
           type: 'order',
-          title: `${selectedProduct.title} • ${selectedVariant.title}`,
+          title: `${selectedProduct.title} - ${selectedVariant.title}`,
           detail: `Order website ${result.data.orderCode}`,
           amountLabel: `Rp ${String(result.data.totalPriceLabel || '0')}`,
         });
@@ -359,9 +369,15 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                       <strong>{selectedProduct.title}</strong>
                       <span>{selectedProduct.subtitle}</span>
                       <small>
-                        {getTotalVariantStock(selectedProduct)} stock • {selectedProduct.sold} terjual
+                        {getTotalVariantStock(selectedProduct)} stock - {selectedProduct.sold} terjual
                       </small>
                     </div>
+                  </div>
+
+                  <div className="apk-app-selected-tags">
+                    <span>{selectedProduct.category}</span>
+                    <span>{selectedProduct.delivery}</span>
+                    <span>{selectedProduct.guarantee}</span>
                   </div>
 
                   <div className="apk-app-variant-list">
@@ -374,9 +390,10 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                           className={active ? 'apk-app-variant-card apk-app-variant-card--active' : 'apk-app-variant-card'}
                           onClick={() => pickVariant(variant)}
                         >
-                          <div>
+                          <div className="apk-app-variant-copy">
                             <strong>{variant.title}</strong>
                             <span>{variant.duration}</span>
+                            {variant.badge ? <small className="apk-app-variant-badge">{variant.badge}</small> : null}
                           </div>
                           <div className="apk-app-variant-meta">
                             <em>Rp {formatRupiah(variant.price)}</em>
@@ -404,10 +421,22 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                       <span>Pengiriman</span>
                       <strong>{selectedProduct.delivery}</strong>
                     </div>
+                    <div>
+                      <span>Jumlah</span>
+                      <strong>{selectedQuantity}</strong>
+                    </div>
+                    <div>
+                      <span>Total Live</span>
+                      <strong>Rp {formatRupiah(selectedTotal)}</strong>
+                    </div>
                   </div>
 
                   <div className="apk-app-form-card">
                     <span className="apk-app-section-label">Order website</span>
+                    <div className="apk-app-form-note">
+                      Total akan otomatis berubah mengikuti jumlah yang kamu isi di bawah.
+                    </div>
+
                     <div className="apk-app-form-grid">
                       <label className="apk-app-form-field">
                         <span>Nama customer</span>
@@ -475,6 +504,9 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                       <button type="button" className="apk-app-secondary-button" onClick={submitWebsiteOrder} disabled={isSubmittingOrder}>
                         {isSubmittingOrder ? 'Memproses...' : 'Buat Order'}
                       </button>
+                      <button type="button" className="apk-app-ghost-button" onClick={backToCatalog}>
+                        Pilih Aplikasi Lain
+                      </button>
                     </div>
                   </div>
                 </>
@@ -526,7 +558,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                       <strong>{entry.title}</strong>
                       <p>{entry.detail}</p>
                       <p>
-                        {entry.amountLabel} • {entry.createdAt}
+                        {entry.amountLabel} - {entry.createdAt}
                       </p>
                     </article>
                   ))}
