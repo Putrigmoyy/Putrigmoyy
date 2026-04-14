@@ -99,31 +99,31 @@ function SocialNavGlyph({ type }: { type: SocialTab }) {
   if (type === 'sosmed') {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <rect x="4" y="5" width="16" height="14" rx="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
-        <path d="M8 9h8M8 12h8M8 15h4" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+        <rect x="4.75" y="5.5" width="14.5" height="13" rx="3.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M8.1 9.15h7.8M8.1 12h7.8M8.1 14.85h4.35" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" />
       </svg>
     );
   }
   if (type === 'riwayat') {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 7v5l3 2" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-        <path d="M20 12a8 8 0 1 1-2.34-5.66" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-        <path d="M20 5v3h-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+        <path d="M12 7.4v4.45l2.6 1.7" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" />
+        <path d="M19.3 12a7.3 7.3 0 1 1-2.2-5.2" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" />
+        <path d="M19.35 5.65v2.85H16.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" />
       </svg>
     );
   }
   if (type === 'status') {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="1.8" />
-        <path d="M9.5 12.3l1.7 1.7 3.7-4.1" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+        <circle cx="12" cy="12" r="7.35" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M9.45 12.2l1.7 1.72 3.55-3.95" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" />
       </svg>
     );
   }
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 8h16M7 5h10M6 11h12v8H6z" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="M5 8.1h14M7.3 5.7h9.4M6.4 10.85h11.2v7.2H6.4z" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" />
     </svg>
   );
 }
@@ -744,10 +744,10 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             <button
               key={tab}
               type="button"
-              className={activeTab === tab ? 'apk-app-bottom-tab apk-app-bottom-tab--active' : 'apk-app-bottom-tab'}
+              className={activeTab === tab ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
               onClick={() => setActiveTab(tab)}
             >
-              <span className="apk-app-bottom-icon">
+              <span className="apk-app-nav-icon">
                 <SocialNavGlyph type={tab} />
               </span>
               <span>{label}</span>
