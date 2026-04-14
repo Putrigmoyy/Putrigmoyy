@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "bootstrap:neon": "node scripts/bootstrap-neon.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
