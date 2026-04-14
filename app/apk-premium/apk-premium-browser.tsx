@@ -23,12 +23,12 @@ type HistoryEntry = {
 };
 
 const productArtwork: Record<string, string> = {
-  canva: '/premium-canva.svg',
-  netflix: '/premium-netflix.svg',
-  'yt-premium': '/premium-youtube.svg',
-  capcut: '/premium-capcut.svg',
-  spotify: '/premium-spotify.svg',
-  chatgpt: '/premium-chatgpt.svg',
+  canva: '/premium-icons/canva.jpg',
+  netflix: '/premium-icons/netflix.jpg',
+  'yt-premium': '/premium-icons/youtube.jpg',
+  capcut: '/premium-icons/capcut.jpg',
+  spotify: '/premium-icons/spotify.jpg',
+  chatgpt: '/premium-icons/chatgpt.jpg',
 };
 
 function getProductArtwork(productId: string) {
