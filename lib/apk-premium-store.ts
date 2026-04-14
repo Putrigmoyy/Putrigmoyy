@@ -10,7 +10,7 @@ export type ApkPremiumCatalogSummary = {
 };
 
 export type ApkPremiumCatalogPayload = {
-  dataSource: 'local-seed' | 'neon' | 'local-seed-fallback';
+  dataSource: 'local-seed' | 'neon' | 'local-seed-fallback' | 'remote-json';
   syncReady: boolean;
   updatedAt: string;
   categories: string[];
@@ -48,6 +48,113 @@ function createSeedCatalog(dataSource: ApkPremiumCatalogPayload['dataSource']): 
     dataSource,
     syncReady: false,
     updatedAt: new Date().toISOString(),
+    categories,
+    summary: buildSummary(products),
+    products,
+  };
+}
+
+type RemoteOwnerCatalogVariant = {
+  id?: string;
+  title?: string;
+  name?: string;
+  duration?: string;
+  price?: number;
+  stock?: number;
+  badge?: string | null;
+};
+
+type RemoteOwnerCatalogProduct = {
+  id?: string;
+  title?: string;
+  name?: string;
+  subtitle?: string;
+  category?: string;
+  stock?: number;
+  sold?: number;
+  rating?: string;
+  delivery?: string;
+  accent?: ApkPremiumProduct['accent'];
+  note?: string;
+  guarantee?: string;
+  variants?: RemoteOwnerCatalogVariant[];
+};
+
+function mapRemoteCatalogProduct(raw: RemoteOwnerCatalogProduct, index: number): ApkPremiumProduct {
+  const variants = Array.isArray(raw.variants)
+    ? raw.variants.map((variant, variantIndex) => ({
+        id: String(variant.id || `variant-${index + 1}-${variantIndex + 1}`),
+        title: String(variant.title || variant.name || `Varian ${variantIndex + 1}`),
+        duration: String(variant.duration || '').trim() || 'Sesuai deskripsi',
+        price: Number(variant.price || 0),
+        stock: Number(variant.stock || 0),
+        badge: variant.badge ? String(variant.badge) : undefined,
+      }))
+    : [];
+
+  return {
+    id: String(raw.id || `product-${index + 1}`),
+    title: String(raw.title || raw.name || `Produk ${index + 1}`),
+    subtitle: String(raw.subtitle || '').trim() || 'Aplikasi premium siap order cepat.',
+    category: String(raw.category || '').trim() || 'App Premium',
+    stock: Number(raw.stock || 0),
+    sold: Number(raw.sold || 0),
+    rating: String(raw.rating || '').trim() || '4.9/5',
+    delivery: String(raw.delivery || '').trim() || 'Auto kirim akun',
+    accent: ['cyan', 'amber', 'emerald', 'violet'].includes(String(raw.accent || ''))
+      ? (raw.accent as ApkPremiumProduct['accent'])
+      : (['cyan', 'amber', 'emerald', 'violet'][index % 4] as ApkPremiumProduct['accent']),
+    note: String(raw.note || '').trim() || 'Detail produk mengikuti varian yang dipilih.',
+    guarantee: String(raw.guarantee || '').trim() || 'Garansi mengikuti ketentuan toko dan durasi varian.',
+    variants,
+  };
+}
+
+async function getApkPremiumCatalogFromRemote(remoteCatalogUrl: string): Promise<ApkPremiumCatalogPayload> {
+  const response = await fetch(remoteCatalogUrl, {
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Gagal mengambil katalog Apprem dari owner bridge.');
+  }
+
+  const rawPayload = (await response.json()) as unknown;
+  const catalogSource =
+    rawPayload &&
+    typeof rawPayload === 'object' &&
+    'catalog' in rawPayload &&
+    rawPayload.catalog &&
+    typeof rawPayload.catalog === 'object'
+      ? rawPayload.catalog
+      : rawPayload;
+
+  const catalog = (catalogSource && typeof catalogSource === 'object' ? catalogSource : {}) as {
+    updatedAt?: string;
+    categories?: string[];
+    products?: RemoteOwnerCatalogProduct[];
+  };
+  const products = sortProducts(
+    (Array.isArray(catalog.products) ? catalog.products : []).map((product, index) =>
+      mapRemoteCatalogProduct(product, index),
+    ),
+  );
+  const categories = Array.from(
+    new Set(
+      (catalog.categories && catalog.categories.length > 0
+        ? catalog.categories
+        : products.map((product) => product.category)
+      ).filter(Boolean),
+    ),
+  ).sort((left, right) => left.localeCompare(right, 'id'));
+
+  return {
+    dataSource: 'remote-json',
+    syncReady: true,
+    updatedAt: String(catalog.updatedAt || new Date().toISOString()),
     categories,
     summary: buildSummary(products),
     products,
@@ -158,6 +265,14 @@ async function getApkPremiumCatalogFromNeon(): Promise<ApkPremiumCatalogPayload>
 
 export async function getApkPremiumCatalog(): Promise<ApkPremiumCatalogPayload> {
   const config = getAppDataSourceConfig();
+  if (config.apk.mode === 'remote-json' && config.apk.remoteCatalogUrl) {
+    try {
+      return await getApkPremiumCatalogFromRemote(config.apk.remoteCatalogUrl);
+    } catch {
+      return createSeedCatalog('local-seed-fallback');
+    }
+  }
+
   if (config.apk.mode === 'neon' && config.apk.databaseConfigured) {
     try {
       return await getApkPremiumCatalogFromNeon();
