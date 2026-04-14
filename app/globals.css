@@ -65,13 +65,7 @@ a {
   background: #ffffff;
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.4s ease, visibility 0.4s ease;
-}
-
-.dashboard-loading-layer--hidden {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
+  animation: dashboard-loading-hide 0.45s ease 2s forwards;
 }
 
 .dashboard-loading-card {
@@ -90,15 +84,8 @@ a {
   width: min(calc(100% - 28px), 430px);
   margin: 0 auto;
   padding: 28px 0 48px;
-}
-
-.dashboard-mobile--hidden {
   opacity: 0;
-}
-
-.dashboard-mobile--ready {
-  opacity: 1;
-  transition: opacity 0.35s ease;
+  animation: dashboard-content-show 0.45s ease 2s forwards;
 }
 
 .dashboard-head {
@@ -1273,6 +1260,29 @@ a {
 
   to {
     transform: translateX(-50%);
+  }
+}
+
+@keyframes dashboard-loading-hide {
+  0% {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  100% {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
+@keyframes dashboard-content-show {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
   }
 }
 

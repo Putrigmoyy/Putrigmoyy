@@ -1,8 +1,5 @@
-'use client';
-
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 
 type DashboardItem = {
   title: string;
@@ -17,16 +14,9 @@ type Props = {
 };
 
 export function DashboardHome({ items }: Props) {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setReady(true), 2000);
-    return () => window.clearTimeout(timer);
-  }, []);
-
   return (
     <main className="dashboard-shell">
-      <div className={ready ? 'dashboard-loading-layer dashboard-loading-layer--hidden' : 'dashboard-loading-layer'}>
+      <div className="dashboard-loading-layer">
         <div className="dashboard-loading-card">
           <Image
             src="/loading-double-ring.svg"
@@ -39,7 +29,7 @@ export function DashboardHome({ items }: Props) {
         </div>
       </div>
 
-      <section className={ready ? 'dashboard-mobile dashboard-mobile--ready' : 'dashboard-mobile dashboard-mobile--hidden'}>
+      <section className="dashboard-mobile">
         <div className="dashboard-head">
           <span className="dashboard-kicker">PUTRI GMOYY STORE</span>
           <h1>Dashboard Katalog</h1>
