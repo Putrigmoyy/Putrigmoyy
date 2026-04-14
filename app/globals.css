@@ -27,7 +27,8 @@ body {
   min-height: 100%;
   background: #ffffff;
   color: var(--text);
-  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+  font-family: inherit;
+  overflow-x: hidden;
 }
 
 body {
@@ -158,19 +159,22 @@ a {
 .apk-app-page {
   min-height: 100dvh;
   background: #ffffff;
+  overflow-x: hidden;
 }
 
 .apk-app-shell {
   min-height: 100dvh;
   background: #ffffff;
+  overflow-x: hidden;
 }
 
 .apk-app-phone {
   width: min(100%, 430px);
   min-height: 100dvh;
   margin: 0 auto;
-  padding: 18px 16px 108px;
+  padding: 14px 14px calc(112px + env(safe-area-inset-bottom, 0px));
   background: #ffffff;
+  overflow-x: hidden;
 }
 
 .apk-app-header {
@@ -307,8 +311,16 @@ a {
   margin-top: 16px;
 }
 
+.apk-app-content--tight {
+  margin-top: 0;
+}
+
 .apk-app-panel {
   padding: 18px;
+}
+
+.apk-app-panel--plain {
+  padding: 14px;
 }
 
 .apk-app-panel-head {
@@ -345,6 +357,31 @@ a {
   display: grid;
   gap: 8px;
   margin-bottom: 14px;
+}
+
+.apk-app-search--top {
+  margin-bottom: 12px;
+}
+
+.apk-app-inline-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.apk-app-inline-stats span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(23, 153, 242, 0.14);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111111;
+  font-size: 0.74rem;
+  font-weight: 700;
 }
 
 .apk-app-search span,
@@ -491,6 +528,40 @@ a {
   margin-bottom: 14px;
 }
 
+.apk-app-order-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.apk-app-back-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(23, 153, 242, 0.14);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111111;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.apk-app-order-head-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.apk-app-order-head-copy h3 {
+  margin: 0;
+  color: #111111;
+  font-size: 1rem;
+}
+
 .apk-app-category-row-copy,
 .apk-app-selected-copy {
   display: grid;
@@ -599,15 +670,16 @@ a {
 .apk-app-bottom-nav {
   position: fixed;
   left: 50%;
-  bottom: 18px;
+  right: auto;
+  bottom: 0;
   z-index: 20;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-  width: min(calc(100% - 24px), 398px);
-  padding: 10px;
+  width: min(100%, 430px);
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
   border: 1px solid rgba(23, 153, 242, 0.14);
-  border-radius: 28px;
+  border-radius: 24px 24px 0 0;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 18px 40px rgba(23, 153, 242, 0.12);
   transform: translateX(-50%);
@@ -1964,7 +2036,7 @@ a {
 
   .apk-app-phone {
     width: 100%;
-    padding: 16px 14px 104px;
+    padding: 12px 12px calc(108px + env(safe-area-inset-bottom, 0px));
   }
 
   .apk-app-hero,
@@ -1994,10 +2066,10 @@ a {
   }
 
   .apk-app-bottom-nav {
-    width: calc(100% - 20px);
-    bottom: 12px;
-    border-radius: 24px;
-    padding: 9px;
+    width: min(100%, 430px);
+    bottom: 0;
+    border-radius: 22px 22px 0 0;
+    padding: 9px 10px calc(9px + env(safe-area-inset-bottom, 0px));
   }
 
   .apk-app-nav-item {

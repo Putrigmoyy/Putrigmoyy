@@ -11,7 +11,16 @@ type Props = {
   categories: string[];
 };
 
-type PremiumTab = 'dashboard' | 'kategori' | 'checkout' | 'info';
+type PremiumTab = 'apprem' | 'deposit' | 'riwayat' | 'profil';
+
+type HistoryEntry = {
+  id: string;
+  type: 'preview' | 'order';
+  title: string;
+  detail: string;
+  amountLabel: string;
+  createdAt: string;
+};
 
 const productArtwork: Record<string, string> = {
   canva: '/premium-canva.svg',
@@ -36,11 +45,11 @@ function getTotalVariantStock(product: ApkPremiumProduct) {
 }
 
 export function ApkPremiumBrowser({ products, categories }: Props) {
-  const [activeTab, setActiveTab] = useState<PremiumTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<PremiumTab>('apprem');
   const [query, setQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('Semua');
   const [selectedProductId, setSelectedProductId] = useState(products[0]?.id || '');
   const [selectedVariantId, setSelectedVariantId] = useState(products[0]?.variants[0]?.id || '');
+  const [appremMode, setAppremMode] = useState<'catalog' | 'order'>('catalog');
   const [checkoutForm, setCheckoutForm] = useState({
     quantity: '1',
     customerName: '',
@@ -54,9 +63,10 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
     totalPriceLabel: string;
     dataSource: string;
   }>(null);
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [checkoutFeedback, setCheckoutFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
     tone: 'idle',
-    text: 'Pilih produk premium lalu lanjut ke checkout website.',
+    text: 'Pilih aplikasi premium lalu lanjutkan order langsung dari menu apprem.',
   });
   const [isPreviewing, startPreview] = useTransition();
   const [isSubmittingOrder, startOrderSubmit] = useTransition();
@@ -64,25 +74,19 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
 
   useEffect(() => {
     const previousPaddingBottom = document.body.style.paddingBottom;
+    const previousOverflowX = document.body.style.overflowX;
     document.body.style.paddingBottom = '0';
+    document.body.style.overflowX = 'hidden';
 
     return () => {
       document.body.style.paddingBottom = previousPaddingBottom;
+      document.body.style.overflowX = previousOverflowX;
     };
   }, []);
 
-  const summaryStats = {
-    totalProducts: products.length,
-    totalVariants: products.reduce((sum, product) => sum + product.variants.length, 0),
-    totalStock: products.reduce((sum, product) => sum + getTotalVariantStock(product), 0),
-    totalSold: products.reduce((sum, product) => sum + product.sold, 0),
-  };
-
   const filteredProducts = products.filter((product) => {
-    const matchesCategory = activeCategory === 'Semua' || product.category === activeCategory;
     const haystack = [product.title, product.subtitle, product.category, product.note, product.delivery].join(' ').toLowerCase();
-    const matchesQuery = !deferredQuery || haystack.includes(deferredQuery);
-    return matchesCategory && matchesQuery;
+    return !deferredQuery || haystack.includes(deferredQuery);
   });
 
   const selectedProduct =
@@ -97,15 +101,43 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
     selectedProduct?.variants[0] ||
     null;
 
-  const openProduct = (product: ApkPremiumProduct, nextTab: PremiumTab = 'checkout') => {
+  const summaryStats = {
+    totalProducts: products.length,
+    totalVariants: products.reduce((sum, product) => sum + product.variants.length, 0),
+    totalStock: products.reduce((sum, product) => sum + getTotalVariantStock(product), 0),
+    totalSold: products.reduce((sum, product) => sum + product.sold, 0),
+  };
+
+  const pushHistory = (entry: Omit<HistoryEntry, 'id' | 'createdAt'>) => {
+    setHistoryEntries((current) => [
+      {
+        ...entry,
+        id: `${entry.type}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        createdAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      },
+      ...current,
+    ].slice(0, 10));
+  };
+
+  const openProduct = (product: ApkPremiumProduct) => {
     setSelectedProductId(product.id);
     setSelectedVariantId(product.variants[0]?.id || '');
     setCheckoutPreview(null);
     setCheckoutFeedback({
       tone: 'idle',
-      text: `Produk "${product.title}" siap dilanjutkan ke checkout.`,
+      text: `Produk "${product.title}" siap dilanjutkan ke order website.`,
     });
-    setActiveTab(nextTab);
+    setActiveTab('apprem');
+    setAppremMode('order');
+  };
+
+  const backToCatalog = () => {
+    setAppremMode('catalog');
+    setCheckoutPreview(null);
+    setCheckoutFeedback({
+      tone: 'idle',
+      text: 'Pilih aplikasi premium lalu lanjutkan order langsung dari menu apprem.',
+    });
   };
 
   const pickVariant = (variant: ApkPremiumVariant) => {
@@ -173,6 +205,12 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
           tone: 'success',
           text: `Preview checkout siap. Kode order: ${result.data.orderCode}`,
         });
+        pushHistory({
+          type: 'preview',
+          title: `${selectedProduct.title} • ${selectedVariant.title}`,
+          detail: `Preview checkout ${result.data.orderCode}`,
+          amountLabel: `Rp ${String(result.data.totalPriceLabel || '0')}`,
+        });
       } catch (error) {
         setCheckoutFeedback({
           tone: 'error',
@@ -212,7 +250,6 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
             orderCode?: string;
             totalPriceLabel?: string;
             nextStep?: string;
-            syncReady?: boolean;
           };
         };
 
@@ -228,15 +265,12 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
           tone: 'success',
           text: `Order ${result.data.orderCode} berhasil dibuat. ${result.data.nextStep || ''}`.trim(),
         });
-        setCheckoutPreview((current) =>
-          current
-            ? {
-                ...current,
-                orderCode: result.data?.orderCode || current.orderCode,
-                totalPriceLabel: String(result.data?.totalPriceLabel || current.totalPriceLabel),
-              }
-            : current,
-        );
+        pushHistory({
+          type: 'order',
+          title: `${selectedProduct.title} • ${selectedVariant.title}`,
+          detail: `Order website ${result.data.orderCode}`,
+          amountLabel: `Rp ${String(result.data.totalPriceLabel || '0')}`,
+        });
       } catch (error) {
         setCheckoutFeedback({
           tone: 'error',
@@ -249,165 +283,68 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
   return (
     <div className="apk-app-shell">
       <div className="apk-app-phone">
-        <header className="apk-app-header">
-          <Link href="/" className="apk-app-home-link">
-            Dashboard
-          </Link>
-          <div className="apk-app-header-copy">
-            <span className="apk-app-kicker">Aplikasi Premium</span>
-            <h1>Putri Gmoyy Store</h1>
-          </div>
-          <span className="apk-app-header-badge">Mobile</span>
-        </header>
-
-        <section className="apk-app-hero">
-          <div>
-            <span className="apk-app-kicker">Premium Center</span>
-            <h2>Semua aplikasi premium dalam satu menu yang rapat dan nyaman di HP.</h2>
-            <p>
-              Dashboard ini disusun seperti aplikasi mobile, lengkap dengan daftar produk bergambar,
-              kategori, checkout website, dan info sinkronisasi.
-            </p>
-          </div>
-          <div className="apk-app-stat-strip">
-            <div>
-              <span>Produk</span>
-              <strong>{summaryStats.totalProducts}</strong>
-            </div>
-            <div>
-              <span>Varian</span>
-              <strong>{summaryStats.totalVariants}</strong>
-            </div>
-            <div>
-              <span>Stock</span>
-              <strong>{summaryStats.totalStock}</strong>
-            </div>
-          </div>
-        </section>
-
-        <div className="apk-app-content">
-          {activeTab === 'dashboard' ? (
-            <section className="apk-app-panel">
-              <div className="apk-app-panel-head">
-                <div>
-                  <span className="apk-app-section-label">Dashboard</span>
-                  <h3>Daftar aplikasi premium</h3>
-                </div>
-                <span className="apk-app-count-pill">{filteredProducts.length} produk</span>
-              </div>
-
-              <label className="apk-app-search">
-                <span>Cari aplikasi premium</span>
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Cari Canva, Netflix, Spotify, AI Tools"
-                />
-              </label>
-
-              <div className="apk-app-product-grid">
-                {filteredProducts.map((product) => (
-                  <button
-                    key={product.id}
-                    type="button"
-                    className="apk-app-product-card"
-                    onClick={() => openProduct(product)}
-                  >
-                    <div className="apk-app-product-image">
-                      <Image
-                        src={getProductArtwork(product.id)}
-                        alt={product.title}
-                        fill
-                        sizes="(max-width: 640px) 42vw, 180px"
-                        className="apk-app-product-art"
-                      />
-                    </div>
-                    <div className="apk-app-product-copy">
-                      <strong>{product.title}</strong>
-                      <span>{product.category}</span>
-                      <em>Mulai Rp {formatRupiah(getLowestPrice(product))}</em>
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {filteredProducts.length === 0 ? (
-                <div className="apk-app-empty">Belum ada produk yang cocok dengan pencarian ini.</div>
-              ) : null}
-            </section>
-          ) : null}
-
-          {activeTab === 'kategori' ? (
-            <section className="apk-app-panel">
-              <div className="apk-app-panel-head">
-                <div>
-                  <span className="apk-app-section-label">Kategori</span>
-                  <h3>Pilih kategori paling cocok</h3>
-                </div>
-              </div>
-
-              <div className="apk-app-chip-row">
-                <button
-                  type="button"
-                  className={activeCategory === 'Semua' ? 'apk-app-chip apk-app-chip--active' : 'apk-app-chip'}
-                  onClick={() => setActiveCategory('Semua')}
-                >
-                  Semua
-                </button>
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    className={activeCategory === category ? 'apk-app-chip apk-app-chip--active' : 'apk-app-chip'}
-                    onClick={() => setActiveCategory(category)}
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
-
-              <div className="apk-app-category-stack">
-                {filteredProducts.map((product) => (
-                  <button
-                    key={product.id}
-                    type="button"
-                    className="apk-app-category-row"
-                    onClick={() => openProduct(product)}
-                  >
-                    <div className="apk-app-category-row-image">
-                      <Image
-                        src={getProductArtwork(product.id)}
-                        alt={product.title}
-                        fill
-                        sizes="80px"
-                        className="apk-app-product-art"
-                      />
-                    </div>
-                    <div className="apk-app-category-row-copy">
-                      <strong>{product.title}</strong>
-                      <span>{product.subtitle}</span>
-                      <small>
-                        {product.variants.length} varian • {getTotalVariantStock(product)} stock
-                      </small>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          {activeTab === 'checkout' ? (
-            <section className="apk-app-panel">
-              <div className="apk-app-panel-head">
-                <div>
-                  <span className="apk-app-section-label">Checkout</span>
-                  <h3>{selectedProduct ? selectedProduct.title : 'Pilih produk premium'}</h3>
-                </div>
-                {selectedProduct ? <span className="apk-app-count-pill">{selectedProduct.category}</span> : null}
-              </div>
-
-              {selectedProduct && selectedVariant ? (
+        <div className="apk-app-content apk-app-content--tight">
+          {activeTab === 'apprem' ? (
+            <section className="apk-app-panel apk-app-panel--plain">
+              {appremMode === 'catalog' ? (
                 <>
+                  <label className="apk-app-search apk-app-search--top">
+                    <span>Cari aplikasi premium</span>
+                    <input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Cari Canva, Netflix, Spotify, ChatGPT"
+                    />
+                  </label>
+
+                  <div className="apk-app-inline-stats">
+                    <span>{summaryStats.totalProducts} produk</span>
+                    <span>{summaryStats.totalVariants} varian</span>
+                    <span>{summaryStats.totalStock} stock</span>
+                  </div>
+
+                  <div className="apk-app-product-grid">
+                    {filteredProducts.map((product) => (
+                      <button
+                        key={product.id}
+                        type="button"
+                        className="apk-app-product-card"
+                        onClick={() => openProduct(product)}
+                      >
+                        <div className="apk-app-product-image">
+                          <Image
+                            src={getProductArtwork(product.id)}
+                            alt={product.title}
+                            fill
+                            sizes="(max-width: 640px) 42vw, 180px"
+                            className="apk-app-product-art"
+                          />
+                        </div>
+                        <div className="apk-app-product-copy">
+                          <strong>{product.title}</strong>
+                          <span>{product.category}</span>
+                          <em>Mulai Rp {formatRupiah(getLowestPrice(product))}</em>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {filteredProducts.length === 0 ? (
+                    <div className="apk-app-empty">Belum ada aplikasi yang cocok dengan pencarian ini.</div>
+                  ) : null}
+                </>
+              ) : selectedProduct && selectedVariant ? (
+                <>
+                  <div className="apk-app-order-head">
+                    <button type="button" className="apk-app-back-button" onClick={backToCatalog}>
+                      Kembali
+                    </button>
+                    <div className="apk-app-order-head-copy">
+                      <span className="apk-app-section-label">Apprem</span>
+                      <h3>{selectedProduct.title}</h3>
+                    </div>
+                  </div>
+
                   <div className="apk-app-selected-card">
                     <div className="apk-app-selected-image">
                       <Image
@@ -470,7 +407,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                   </div>
 
                   <div className="apk-app-form-card">
-                    <span className="apk-app-section-label">Form order website</span>
+                    <span className="apk-app-section-label">Order website</span>
                     <div className="apk-app-form-grid">
                       <label className="apk-app-form-field">
                         <span>Nama customer</span>
@@ -542,32 +479,89 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                   </div>
                 </>
               ) : (
-                <div className="apk-app-empty">Pilih produk premium dari dashboard dulu.</div>
+                <div className="apk-app-empty">Pilih aplikasi premium dari daftar dulu.</div>
               )}
             </section>
           ) : null}
 
-          {activeTab === 'info' ? (
-            <section className="apk-app-panel">
+          {activeTab === 'deposit' ? (
+            <section className="apk-app-panel apk-app-panel--plain">
               <div className="apk-app-panel-head">
                 <div>
-                  <span className="apk-app-section-label">Info</span>
-                  <h3>Flow website dan stok pusat</h3>
+                  <span className="apk-app-section-label">Deposit</span>
+                  <h3>Metode isi saldo dan pembayaran</h3>
                 </div>
               </div>
 
               <div className="apk-app-info-stack">
                 <article className="apk-app-info-card">
-                  <strong>1. Restock dari aplikasi owner</strong>
-                  <p>Produk, varian, dan akun tetap dikelola dari aplikasi owner agar owner tidak repot input manual di website.</p>
+                  <strong>Deposit QRIS Website</strong>
+                  <p>Hubungkan QRIS Midtrans website agar pelanggan bisa isi saldo atau bayar order premium dengan cepat.</p>
                 </article>
                 <article className="apk-app-info-card">
-                  <strong>2. Website dan private chat sinkron</strong>
-                  <p>Order website dan autoorder WhatsApp akan membaca stok pusat yang sama, jadi stock tetap realtime.</p>
+                  <strong>Deposit Social Media</strong>
+                  <p>Saldo untuk layanan social media nanti bisa dibuat satu alur terpisah agar lebih rapi dan hemat limit.</p>
                 </article>
                 <article className="apk-app-info-card">
-                  <strong>3. Notifikasi owner siap disambungkan</strong>
-                  <p>Order berhasil dari website nanti bisa mendorong notifikasi ke aplikasi owner dan grup store kamu.</p>
+                  <strong>Status Sinkron Owner</strong>
+                  <p>Begitu backend penuh aktif, notifikasi deposit berhasil bisa masuk ke aplikasi owner dan grup store kamu.</p>
+                </article>
+              </div>
+            </section>
+          ) : null}
+
+          {activeTab === 'riwayat' ? (
+            <section className="apk-app-panel apk-app-panel--plain">
+              <div className="apk-app-panel-head">
+                <div>
+                  <span className="apk-app-section-label">Riwayat Transaksi</span>
+                  <h3>Aktivitas preview dan order website</h3>
+                </div>
+              </div>
+
+              {historyEntries.length ? (
+                <div className="apk-app-info-stack">
+                  {historyEntries.map((entry) => (
+                    <article key={entry.id} className="apk-app-info-card">
+                      <strong>{entry.title}</strong>
+                      <p>{entry.detail}</p>
+                      <p>
+                        {entry.amountLabel} • {entry.createdAt}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="apk-app-empty">Belum ada riwayat transaksi. Aktivitas preview dan order akan muncul di sini.</div>
+              )}
+            </section>
+          ) : null}
+
+          {activeTab === 'profil' ? (
+            <section className="apk-app-panel apk-app-panel--plain">
+              <div className="apk-app-panel-head">
+                <div>
+                  <span className="apk-app-section-label">Profil</span>
+                  <h3>Putri Gmoyy Store</h3>
+                </div>
+              </div>
+
+              <div className="apk-app-info-stack">
+                <article className="apk-app-info-card">
+                  <strong>Katalog Premium</strong>
+                  <p>
+                    Total {summaryStats.totalProducts} aplikasi premium dengan {summaryStats.totalVariants} varian aktif dan {summaryStats.totalStock} stock.
+                  </p>
+                </article>
+                <article className="apk-app-info-card">
+                  <strong>Kategori Aktif</strong>
+                  <p>{categories.join(', ')}</p>
+                </article>
+                <article className="apk-app-info-card">
+                  <strong>Navigasi Cepat</strong>
+                  <p>
+                    <Link href="/">Kembali ke dashboard utama</Link>
+                  </p>
                 </article>
               </div>
             </section>
@@ -577,35 +571,35 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
         <nav className="apk-app-bottom-nav">
           <button
             type="button"
-            className={activeTab === 'dashboard' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
-            onClick={() => setActiveTab('dashboard')}
+            className={activeTab === 'apprem' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
+            onClick={() => setActiveTab('apprem')}
+          >
+            <span className="apk-app-nav-icon">A</span>
+            <span>Apprem</span>
+          </button>
+          <button
+            type="button"
+            className={activeTab === 'deposit' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
+            onClick={() => setActiveTab('deposit')}
           >
             <span className="apk-app-nav-icon">D</span>
-            <span>Dashboard</span>
+            <span>Deposit</span>
           </button>
           <button
             type="button"
-            className={activeTab === 'kategori' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
-            onClick={() => setActiveTab('kategori')}
+            className={activeTab === 'riwayat' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
+            onClick={() => setActiveTab('riwayat')}
           >
-            <span className="apk-app-nav-icon">K</span>
-            <span>Kategori</span>
+            <span className="apk-app-nav-icon">R</span>
+            <span>Riwayat</span>
           </button>
           <button
             type="button"
-            className={activeTab === 'checkout' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
-            onClick={() => setActiveTab('checkout')}
+            className={activeTab === 'profil' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
+            onClick={() => setActiveTab('profil')}
           >
-            <span className="apk-app-nav-icon">C</span>
-            <span>Checkout</span>
-          </button>
-          <button
-            type="button"
-            className={activeTab === 'info' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
-            onClick={() => setActiveTab('info')}
-          >
-            <span className="apk-app-nav-icon">I</span>
-            <span>Info</span>
+            <span className="apk-app-nav-icon">P</span>
+            <span>Profil</span>
           </button>
         </nav>
       </div>
