@@ -46,6 +46,7 @@ a {
 }
 
 .dashboard-shell {
+  position: relative;
   min-height: 100vh;
   background: #ffffff;
 }
@@ -53,6 +54,24 @@ a {
 .dashboard-shell--loading {
   display: grid;
   place-items: center;
+}
+
+.dashboard-loading-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+.dashboard-loading-layer--hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .dashboard-loading-card {
@@ -71,6 +90,15 @@ a {
   width: min(calc(100% - 28px), 430px);
   margin: 0 auto;
   padding: 28px 0 48px;
+}
+
+.dashboard-mobile--hidden {
+  opacity: 0;
+}
+
+.dashboard-mobile--ready {
+  opacity: 1;
+  transition: opacity 0.35s ease;
 }
 
 .dashboard-head {
@@ -97,7 +125,7 @@ a {
 
 .dashboard-head h1 {
   margin: 0;
-  color: #1799f2;
+  color: #111111;
   font-size: clamp(1.85rem, 7vw, 2.35rem);
   line-height: 1.02;
   letter-spacing: -0.05em;
@@ -105,7 +133,7 @@ a {
 
 .dashboard-head p {
   margin: 0;
-  color: rgba(23, 153, 242, 0.76);
+  color: rgba(17, 17, 17, 0.72);
   font-size: 0.94rem;
   line-height: 1.7;
 }
@@ -146,14 +174,14 @@ a {
 
 .dashboard-card-copy h2 {
   margin: 0;
-  color: #1799f2;
+  color: #111111;
   font-size: 1.06rem;
   line-height: 1.25;
 }
 
 .dashboard-card-copy p {
   margin: 0;
-  color: rgba(23, 153, 242, 0.76);
+  color: rgba(17, 17, 17, 0.72);
   font-size: 0.88rem;
   line-height: 1.65;
 }

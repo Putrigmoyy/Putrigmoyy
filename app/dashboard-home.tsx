@@ -24,9 +24,9 @@ export function DashboardHome({ items }: Props) {
     return () => window.clearTimeout(timer);
   }, []);
 
-  if (!ready) {
-    return (
-      <main className="dashboard-shell dashboard-shell--loading">
+  return (
+    <main className="dashboard-shell">
+      <div className={ready ? 'dashboard-loading-layer dashboard-loading-layer--hidden' : 'dashboard-loading-layer'}>
         <div className="dashboard-loading-card">
           <Image
             src="/loading-double-ring.svg"
@@ -37,13 +37,9 @@ export function DashboardHome({ items }: Props) {
             className="dashboard-loading-image"
           />
         </div>
-      </main>
-    );
-  }
+      </div>
 
-  return (
-    <main className="dashboard-shell">
-      <section className="dashboard-mobile">
+      <section className={ready ? 'dashboard-mobile dashboard-mobile--ready' : 'dashboard-mobile dashboard-mobile--hidden'}>
         <div className="dashboard-head">
           <span className="dashboard-kicker">PUTRI GMOYY STORE</span>
           <h1>Dashboard Katalog</h1>
