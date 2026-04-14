@@ -1,16 +1,14 @@
 import { ApkPremiumBrowser } from './apk-premium-browser';
-import { apkPremiumProducts } from '@/lib/apk-premium';
+import { getApkPremiumCatalog } from '@/lib/apk-premium-store';
 
-export const dynamic = 'force-static';
+export const revalidate = 300;
 
-export default function ApkPremiumPage() {
-  const categories = Array.from(new Set(apkPremiumProducts.map((product) => product.category))).sort((left, right) =>
-    left.localeCompare(right, 'id'),
-  );
+export default async function ApkPremiumPage() {
+  const catalog = await getApkPremiumCatalog();
 
   return (
     <main className="market-shell">
-      <ApkPremiumBrowser products={apkPremiumProducts} categories={categories} />
+      <ApkPremiumBrowser products={catalog.products} categories={catalog.categories} />
     </main>
   );
 }
