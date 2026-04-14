@@ -949,6 +949,15 @@ a {
   display: block;
 }
 
+.smm-platform-icon img {
+  width: 22px;
+  height: 22px;
+  display: block;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
 .smm-platform-icon--large {
   width: 46px;
   height: 46px;
@@ -957,6 +966,11 @@ a {
 }
 
 .smm-platform-icon--large svg {
+  width: 26px;
+  height: 26px;
+}
+
+.smm-platform-icon--large img {
   width: 26px;
   height: 26px;
 }

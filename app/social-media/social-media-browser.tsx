@@ -1,6 +1,30 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
+import {
+  siApplepodcasts,
+  siAudiomack,
+  siClubhouse,
+  siDailymotion,
+  siDiscord,
+  siFacebook,
+  siGoogleplay,
+  siInstagram,
+  siKuaishou,
+  siPinterest,
+  siQuora,
+  siReddit,
+  siShopee,
+  siSoundcloud,
+  siSpotify,
+  siTelegram,
+  siThreads,
+  siTiktok,
+  siTwitch,
+  siWhatsapp,
+  siX,
+  siYoutube,
+} from 'simple-icons';
 import type { NormalizedPusatPanelProfile, NormalizedPusatPanelService } from '@/lib/pusatpanel';
 
 type Props = {
@@ -81,7 +105,45 @@ const PLATFORM_VISUALS: Array<{ matchers: string[]; visual: SocialPlatformVisual
   { matchers: ['telegram'], visual: { label: 'Telegram', accent: '#27a7e7', icon: 'telegram' } },
   { matchers: ['shopee'], visual: { label: 'Shopee', accent: '#ee4d2d', icon: 'shopee' } },
   { matchers: ['tokopedia'], visual: { label: 'Tokopedia', accent: '#03ac0e', icon: 'tokopedia' } },
+  { matchers: ['clubhouse'], visual: { label: 'Clubhouse', accent: '#111111', icon: 'clubhouse' } },
+  { matchers: ['kwai'], visual: { label: 'Kwai', accent: '#ff5b24', icon: 'kwai' } },
+  { matchers: ['podcast', 'itunes'], visual: { label: 'Podcast [iTunes Store]', accent: '#a141ff', icon: 'podcast' } },
+  { matchers: ['reddit'], visual: { label: 'Reddit', accent: '#ff4500', icon: 'reddit' } },
+  { matchers: ['snackvideo'], visual: { label: 'SnackVideo', accent: '#111111', icon: 'snackvideo' } },
+  { matchers: ['twitch'], visual: { label: 'Twitch', accent: '#9146ff', icon: 'twitch' } },
 ];
+
+const SIMPLE_ICON_MAP = {
+  instagram: siInstagram,
+  tiktok: siTiktok,
+  facebook: siFacebook,
+  whatsapp: siWhatsapp,
+  threads: siThreads,
+  x: siX,
+  spotify: siSpotify,
+  discord: siDiscord,
+  soundcloud: siSoundcloud,
+  pinterest: siPinterest,
+  quora: siQuora,
+  install: siGoogleplay,
+  dailymotion: siDailymotion,
+  audiomack: siAudiomack,
+  youtube: siYoutube,
+  telegram: siTelegram,
+  shopee: siShopee,
+  clubhouse: siClubhouse,
+  kwai: siKuaishou,
+  podcast: siApplepodcasts,
+  reddit: siReddit,
+  twitch: siTwitch,
+} as const;
+
+const REMOTE_LOGO_MAP: Record<string, string> = {
+  linkedin: 'https://logo.clearbit.com/linkedin.com',
+  likee: 'https://logo.clearbit.com/likee.video',
+  tokopedia: 'https://logo.clearbit.com/tokopedia.com',
+  snackvideo: 'https://logo.clearbit.com/snackvideo.com',
+};
 
 function buildMenuTypeTitle(menuType: string) {
   if (menuType === '2') return 'Custom Comments';
@@ -142,107 +204,20 @@ function detectPlatformVisual(service: NormalizedPusatPanelService): SocialPlatf
 }
 
 function SocialPlatformIcon({ icon }: { icon: string }) {
-  if (icon === 'instagram') {
+  const simpleIcon = SIMPLE_ICON_MAP[icon as keyof typeof SIMPLE_ICON_MAP];
+  if (simpleIcon) {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <rect x="4.5" y="4.5" width="15" height="15" rx="4.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
-        <circle cx="12" cy="12" r="3.3" fill="none" stroke="currentColor" strokeWidth="1.8" />
-        <circle cx="17" cy="7.4" r="1.1" fill="currentColor" />
+        <path d={simpleIcon.path} fill="currentColor" />
       </svg>
     );
   }
-  if (icon === 'tiktok') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M13 5v8.25a3 3 0 1 1-2.4-2.94" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-        <path d="M13 5c.65 1.5 1.8 2.7 3.2 3.4 1 .5 1.75.65 2.3.7" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-      </svg>
-    );
+
+  const remoteLogo = REMOTE_LOGO_MAP[icon];
+  if (remoteLogo) {
+    return <img src={remoteLogo} alt="" loading="lazy" referrerPolicy="no-referrer" />;
   }
-  if (icon === 'facebook') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M13.2 20v-7h2.35l.45-2.9H13.2V8.45c0-.82.34-1.45 1.56-1.45H16V4.46c-.64-.1-1.42-.16-2.3-.16-2.27 0-3.82 1.39-3.82 3.95V10.1H7.5V13h2.38v7Z" fill="currentColor" />
-      </svg>
-    );
-  }
-  if (icon === 'whatsapp') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 4.8a7.2 7.2 0 0 0-6.2 10.84L5 19.3l3.78-.74A7.2 7.2 0 1 0 12 4.8Z" fill="none" stroke="currentColor" strokeWidth="1.8" />
-        <path d="M9.25 8.95c.3-.66.64-.68.9-.69.23-.01.5-.01.77-.01.2 0 .52.08.79.65.27.58.92 2.25 1 2.41.08.16.14.35.03.57-.11.22-.17.35-.34.53-.16.18-.34.4-.48.53-.16.15-.33.3-.14.58.2.29.86 1.42 1.84 2.3 1.26 1.13 2.33 1.48 2.6 1.64.27.16.42.13.57-.08.15-.21.66-.76.84-1.02.18-.27.36-.22.61-.13.26.09 1.63.77 1.91.91.28.14.47.21.54.33.07.11.07.67-.16 1.31-.23.65-1.36 1.28-1.89 1.36-.49.07-1.1.11-1.77-.11-.41-.13-.93-.31-1.6-.6-2.8-1.21-4.64-4.22-4.78-4.42-.14-.2-1.13-1.5-1.13-2.87 0-1.37.71-2.04.96-2.33Z" fill="currentColor" />
-      </svg>
-    );
-  }
-  if (icon === 'threads') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M15.9 10.35c-.24-2.3-1.92-3.52-4.44-3.52-2.95 0-4.9 1.94-4.9 4.86 0 3.42 2.6 5.5 5.64 5.5 2.93 0 4.7-1.6 4.7-3.73 0-1.86-1.22-3.03-3.67-3.03-1.88 0-3.16.84-3.16 2.16 0 1.06.82 1.82 2.1 1.82 1.1 0 1.93-.5 2.17-1.53.2-.88.09-1.76-.03-2.53-.25-1.55-.97-3.5-3.85-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.9" />
-      </svg>
-    );
-  }
-  if (icon === 'x') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M6.2 5.5h2.85l3.4 4.46 3.78-4.46h1.88l-4.84 5.73 5.53 7.27h-2.85l-3.85-5.05-4.27 5.05H6.95l5.28-6.26Z" fill="currentColor" />
-      </svg>
-    );
-  }
-  if (icon === 'spotify') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M8.1 10.1c2.62-.7 5.72-.46 8.68.68" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.9" />
-        <path d="M8.9 13.05c2.1-.45 4.45-.24 6.65.66" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
-        <path d="M9.7 15.85c1.58-.28 3.18-.14 4.85.53" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
-      </svg>
-    );
-  }
-  if (icon === 'discord') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M8.2 8.4c1.1-.5 2.26-.77 3.4-.84l.42.8c1.15-.02 2.3.1 3.42.38.13-.27.27-.54.42-.81 1.14.08 2.27.36 3.35.85 1.3 1.95 1.86 4.01 1.67 6.18-1.02.76-2.01 1.22-2.97 1.48-.24-.33-.46-.68-.66-1.05.36-.13.71-.3 1.04-.49-.09-.07-.18-.14-.26-.22-2 1-4.95 1-6.96 0l-.26.22c.33.2.68.36 1.04.49-.2.37-.42.72-.66 1.05-.96-.26-1.95-.72-2.97-1.48-.22-2.41.44-4.47 1.68-6.18Z" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.6" />
-        <circle cx="9.8" cy="12.35" r="1.15" fill="currentColor" />
-        <circle cx="14.2" cy="12.35" r="1.15" fill="currentColor" />
-      </svg>
-    );
-  }
-  if (icon === 'youtube') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M19.6 8.1c-.2-.78-.82-1.4-1.6-1.6C16.72 6.1 12 6.1 12 6.1s-4.72 0-6 .4c-.78.2-1.4.82-1.6 1.6-.4 1.29-.4 3.98-.4 3.98s0 2.69.4 3.98c.2.78.82 1.4 1.6 1.6 1.28.4 6 .4 6 .4s4.72 0 6-.4c.78-.2 1.4-.82 1.6-1.6.4-1.29.4-3.98.4-3.98s0-2.69-.4-3.98Z" fill="currentColor" />
-        <path d="m10.4 14.8 4.2-2.8-4.2-2.8Z" fill="#ffffff" />
-      </svg>
-    );
-  }
-  if (icon === 'telegram') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="m19.7 5.2-2.47 13.2c-.19.94-.68 1.16-1.37.72l-4.42-3.25-2.13 2.05c-.24.24-.43.43-.89.43l.32-4.53 8.25-7.45c.36-.32-.08-.49-.56-.16l-10.2 6.42-4.4-1.38c-.96-.3-.98-.96.2-1.42L18.4 4.2c.75-.27 1.4.17 1.3 1Z" fill="currentColor" />
-      </svg>
-    );
-  }
-  if (icon === 'linkedin') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M6.8 8.4a1.45 1.45 0 1 0 0-2.9 1.45 1.45 0 0 0 0 2.9ZM5.6 9.9h2.4v8.2H5.6Zm3.9 0h2.3v1.12h.03c.32-.61 1.1-1.25 2.27-1.25 2.43 0 2.88 1.6 2.88 3.69v4.64h-2.4V14c0-.98-.02-2.24-1.36-2.24-1.37 0-1.58 1.07-1.58 2.17v4.17H9.5Z" fill="currentColor" />
-      </svg>
-    );
-  }
-  if (icon === 'pinterest') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12.35 5.2c-3.6 0-5.75 2.57-5.75 5.37 0 2.05 1.14 3.22 1.82 3.22.28 0 .43-.77.43-.99 0-.26-.67-.84-.67-1.95 0-2.31 1.76-3.95 4.03-3.95 1.96 0 3.42 1.11 3.42 3.16 0 1.53-.62 4.41-2.61 4.41-.72 0-1.34-.6-1.34-1.34 0-1.16.81-2.27.81-3.47 0-2.03-2.88-1.66-2.88.79 0 .52.07 1.1.3 1.58-.43 1.86-1.3 4.62-.87 6.52l.09.37.25-.29c.35-.42 1.77-4.87 1.77-4.87.44.84 1.58 1.3 2.48 1.3 3.8 0 5.5-3.38 5.5-6.74 0-2.84-2.47-4.89-5.78-4.89Z" fill="currentColor" />
-      </svg>
-    );
-  }
-  if (icon === 'soundcloud') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M9.1 16.6H6.7a2.2 2.2 0 1 1 .3-4.37 3.93 3.93 0 0 1 7.63 1.17 2.56 2.56 0 0 1 2.58 2.55 2.65 2.65 0 0 1-.06.55H9.1Z" fill="currentColor" />
-        <path d="M4.3 16.6h-.95v-4.1h.95Zm1.7 0H5v-5.3h1Zm1.65 0H6.7V10.5h.95Zm1.65 0h-.95V9.2h.95Z" fill="currentColor" />
-      </svg>
-    );
-  }
+
   return <span className="smm-platform-fallback">{icon}</span>;
 }
 
