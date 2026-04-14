@@ -83,10 +83,13 @@ a {
 
 .dashboard-mobile {
   position: relative;
-  width: min(calc(100% - 32px), 390px);
-  height: 100dvh;
+  width: min(calc(100% - 44px), 340px);
+  min-height: 100dvh;
   margin: 0 auto;
-  padding: 18px 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   opacity: 0;
   animation: dashboard-content-show 0.45s ease 2s forwards;
 }
@@ -94,24 +97,23 @@ a {
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  height: 100%;
-  align-content: center;
+  width: 100%;
+  gap: 12px;
 }
 
 .dashboard-card {
   position: relative;
   display: block;
   border: 1px solid rgba(23, 153, 242, 0.16);
-  border-radius: 24px;
+  border-radius: 22px;
   background: #ffffff;
   padding: 0;
-  box-shadow: 0 16px 40px rgba(23, 153, 242, 0.08);
+  box-shadow: 0 14px 30px rgba(23, 153, 242, 0.08);
   overflow: hidden;
   appearance: none;
   cursor: pointer;
   aspect-ratio: 1 / 1;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .dashboard-card-media {
@@ -124,58 +126,33 @@ a {
 
 .dashboard-card-image {
   object-fit: cover;
-  transition: transform 0.38s ease;
 }
 
 .dashboard-card-overlay {
   position: absolute;
   inset: auto 0 0 0;
   display: flex;
-  align-items: flex-end;
-  min-height: 66px;
-  padding: 10px 10px 12px;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+  padding: 10px 8px 12px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.92) 55%, #ffffff 100%);
 }
 
 .dashboard-card-overlay h2 {
   margin: 0;
   color: #111111;
-  font-size: 0.84rem;
+  width: 100%;
+  font-size: 0.8rem;
+  font-weight: 700;
   line-height: 1.3;
-  text-align: left;
+  text-align: center;
 }
 
 .dashboard-card--active {
-  transform: scale(0.98);
-}
-
-.dashboard-card--active .dashboard-card-image {
-  transform: scale(1.08);
-}
-
-.dashboard-preview-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 998;
-  display: grid;
-  place-items: center;
-  background: rgba(255, 255, 255, 0.94);
-  pointer-events: none;
-}
-
-.dashboard-preview-card {
-  width: min(calc(100% - 44px), 430px);
-  animation: dashboard-preview-zoom 0.42s ease forwards;
-}
-
-.dashboard-preview-media {
-  position: relative;
-  overflow: hidden;
-  aspect-ratio: 1 / 1;
-  border: 1px solid rgba(23, 153, 242, 0.16);
-  border-radius: 34px;
-  background: #ffffff;
-  box-shadow: 0 22px 60px rgba(23, 153, 242, 0.12);
+  border-color: rgba(210, 9, 209, 0.26);
+  box-shadow: 0 18px 34px rgba(210, 9, 209, 0.18);
+  animation: dashboard-card-pop 0.36s ease forwards;
 }
 
 .promo-strip {
@@ -1291,15 +1268,17 @@ a {
   }
 }
 
-@keyframes dashboard-preview-zoom {
+@keyframes dashboard-card-pop {
   0% {
-    opacity: 0;
-    transform: scale(0.82);
+    transform: translateY(0);
+  }
+
+  45% {
+    transform: translateY(-6px);
   }
 
   100% {
-    opacity: 1;
-    transform: scale(1);
+    transform: translateY(0);
   }
 }
 
@@ -1424,26 +1403,25 @@ a {
   }
 
   .dashboard-mobile {
-    width: min(calc(100% - 28px), 370px);
-    height: 100svh;
-    padding: 14px 0;
+    width: min(calc(100% - 32px), 332px);
+    min-height: 100svh;
   }
 
   .dashboard-grid {
-    gap: 8px;
+    gap: 10px;
   }
 
   .dashboard-card {
-    border-radius: 22px;
+    border-radius: 20px;
   }
 
   .dashboard-card-overlay {
-    min-height: 58px;
-    padding: 9px 9px 11px;
+    min-height: 56px;
+    padding: 9px 8px 11px;
   }
 
   .dashboard-card-overlay h2 {
-    font-size: 0.78rem;
+    font-size: 0.76rem;
   }
 
   .hero-card h1,

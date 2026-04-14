@@ -91,30 +91,6 @@ export function DashboardHome({ items }: Props) {
             </button>
           ))}
         </div>
-
-        {activeItem ? (
-          <div className="dashboard-preview-layer">
-            {items
-              .filter((item) => item.title === activeItem)
-              .map((item) => (
-                <div key={item.title} className="dashboard-preview-card">
-                  <div className="dashboard-preview-media">
-                    <Image
-                      src={item.image}
-                      alt={item.title}
-                      fill
-                      sizes="80vw"
-                      className="dashboard-card-image"
-                      priority
-                    />
-                    <div className="dashboard-card-overlay">
-                      <h2>{item.title}</h2>
-                    </div>
-                  </div>
-                </div>
-              ))}
-          </div>
-        ) : null}
       </section>
     </main>
   );
