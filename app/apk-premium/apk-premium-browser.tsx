@@ -1,6 +1,6 @@
 'use client';
 
-import { useDeferredValue, useState } from 'react';
+import { useDeferredValue, useState, useTransition } from 'react';
 import type { ApkPremiumProduct, ApkPremiumVariant } from '@/lib/apk-premium';
 import { formatRupiah } from '@/lib/apk-premium';
 
@@ -21,6 +21,25 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
   const [activeCategory, setActiveCategory] = useState('Semua');
   const [selectedProductId, setSelectedProductId] = useState(products[0]?.id || '');
   const [selectedVariantId, setSelectedVariantId] = useState(products[0]?.variants[0]?.id || '');
+  const [checkoutForm, setCheckoutForm] = useState({
+    quantity: '1',
+    customerName: '',
+    customerContact: '',
+    note: '',
+  });
+  const [checkoutPreview, setCheckoutPreview] = useState<null | {
+    orderCode: string;
+    quantity: number;
+    unitPriceLabel: string;
+    totalPriceLabel: string;
+    dataSource: string;
+  }>(null);
+  const [checkoutFeedback, setCheckoutFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
+    tone: 'idle',
+    text: 'Isi data customer lalu ambil preview checkout website.',
+  });
+  const [isPreviewing, startPreview] = useTransition();
+  const [isSubmittingOrder, startOrderSubmit] = useTransition();
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
   const filteredProducts = products.filter((product) => {
@@ -52,10 +71,149 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
   const pickProduct = (product: ApkPremiumProduct) => {
     setSelectedProductId(product.id);
     setSelectedVariantId(product.variants[0]?.id || '');
+    setCheckoutPreview(null);
+    setCheckoutFeedback({
+      tone: 'idle',
+      text: `Produk "${product.title}" siap dipakai untuk checkout website.`,
+    });
   };
 
   const pickVariant = (variant: ApkPremiumVariant) => {
     setSelectedVariantId(variant.id);
+    setCheckoutForm((current) => ({ ...current, quantity: '1' }));
+    setCheckoutPreview(null);
+    setCheckoutFeedback({
+      tone: 'idle',
+      text: `Varian "${variant.title}" siap dipreview untuk order website.`,
+    });
+  };
+
+  const runCheckoutPreview = () => {
+    if (!selectedProduct || !selectedVariant) {
+      setCheckoutFeedback({ tone: 'error', text: 'Pilih produk dan varian dulu.' });
+      return;
+    }
+
+    startPreview(async () => {
+      setCheckoutFeedback({ tone: 'idle', text: 'Menyiapkan ringkasan checkout website...' });
+      setCheckoutPreview(null);
+      try {
+        const response = await fetch('/api/apk-premium/checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            productId: selectedProduct.id,
+            variantId: selectedVariant.id,
+            quantity: Number(checkoutForm.quantity || 0),
+            customerName: checkoutForm.customerName,
+            customerContact: checkoutForm.customerContact,
+            note: checkoutForm.note,
+          }),
+        });
+        const result = await response.json() as {
+          status?: boolean;
+          data?: {
+            msg?: string;
+            orderCode?: string;
+            quantity?: number;
+            unitPriceLabel?: string;
+            totalPriceLabel?: string;
+            dataSource?: string;
+          };
+        };
+
+        if (!response.ok || !result.status || !result.data?.orderCode) {
+          setCheckoutFeedback({
+            tone: 'error',
+            text: result.data?.msg || 'Preview checkout belum berhasil dibuat.',
+          });
+          return;
+        }
+
+        setCheckoutPreview({
+          orderCode: result.data.orderCode,
+          quantity: Number(result.data.quantity || 0),
+          unitPriceLabel: String(result.data.unitPriceLabel || '0'),
+          totalPriceLabel: String(result.data.totalPriceLabel || '0'),
+          dataSource: String(result.data.dataSource || '-'),
+        });
+        setCheckoutFeedback({
+          tone: 'success',
+          text: `Preview checkout siap. Kode order: ${result.data.orderCode}`,
+        });
+      } catch (error) {
+        setCheckoutFeedback({
+          tone: 'error',
+          text: error instanceof Error ? error.message : 'Preview checkout gagal dibuat.',
+        });
+      }
+    });
+  };
+
+  const submitWebsiteOrder = () => {
+    if (!selectedProduct || !selectedVariant) {
+      setCheckoutFeedback({ tone: 'error', text: 'Pilih produk dan varian dulu.' });
+      return;
+    }
+
+    startOrderSubmit(async () => {
+      setCheckoutFeedback({ tone: 'idle', text: 'Membuat order website APK premium...' });
+      try {
+        const response = await fetch('/api/apk-premium/order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            productId: selectedProduct.id,
+            variantId: selectedVariant.id,
+            quantity: Number(checkoutForm.quantity || 0),
+            customerName: checkoutForm.customerName,
+            customerContact: checkoutForm.customerContact,
+            note: checkoutForm.note,
+          }),
+        });
+        const result = await response.json() as {
+          status?: boolean;
+          data?: {
+            msg?: string;
+            orderCode?: string;
+            totalPriceLabel?: string;
+            nextStep?: string;
+            syncReady?: boolean;
+          };
+        };
+
+        if (!response.ok || !result.status || !result.data?.orderCode) {
+          setCheckoutFeedback({
+            tone: 'error',
+            text: result.data?.msg || 'Order website belum berhasil dibuat.',
+          });
+          return;
+        }
+
+        setCheckoutFeedback({
+          tone: 'success',
+          text: `Order ${result.data.orderCode} berhasil dibuat. ${result.data.nextStep || ''}`.trim(),
+        });
+        setCheckoutPreview((current) =>
+          current
+            ? {
+                ...current,
+                orderCode: result.data?.orderCode || current.orderCode,
+                totalPriceLabel: String(result.data?.totalPriceLabel || current.totalPriceLabel),
+              }
+            : current,
+        );
+      } catch (error) {
+        setCheckoutFeedback({
+          tone: 'error',
+          text: error instanceof Error ? error.message : 'Order website gagal dibuat.',
+        });
+      }
+    });
   };
 
   return (
@@ -308,6 +466,69 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                 </div>
 
                 <div className="apk-order-step-box">
+                  <span>Checkout Website</span>
+                  <div className="apk-form-grid">
+                    <label className="form-field">
+                      <span>Nama customer</span>
+                      <input
+                        value={checkoutForm.customerName}
+                        onChange={(event) => setCheckoutForm((current) => ({ ...current, customerName: event.target.value }))}
+                        placeholder="Nama pembeli"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>Kontak customer</span>
+                      <input
+                        value={checkoutForm.customerContact}
+                        onChange={(event) => setCheckoutForm((current) => ({ ...current, customerContact: event.target.value }))}
+                        placeholder="Nomor WhatsApp / username"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>Jumlah</span>
+                      <input
+                        value={checkoutForm.quantity}
+                        onChange={(event) => setCheckoutForm((current) => ({ ...current, quantity: event.target.value.replace(/[^\d]/g, '') || '1' }))}
+                        placeholder="1"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>Catatan</span>
+                      <input
+                        value={checkoutForm.note}
+                        onChange={(event) => setCheckoutForm((current) => ({ ...current, note: event.target.value }))}
+                        placeholder="Catatan tambahan order"
+                      />
+                    </label>
+                  </div>
+
+                  {checkoutPreview ? (
+                    <div className="apk-checkout-preview">
+                      <div>
+                        <span>Kode order</span>
+                        <strong>{checkoutPreview.orderCode}</strong>
+                      </div>
+                      <div>
+                        <span>Jumlah</span>
+                        <strong>{checkoutPreview.quantity}</strong>
+                      </div>
+                      <div>
+                        <span>Harga satuan</span>
+                        <strong>Rp {checkoutPreview.unitPriceLabel}</strong>
+                      </div>
+                      <div>
+                        <span>Total</span>
+                        <strong>Rp {checkoutPreview.totalPriceLabel}</strong>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className={`feedback-box feedback-box--${checkoutFeedback.tone}`}>
+                    {checkoutFeedback.text}
+                  </div>
+                </div>
+
+                <div className="apk-order-step-box">
                   <span>Langkah berikutnya</span>
                   <ul className="apk-flow-list">
                     <li>Sambungkan stok pusat dari Neon / backend</li>
@@ -318,7 +539,12 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                 </div>
 
                 <div className="order-form-actions">
-                  <button type="button" className="hero-cta order-submit-button">Siapkan Checkout Website</button>
+                  <button type="button" className="hero-cta order-submit-button" onClick={runCheckoutPreview} disabled={isPreviewing}>
+                    {isPreviewing ? 'Menyiapkan preview...' : 'Ambil Preview Checkout'}
+                  </button>
+                  <button type="button" className="hero-cta order-submit-button" onClick={submitWebsiteOrder} disabled={isSubmittingOrder}>
+                    {isSubmittingOrder ? 'Membuat order...' : 'Buat Order Website'}
+                  </button>
                   <button type="button" className="hero-ghost order-submit-button">Lanjut Private Chat</button>
                 </div>
               </>

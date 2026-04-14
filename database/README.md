@@ -6,6 +6,8 @@ Website ini disiapkan untuk 2 database Neon terpisah supaya lebih hemat limit da
   - khusus produk APK premium, varian, stock akun, dan order premium
 - `DATABASE_URL_SMM`
   - khusus cache layanan social media dan order provider
+- `OWNER_APP_TOKEN`
+  - token sederhana untuk polling notifikasi ke aplikasi owner
 
 Mode env yang dipakai:
 
@@ -21,3 +23,12 @@ Saran penggunaan awal:
 5. Lakukan hal yang sama terpisah untuk SMM
 
 Dengan pola ini storefront tetap hidup walau database belum siap penuh.
+
+Endpoint jembatan owner yang sudah disiapkan:
+
+- `GET /api/owner/notifications/poll`
+- `POST /api/owner/notifications/ack`
+
+Keduanya memakai header:
+
+- `x-owner-token: <OWNER_APP_TOKEN>`
