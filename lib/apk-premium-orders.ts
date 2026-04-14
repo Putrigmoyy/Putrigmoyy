@@ -2,7 +2,7 @@ import { getAppDataSourceConfig } from '@/lib/data-sources';
 import { getNeonClient } from '@/lib/neon-clients';
 import { formatRupiah } from '@/lib/apk-premium';
 import { getApkPremiumProductById } from '@/lib/apk-premium-store';
-import { recordCoreOrderHistory } from '@/lib/core-store';
+import { recordCoreOrderHistory, refundCoreWalletBalanceOrder, spendCoreWalletBalanceForOrder } from '@/lib/core-store';
 
 type CheckoutInput = {
   productId: string;
@@ -11,6 +11,7 @@ type CheckoutInput = {
   customerName: string;
   customerContact: string;
   accountContact?: string;
+  paymentMethod?: 'midtrans' | 'balance';
   note?: string;
 };
 
@@ -25,7 +26,7 @@ type ApkCheckoutBase = {
   unitPriceLabel: string;
   totalPrice: number;
   totalPriceLabel: string;
-  paymentStatus: 'awaiting-payment';
+  paymentStatus: 'awaiting-payment' | 'paid';
   dataSource: 'local-preview' | 'neon';
 };
 
@@ -34,10 +35,11 @@ export type ApkCheckoutPreview = ApkCheckoutBase & {
 };
 
 export type ApkSubmittedOrder = ApkCheckoutBase & {
-  orderStatus: 'pending';
+  orderStatus: 'pending' | 'paid';
   queueCreated: boolean;
   syncReady: boolean;
   nextStep: string;
+  paymentMethod: 'midtrans' | 'balance';
 };
 
 function createOrderCode() {
@@ -72,6 +74,7 @@ async function buildCheckoutCore(input: CheckoutInput) {
   const customerName = String(input.customerName || '').trim();
   const customerContact = String(input.customerContact || '').trim();
   const accountContact = String(input.accountContact || '').trim();
+  const paymentMethod: 'midtrans' | 'balance' = input.paymentMethod === 'balance' ? 'balance' : 'midtrans';
   const note = String(input.note || '').trim();
 
   if (!customerName) {
@@ -93,6 +96,7 @@ async function buildCheckoutCore(input: CheckoutInput) {
     customerName,
     customerContact,
     accountContact,
+    paymentMethod,
     note,
     unitPrice,
     totalPrice,
@@ -123,96 +127,191 @@ export async function buildApkPremiumCheckoutPreview(input: CheckoutInput): Prom
 async function submitOrderToNeon(input: CheckoutInput): Promise<ApkSubmittedOrder> {
   const sql = getNeonClient('apk');
   const result = await buildCheckoutCore(input);
+  const usingBalance = result.paymentMethod === 'balance';
+  const detailText = `Varian: ${result.variant.title}\nJumlah: ${result.quantity}\nKontak: ${result.customerContact || '-'}\nCatatan: ${result.note || '-'}`;
 
-  await sql`
-    insert into apk_orders (
-      order_code,
-      product_id,
-      product_title,
-      variant_id,
-      variant_title,
-      customer_name,
-      customer_contact,
-      quantity,
-      unit_price,
-      total_price,
-      order_note,
-      order_status,
-      payment_status
-    ) values (
-      ${result.orderCode},
-      ${result.product.id},
-      ${result.product.title},
-      ${result.variant.id},
-      ${result.variant.title},
-      ${result.customerName},
-      ${result.customerContact},
-      ${result.quantity},
-      ${result.unitPrice},
-      ${result.totalPrice},
-      ${result.note},
-      ${'pending'},
-      ${'awaiting-payment'}
-    )
-  `;
+  let balanceDebited = false;
+  let inventoryAdjusted = false;
+  let orderInserted = false;
+  if (usingBalance) {
+    if (!result.accountContact) {
+      throw new Error('Login akun dulu untuk memakai saldo akun.');
+    }
+    await spendCoreWalletBalanceForOrder({
+      accountContact: result.accountContact,
+      amount: result.totalPrice,
+      subjectName: result.customerName,
+      title: `${result.product.title} - ${result.variant.title}`,
+      detail: detailText,
+      reference: result.orderCode,
+    });
+    balanceDebited = true;
+  }
 
-  const payload = JSON.stringify({
-    kind: 'apk-premium-order-created',
-    orderCode: result.orderCode,
-    productId: result.product.id,
-    productTitle: result.product.title,
-    variantId: result.variant.id,
-    variantTitle: result.variant.title,
-    quantity: result.quantity,
-    totalPrice: result.totalPrice,
-    customerName: result.customerName,
-    customerContact: result.customerContact,
-  });
+  try {
+    if (usingBalance) {
+      const variantRows = (await sql`
+        update apk_product_variants
+        set
+          stock = stock - ${result.quantity},
+          updated_at = now()
+        where id = ${result.variant.id}
+          and stock >= ${result.quantity}
+        returning stock
+      `) as Array<{ stock?: number }>;
 
-  await sql`
-    insert into owner_notification_queue (
-      source,
-      event_type,
-      order_code,
-      payload,
-      queue_status
-    ) values (
-      ${'apk-premium'},
-      ${'order-created'},
-      ${result.orderCode},
-      ${payload}::jsonb,
-      ${'pending'}
-    )
-  `;
+      if (!variantRows[0]) {
+        throw new Error('Stock varian berubah atau sudah habis. Coba sinkronkan lalu ulangi order.');
+      }
+      inventoryAdjusted = true;
 
-  await recordCoreOrderHistory({
-    accountContact: result.accountContact,
-    subjectName: result.customerName,
-    title: `${result.product.title} - ${result.variant.title}`,
-    amount: result.totalPrice,
-    detail: `Varian: ${result.variant.title}\nJumlah: ${result.quantity}\nKontak: ${result.customerContact || '-'}\nCatatan: ${result.note || '-'}`,
-    methodLabel: 'Order aplikasi premium',
-    reference: result.orderCode,
-  });
+      await sql`
+        update apk_products
+        set
+          stock = greatest(stock - ${result.quantity}, 0),
+          sold = sold + ${result.quantity},
+          updated_at = now()
+        where id = ${result.product.id}
+      `;
+    }
 
-  return {
-    orderCode: result.orderCode,
-    productId: result.product.id,
-    productTitle: result.product.title,
-    variantId: result.variant.id,
-    variantTitle: result.variant.title,
-    quantity: result.quantity,
-    unitPrice: result.unitPrice,
-    unitPriceLabel: formatRupiah(result.unitPrice),
-    totalPrice: result.totalPrice,
-    totalPriceLabel: formatRupiah(result.totalPrice),
-    paymentStatus: 'awaiting-payment',
-    orderStatus: 'pending',
-    dataSource: 'neon',
-    queueCreated: true,
-    syncReady: true,
-    nextStep: 'Lanjut sambungkan checkout Midtrans website untuk order ini.',
-  };
+    await sql`
+      insert into apk_orders (
+        order_code,
+        product_id,
+        product_title,
+        variant_id,
+        variant_title,
+        customer_name,
+        customer_contact,
+        quantity,
+        unit_price,
+        total_price,
+        order_note,
+        order_status,
+        payment_status
+      ) values (
+        ${result.orderCode},
+        ${result.product.id},
+        ${result.product.title},
+        ${result.variant.id},
+        ${result.variant.title},
+        ${result.customerName},
+        ${result.customerContact},
+        ${result.quantity},
+        ${result.unitPrice},
+        ${result.totalPrice},
+        ${result.note},
+        ${usingBalance ? 'paid' : 'pending'},
+        ${usingBalance ? 'paid' : 'awaiting-payment'}
+      )
+    `;
+    orderInserted = true;
+
+    const payload = JSON.stringify({
+      kind: usingBalance ? 'apk-premium-order-paid-balance' : 'apk-premium-order-created',
+      orderCode: result.orderCode,
+      productId: result.product.id,
+      productTitle: result.product.title,
+      variantId: result.variant.id,
+      variantTitle: result.variant.title,
+      quantity: result.quantity,
+      totalPrice: result.totalPrice,
+      customerName: result.customerName,
+      customerContact: result.customerContact,
+      paymentMethod: result.paymentMethod,
+      balancePaid: usingBalance,
+    });
+
+    await sql`
+      insert into owner_notification_queue (
+        source,
+        event_type,
+        order_code,
+        payload,
+        queue_status
+      ) values (
+        ${'apk-premium'},
+        ${usingBalance ? 'order-paid-balance' : 'order-created'},
+        ${result.orderCode},
+        ${payload}::jsonb,
+        ${'pending'}
+      )
+    `;
+
+    if (!usingBalance) {
+      await recordCoreOrderHistory({
+        accountContact: result.accountContact,
+        subjectName: result.customerName,
+        title: `${result.product.title} - ${result.variant.title}`,
+        amount: result.totalPrice,
+        detail: detailText,
+        methodLabel: 'Order aplikasi premium',
+        reference: result.orderCode,
+      });
+    }
+
+    return {
+      orderCode: result.orderCode,
+      productId: result.product.id,
+      productTitle: result.product.title,
+      variantId: result.variant.id,
+      variantTitle: result.variant.title,
+      quantity: result.quantity,
+      unitPrice: result.unitPrice,
+      unitPriceLabel: formatRupiah(result.unitPrice),
+      totalPrice: result.totalPrice,
+      totalPriceLabel: formatRupiah(result.totalPrice),
+      paymentStatus: usingBalance ? 'paid' : 'awaiting-payment',
+      orderStatus: usingBalance ? 'paid' : 'pending',
+      dataSource: 'neon',
+      queueCreated: true,
+      syncReady: true,
+      paymentMethod: result.paymentMethod,
+      nextStep: usingBalance
+        ? 'Pembayaran saldo berhasil. Owner akan menerima notifikasi fulfillment order ini.'
+        : 'Lanjut sambungkan checkout Midtrans website untuk order ini.',
+    };
+  } catch (error) {
+    if (orderInserted) {
+      await sql`
+        update apk_orders
+        set
+          order_status = ${'failed'},
+          payment_status = ${usingBalance ? 'refunded' : 'failed'},
+          order_note = ${`${result.note || ''}\n[system] ${error instanceof Error ? error.message : 'Order APK gagal.'}`.trim()},
+          updated_at = now()
+        where order_code = ${result.orderCode}
+      `;
+    }
+    if (inventoryAdjusted) {
+      await sql`
+        update apk_product_variants
+        set
+          stock = stock + ${result.quantity},
+          updated_at = now()
+        where id = ${result.variant.id}
+      `;
+      await sql`
+        update apk_products
+        set
+          stock = stock + ${result.quantity},
+          sold = greatest(sold - ${result.quantity}, 0),
+          updated_at = now()
+        where id = ${result.product.id}
+      `;
+    }
+    if (balanceDebited) {
+      await refundCoreWalletBalanceOrder({
+        accountContact: result.accountContact,
+        amount: result.totalPrice,
+        subjectName: result.customerName,
+        reference: result.orderCode,
+        reason: error instanceof Error ? error.message : 'Order APK gagal setelah saldo dipotong.',
+      });
+    }
+    throw error;
+  }
 }
 
 export async function submitApkPremiumOrder(input: CheckoutInput): Promise<ApkSubmittedOrder> {
@@ -227,6 +326,7 @@ export async function submitApkPremiumOrder(input: CheckoutInput): Promise<ApkSu
     orderStatus: 'pending',
     queueCreated: false,
     syncReady: false,
+    paymentMethod: input.paymentMethod === 'balance' ? 'balance' : 'midtrans',
     nextStep: 'Hubungkan DATABASE_URL_APK dan ubah APK_PREMIUM_DATA_SOURCE=neon agar order website tersimpan penuh.',
   };
 }

@@ -10,6 +10,7 @@ export async function POST(request: Request) {
       customerName?: string;
       customerContact?: string;
       accountContact?: string;
+      paymentMethod?: 'midtrans' | 'balance';
       note?: string;
     };
 
@@ -20,6 +21,7 @@ export async function POST(request: Request) {
       customerName: String(body.customerName || ''),
       customerContact: String(body.customerContact || ''),
       accountContact: String(body.accountContact || ''),
+      paymentMethod: body.paymentMethod === 'balance' ? 'balance' : 'midtrans',
       note: String(body.note || ''),
     });
 

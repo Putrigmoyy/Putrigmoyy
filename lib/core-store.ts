@@ -383,3 +383,112 @@ export async function recordCoreOrderHistory(input: {
     reference: input.reference,
   });
 }
+
+export async function spendCoreWalletBalanceForOrder(input: {
+  accountContact: string;
+  amount: number;
+  subjectName: string;
+  title: string;
+  detail: string;
+  reference: string;
+}) {
+  if (!isCoreConfigured()) {
+    throw new Error('DATABASE_URL_CORE belum diisi.');
+  }
+
+  const accountContact = String(input.accountContact || '').trim();
+  const amount = Math.max(0, Number(input.amount || 0));
+  if (!accountContact) {
+    throw new Error('Kontak akun wajib diisi untuk pembayaran saldo.');
+  }
+  if (amount <= 0) {
+    throw new Error('Nominal pembayaran saldo belum valid.');
+  }
+
+  const row = await getWalletRow(accountContact);
+  if (!row) {
+    throw new Error('Akun saldo belum ditemukan. Silakan login dulu.');
+  }
+  if (Number(row.balance || 0) < amount) {
+    throw new Error('Saldo akun belum cukup untuk menyelesaikan order ini.');
+  }
+
+  const sql = getNeonClient('core');
+  const updatedRows = (await sql`
+    update core_wallet_accounts
+    set
+      balance = balance - ${amount},
+      updated_at = now()
+    where contact = ${accountContact}
+      and balance >= ${amount}
+    returning balance
+  `) as Array<{ balance?: number }>;
+
+  if (!updatedRows[0]) {
+    throw new Error('Saldo akun berubah. Coba ulangi pembayaran ini.');
+  }
+
+  await insertCoreHistory({
+    accountContact,
+    kind: 'order',
+    title: input.title,
+    subjectName: String(input.subjectName || '').trim() || row.display_name,
+    amount,
+    statusLabel: 'Berhasil',
+    status: 'success',
+    detail: input.detail,
+    methodLabel: 'Saldo akun',
+    reference: input.reference,
+  });
+
+  const bundle = await getCoreWalletBundle(accountContact, true);
+  return {
+    balanceAfter: Math.max(0, Number(updatedRows[0].balance || 0)),
+    bundle,
+  };
+}
+
+export async function refundCoreWalletBalanceOrder(input: {
+  accountContact: string;
+  amount: number;
+  subjectName: string;
+  reference: string;
+  reason: string;
+}) {
+  if (!isCoreConfigured()) {
+    return;
+  }
+
+  const accountContact = String(input.accountContact || '').trim();
+  const amount = Math.max(0, Number(input.amount || 0));
+  if (!accountContact || amount <= 0) {
+    return;
+  }
+
+  const row = await getWalletRow(accountContact);
+  if (!row) {
+    return;
+  }
+
+  const sql = getNeonClient('core');
+  await sql`
+    update core_wallet_accounts
+    set
+      balance = balance + ${amount},
+      updated_at = now()
+    where contact = ${accountContact}
+  `;
+
+  await insertCoreHistory({
+    accountContact,
+    kind: 'deposit',
+    title: 'Refund saldo order APK',
+    subjectName: String(input.subjectName || '').trim() || row.display_name,
+    amount,
+    statusLabel: 'Dikembalikan',
+    status: 'success',
+    detail: `Refund otomatis untuk order ${input.reference}\nAlasan: ${String(input.reason || '').trim() || '-'}`,
+    methodLabel: 'Refund saldo akun',
+    reference: `${input.reference}-REFUND`,
+  });
+}

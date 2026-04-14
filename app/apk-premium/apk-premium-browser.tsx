@@ -32,6 +32,7 @@ type HistoryEntry = {
 };
 
 type DepositMethod = 'midtrans' | 'balance';
+type OrderPaymentMethod = 'midtrans' | 'balance';
 
 type CoreBundlePayload = {
   account?: {
@@ -135,6 +136,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
     customerContact: '',
     note: '',
   });
+  const [orderPaymentMethod, setOrderPaymentMethod] = useState<OrderPaymentMethod>('midtrans');
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const [depositAmount, setDepositAmount] = useState('10000');
@@ -267,6 +269,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
   const normalizedDepositAmount = Math.max(0, Number(depositAmount.replace(/[^\d]/g, '') || 0));
   const depositLocked = !walletProfile.registered || !walletProfile.loggedIn;
   const canUseBalance = !depositLocked && normalizedDepositAmount > 0 && walletProfile.balance >= normalizedDepositAmount;
+  const canPayOrderWithBalance = walletProfile.loggedIn && selectedTotal > 0 && walletProfile.balance >= selectedTotal;
   const orderHistoryEntries = historyEntries.filter((entry) => entry.kind === 'order');
   const depositHistoryEntries = historyEntries.filter((entry) => entry.kind === 'deposit');
 
@@ -277,6 +280,15 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
       }
     }
   }, [canUseBalance, depositLocked, depositMethod]);
+
+  useEffect(() => {
+    if (!walletProfile.loggedIn || !canPayOrderWithBalance) {
+      if (orderPaymentMethod === 'balance') {
+        setOrderPaymentMethod('midtrans');
+      }
+      return;
+    }
+  }, [canPayOrderWithBalance, orderPaymentMethod, walletProfile.loggedIn]);
 
   useEffect(() => {
     if (!walletProfile.loggedIn) {
@@ -334,6 +346,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
             customerName: checkoutForm.customerName,
             customerContact: checkoutForm.customerContact,
             accountContact: walletProfile.loggedIn ? walletProfile.contact : '',
+            paymentMethod: orderPaymentMethod,
             note: checkoutForm.note,
           }),
         });
@@ -345,6 +358,8 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
             orderCode?: string;
             totalPriceLabel?: string;
             nextStep?: string;
+            paymentMethod?: OrderPaymentMethod;
+            orderStatus?: 'pending' | 'paid';
           };
         };
 
@@ -358,7 +373,10 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
 
         setCheckoutFeedback({
           tone: 'success',
-          text: `Order ${result.data.orderCode} berhasil dibuat. ${result.data.nextStep || ''}`.trim(),
+          text:
+            result.data.orderStatus === 'paid'
+              ? `Order ${result.data.orderCode} berhasil dibayar dengan saldo akun. ${result.data.nextStep || ''}`.trim()
+              : `Order ${result.data.orderCode} berhasil dibuat. ${result.data.nextStep || ''}`.trim(),
         });
         if (walletProfile.loggedIn && walletProfile.contact) {
           try {
@@ -688,6 +706,31 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                       <strong>Rp {formatRupiah(selectedTotal)}</strong>
                     </div>
 
+                    <div className="apk-app-payment-methods">
+                      <button
+                        type="button"
+                        className={orderPaymentMethod === 'midtrans' ? 'apk-app-quick-chip apk-app-quick-chip--active' : 'apk-app-quick-chip'}
+                        onClick={() => setOrderPaymentMethod('midtrans')}
+                      >
+                        QRIS Midtrans
+                      </button>
+                      <button
+                        type="button"
+                        className={orderPaymentMethod === 'balance' ? 'apk-app-quick-chip apk-app-quick-chip--active' : 'apk-app-quick-chip'}
+                        onClick={() => setOrderPaymentMethod('balance')}
+                        disabled={!canPayOrderWithBalance}
+                      >
+                        Pakai saldo akun
+                      </button>
+                    </div>
+                    <div className="apk-app-inline-helper">
+                      {orderPaymentMethod === 'balance'
+                        ? `Saldo aktif akan dipotong Rp ${formatRupiah(selectedTotal)} dan order langsung masuk ke owner.`
+                        : walletProfile.loggedIn
+                          ? `Saldo akun kamu saat ini Rp ${formatRupiah(walletProfile.balance)}. Kalau cukup, kamu bisa bayar langsung pakai saldo.`
+                          : 'Login dulu kalau ingin memakai saldo akun. Kalau belum, order akan dibuat dengan status menunggu pembayaran.'}
+                    </div>
+
                     {checkoutFeedback.tone !== 'idle' ? (
                       <div className={`apk-app-feedback apk-app-feedback--${checkoutFeedback.tone}`}>
                         {checkoutFeedback.text}
@@ -696,7 +739,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
 
                     <div className="apk-app-action-row">
                       <button type="button" className="apk-app-primary-button" onClick={submitWebsiteOrder} disabled={isSubmittingOrder}>
-                        {isSubmittingOrder ? 'Memproses...' : 'Buat Order'}
+                        {isSubmittingOrder ? 'Memproses...' : orderPaymentMethod === 'balance' ? 'Bayar dengan Saldo' : 'Buat Order'}
                       </button>
                       <button type="button" className="apk-app-ghost-button" onClick={backToCatalog}>
                         Pilih Aplikasi Lain
