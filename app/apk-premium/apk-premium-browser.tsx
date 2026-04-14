@@ -308,9 +308,9 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                   </label>
 
                   <div className="apk-app-inline-stats">
-                    <span>{summaryStats.totalProducts} produk</span>
-                    <span>{summaryStats.totalVariants} varian</span>
-                    <span>{summaryStats.totalStock} stock</span>
+                    {categories.map((category) => (
+                      <span key={category}>{category}</span>
+                    ))}
                   </div>
 
                   <div className="apk-app-product-grid">
@@ -332,7 +332,10 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                         </div>
                         <div className="apk-app-product-copy">
                           <strong>{product.title}</strong>
-                          <span>{product.category}</span>
+                          <div className="apk-app-product-meta">
+                            <span>{getTotalVariantStock(product)} stock</span>
+                            <span>{product.sold} terjual</span>
+                          </div>
                           <em>Mulai Rp {formatRupiah(getLowestPrice(product))}</em>
                         </div>
                       </button>

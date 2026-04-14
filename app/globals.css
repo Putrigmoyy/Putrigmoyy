@@ -355,12 +355,12 @@ a {
 
 .apk-app-search {
   display: grid;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: 6px;
+  margin-bottom: 12px;
 }
 
 .apk-app-search--top {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .apk-app-inline-stats {
@@ -368,39 +368,42 @@ a {
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 14px;
+  animation: apk-app-fade-up 0.45s ease;
 }
 
 .apk-app-inline-stats span {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
+  min-height: 32px;
   padding: 0 12px;
   border: 1px solid rgba(23, 153, 242, 0.14);
   border-radius: 999px;
   background: #ffffff;
   color: #111111;
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-weight: 700;
+  box-shadow: 0 8px 16px rgba(23, 153, 242, 0.06);
 }
 
 .apk-app-search span,
 .apk-app-form-field span {
   color: #111111;
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   font-weight: 700;
 }
 
 .apk-app-search input,
 .apk-app-form-field input {
   width: 100%;
-  min-height: 48px;
-  padding: 0 14px;
+  min-height: 44px;
+  padding: 0 13px;
   border: 1px solid rgba(23, 153, 242, 0.14);
-  border-radius: 16px;
+  border-radius: 15px;
   background: #ffffff;
   color: #111111;
   font: inherit;
+  font-size: 0.92rem;
   outline: none;
 }
 
@@ -425,6 +428,13 @@ a {
   text-align: left;
   appearance: none;
   cursor: pointer;
+  animation: apk-app-fade-up 0.42s ease both;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.apk-app-product-card:active {
+  transform: scale(0.98) translateY(-2px);
+  filter: saturate(1.04);
 }
 
 .apk-app-product-image {
@@ -435,6 +445,12 @@ a {
   border-radius: 28px;
   background: linear-gradient(180deg, rgba(23, 153, 242, 0.04), rgba(210, 9, 209, 0.06));
   box-shadow: 0 16px 30px rgba(23, 153, 242, 0.08);
+  transition: transform 0.24s ease, box-shadow 0.24s ease;
+}
+
+.apk-app-product-card:active .apk-app-product-image {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 34px rgba(210, 9, 209, 0.12);
 }
 
 .apk-app-product-art {
@@ -444,6 +460,24 @@ a {
 .apk-app-product-copy {
   display: grid;
   gap: 4px;
+}
+
+.apk-app-product-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.apk-app-product-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(23, 153, 242, 0.08);
+  color: rgba(17, 17, 17, 0.72);
+  font-size: 0.68rem;
+  font-weight: 700;
 }
 
 .apk-app-product-copy strong,
@@ -456,7 +490,7 @@ a {
 .apk-app-product-copy em,
 .apk-app-variant-meta em {
   color: #d209d1;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-style: normal;
   font-weight: 700;
 }
@@ -595,6 +629,11 @@ a {
 
 .apk-app-variant-card {
   grid-template-columns: 1fr auto;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.apk-app-variant-card:active {
+  transform: scale(0.985) translateY(-2px);
 }
 
 .apk-app-variant-card span,
@@ -626,6 +665,7 @@ a {
 .apk-app-variant-card--active {
   border-color: rgba(210, 9, 209, 0.24);
   box-shadow: 0 12px 24px rgba(23, 153, 242, 0.08);
+  animation: apk-app-soft-pop 0.3s ease;
 }
 
 .apk-app-summary-card,
@@ -732,9 +772,9 @@ a {
   z-index: 20;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
   width: min(100%, 430px);
-  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
   border: 1px solid rgba(23, 153, 242, 0.14);
   border-radius: 24px 24px 0 0;
   background: rgba(255, 255, 255, 0.96);
@@ -746,35 +786,68 @@ a {
 .apk-app-nav-item {
   display: grid;
   justify-items: center;
-  gap: 6px;
-  padding: 8px 6px;
+  gap: 5px;
+  padding: 7px 6px;
   border: 0;
-  border-radius: 18px;
+  border-radius: 16px;
   background: transparent;
   color: rgba(17, 17, 17, 0.66);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.apk-app-nav-item:active {
+  transform: translateY(-2px);
 }
 
 .apk-app-nav-icon {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 25px;
+  height: 25px;
   border-radius: 999px;
   background: rgba(23, 153, 242, 0.08);
   color: #111111;
+  font-size: 0.72rem;
 }
 
 .apk-app-nav-item--active {
   background: linear-gradient(135deg, rgba(210, 9, 209, 0.12), rgba(23, 153, 242, 0.12));
   color: #111111;
+  animation: apk-app-soft-pop 0.28s ease;
 }
 
 .apk-app-nav-item--active .apk-app-nav-icon {
   background: linear-gradient(135deg, #d209d1, #1799f2);
   color: #ffffff;
+}
+
+@keyframes apk-app-soft-pop {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.03);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes apk-app-fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .promo-strip {
