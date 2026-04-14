@@ -22,6 +22,8 @@ type HistoryEntry = {
   createdAt: string;
 };
 
+type DepositMethod = 'midtrans' | 'balance';
+
 const productArtwork: Record<string, string> = {
   canva: '/premium-icons/canva.jpg',
   netflix: '/premium-icons/netflix.jpg',
@@ -82,6 +84,7 @@ function NavGlyph({ type }: { type: PremiumTab }) {
 }
 
 export function ApkPremiumBrowser({ products, categories }: Props) {
+  const quickDepositAmounts = [10000, 20000, 50000, 100000];
   const [activeTab, setActiveTab] = useState<PremiumTab>('apprem');
   const [query, setQuery] = useState('');
   const [selectedProductId, setSelectedProductId] = useState(products[0]?.id || '');
@@ -94,6 +97,22 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
     note: '',
   });
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
+  const [depositAmount, setDepositAmount] = useState('10000');
+  const [depositMethod, setDepositMethod] = useState<DepositMethod>('midtrans');
+  const [walletProfile, setWalletProfile] = useState({
+    registered: false,
+    name: '',
+    contact: '',
+    balance: 0,
+  });
+  const [walletRegisterDraft, setWalletRegisterDraft] = useState({
+    name: '',
+    contact: '',
+  });
+  const [depositFeedback, setDepositFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
+    tone: 'idle',
+    text: '',
+  });
   const [checkoutFeedback, setCheckoutFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
     tone: 'idle',
     text: 'Pilih aplikasi premium lalu lanjutkan order langsung dari menu apprem.',
@@ -139,6 +158,14 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
 
   const selectedQuantity = Math.max(1, Number(checkoutForm.quantity || 1));
   const selectedTotal = selectedVariant ? selectedVariant.price * selectedQuantity : 0;
+  const normalizedDepositAmount = Math.max(0, Number(depositAmount.replace(/[^\d]/g, '') || 0));
+  const canUseBalance = walletProfile.registered && normalizedDepositAmount > 0 && walletProfile.balance >= normalizedDepositAmount;
+
+  useEffect(() => {
+    if (!canUseBalance && depositMethod === 'balance') {
+      setDepositMethod('midtrans');
+    }
+  }, [canUseBalance, depositMethod]);
 
   const pushHistory = (entry: Omit<HistoryEntry, 'id' | 'createdAt'>) => {
     setHistoryEntries((current) => [
@@ -239,6 +266,66 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
           text: error instanceof Error ? error.message : 'Order gagal dibuat.',
         });
       }
+    });
+  };
+
+  const registerWalletAccount = () => {
+    const name = walletRegisterDraft.name.trim();
+    const contact = walletRegisterDraft.contact.trim();
+    if (!name || !contact) {
+      setDepositFeedback({
+        tone: 'error',
+        text: 'Isi nama dan kontak dulu untuk mengaktifkan saldo akun.',
+      });
+      return;
+    }
+
+    setWalletProfile({
+      registered: true,
+      name,
+      contact,
+      balance: 0,
+    });
+    setDepositFeedback({
+      tone: 'success',
+      text: 'Akun saldo berhasil diaktifkan. Sekarang kamu bisa deposit via QRIS atau pakai saldo jika sudah terisi.',
+    });
+  };
+
+  const submitDepositFlow = () => {
+    if (normalizedDepositAmount <= 0) {
+      setDepositFeedback({
+        tone: 'error',
+        text: 'Masukkan jumlah deposit dulu.',
+      });
+      return;
+    }
+
+    if (depositMethod === 'balance') {
+      if (!walletProfile.registered) {
+        setDepositFeedback({
+          tone: 'error',
+          text: 'Daftarkan akun dulu untuk memakai saldo akun.',
+        });
+        return;
+      }
+      if (!canUseBalance) {
+        setDepositFeedback({
+          tone: 'error',
+          text: 'Saldo akun belum cukup. Pakai QRIS Midtrans untuk melanjutkan.',
+        });
+        return;
+      }
+      setDepositFeedback({
+        tone: 'success',
+        text: `Saldo akun siap dipakai untuk pembayaran Rp ${formatRupiah(normalizedDepositAmount)}.`,
+      });
+      return;
+    }
+
+    setDepositFeedback({
+      tone: 'success',
+      text: `QRIS Midtrans akan dipakai untuk nominal Rp ${formatRupiah(normalizedDepositAmount)}.`,
     });
   };
 
@@ -422,22 +509,129 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
               <div className="apk-app-panel-head">
                 <div>
                   <span className="apk-app-section-label">Deposit</span>
-                  <h3>Metode isi saldo dan pembayaran</h3>
+                  <h3>Isi saldo dan pilih metode bayar</h3>
                 </div>
               </div>
 
-              <div className="apk-app-info-stack">
-                <article className="apk-app-info-card">
-                  <strong>Deposit QRIS Website</strong>
-                  <p>Hubungkan QRIS Midtrans website agar pelanggan bisa isi saldo atau bayar order premium dengan cepat.</p>
+              <div className="apk-app-deposit-stack">
+                <article className="apk-app-info-card apk-app-deposit-account">
+                  <strong>{walletProfile.registered ? 'Akun saldo aktif' : 'Daftar akun saldo dulu'}</strong>
+                  <p>
+                    {walletProfile.registered
+                      ? `${walletProfile.name} • ${walletProfile.contact}`
+                      : 'Fitur saldo akun hanya bisa dipakai jika akun sudah terdaftar.'}
+                  </p>
+                  <div className="apk-app-live-total-card">
+                    <span>Saldo akun</span>
+                    <strong>Rp {formatRupiah(walletProfile.balance)}</strong>
+                  </div>
+                  {!walletProfile.registered ? (
+                    <div className="apk-app-form-grid">
+                      <label className="apk-app-form-field">
+                        <span>Nama akun</span>
+                        <input
+                          value={walletRegisterDraft.name}
+                          onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, name: event.target.value }))}
+                          placeholder="Nama akun"
+                        />
+                      </label>
+                      <label className="apk-app-form-field">
+                        <span>Kontak akun</span>
+                        <input
+                          value={walletRegisterDraft.contact}
+                          onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, contact: event.target.value }))}
+                          placeholder="WhatsApp / username"
+                        />
+                      </label>
+                    </div>
+                  ) : null}
+                  {!walletProfile.registered ? (
+                    <button type="button" className="apk-app-ghost-button" onClick={registerWalletAccount}>
+                      Daftarkan Akun
+                    </button>
+                  ) : null}
                 </article>
-                <article className="apk-app-info-card">
-                  <strong>Deposit Social Media</strong>
-                  <p>Saldo untuk layanan social media nanti bisa dibuat satu alur terpisah agar lebih rapi dan hemat limit.</p>
+
+                <article className="apk-app-form-card">
+                  <span className="apk-app-section-label">Nominal Deposit</span>
+                  <div className="apk-app-form-grid">
+                    <label className="apk-app-form-field">
+                      <span>Masukkan jumlah</span>
+                      <input
+                        value={depositAmount}
+                        onChange={(event) => setDepositAmount(event.target.value.replace(/[^\d]/g, ''))}
+                        placeholder="Contoh: 10000"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="apk-app-quick-grid">
+                    {quickDepositAmounts.map((amount) => (
+                      <button
+                        key={amount}
+                        type="button"
+                        className={normalizedDepositAmount === amount ? 'apk-app-quick-chip apk-app-quick-chip--active' : 'apk-app-quick-chip'}
+                        onClick={() => setDepositAmount(String(amount))}
+                      >
+                        Rp {formatRupiah(amount)}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="apk-app-live-total-card">
+                    <span>Total deposit</span>
+                    <strong>Rp {formatRupiah(normalizedDepositAmount)}</strong>
+                  </div>
                 </article>
-                <article className="apk-app-info-card">
-                  <strong>Status Sinkron Owner</strong>
-                  <p>Begitu backend penuh aktif, notifikasi deposit berhasil bisa masuk ke aplikasi owner dan grup store kamu.</p>
+
+                <article className="apk-app-form-card">
+                  <span className="apk-app-section-label">Metode Bayar</span>
+                  <div className="apk-app-method-grid">
+                    <button
+                      type="button"
+                      className={depositMethod === 'midtrans' ? 'apk-app-method-card apk-app-method-card--active' : 'apk-app-method-card'}
+                      onClick={() => setDepositMethod('midtrans')}
+                    >
+                      <strong>QRIS Otomatis Midtrans</strong>
+                      <p>Dipakai saat saldo akun belum ada atau belum cukup.</p>
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        depositMethod === 'balance'
+                          ? 'apk-app-method-card apk-app-method-card--active'
+                          : !walletProfile.registered || !canUseBalance
+                            ? 'apk-app-method-card apk-app-method-card--disabled'
+                            : 'apk-app-method-card'
+                      }
+                      onClick={() => {
+                        if (walletProfile.registered && canUseBalance) {
+                          setDepositMethod('balance');
+                        }
+                      }}
+                    >
+                      <strong>Pakai Saldo Akun</strong>
+                      <p>
+                        {!walletProfile.registered
+                          ? 'Daftar akun dulu untuk mengaktifkan metode ini.'
+                          : canUseBalance
+                            ? 'Saldo akun cukup untuk membayar langsung.'
+                            : 'Saldo akun belum cukup untuk nominal ini.'}
+                      </p>
+                    </button>
+                  </div>
+
+                  {depositFeedback.text ? (
+                    <div className={`apk-app-feedback apk-app-feedback--${depositFeedback.tone}`}>
+                      {depositFeedback.text}
+                    </div>
+                  ) : null}
+
+                  <div className="apk-app-action-row">
+                    <button type="button" className="apk-app-primary-button" onClick={submitDepositFlow}>
+                      {depositMethod === 'balance' ? 'Pakai Saldo Akun' : 'Lanjut ke QRIS Midtrans'}
+                    </button>
+                  </div>
                 </article>
               </div>
             </section>
