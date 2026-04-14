@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { PusatPanelService } from '@/lib/pusatpanel';
-import { normalizePusatPanelService, requestPusatPanel } from '@/lib/pusatpanel';
+import { isBlockedPusatPanelService, normalizePusatPanelService, requestPusatPanel } from '@/lib/pusatpanel';
 import { syncSmmServicesCache } from '@/lib/smm-store';
 
 export async function POST() {
@@ -18,11 +18,16 @@ export async function POST() {
     });
 
     if (response.status && Array.isArray(response.data)) {
+      const filteredServices = response.data.filter((service) => !isBlockedPusatPanelService(service as PusatPanelService));
       try {
-        await syncSmmServicesCache(response.data.map((service) => normalizePusatPanelService(service as PusatPanelService)));
+        await syncSmmServicesCache(filteredServices.map((service) => normalizePusatPanelService(service as PusatPanelService)));
       } catch {
         // ignore cache sync failure
       }
+      return NextResponse.json({
+        ...response,
+        data: filteredServices,
+      });
     }
 
     return NextResponse.json(response);

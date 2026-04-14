@@ -81,6 +81,11 @@ function normalizeProviderNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+export function isBlockedPusatPanelService(service?: Pick<PusatPanelService, 'name' | 'category' | 'note'> | null) {
+  const haystack = `${service?.name || ''} ${service?.category || ''} ${service?.note || ''}`.toLowerCase();
+  return haystack.includes('traffic');
+}
+
 export function normalizePusatPanelProfile(profile?: PusatPanelProfile | null): NormalizedPusatPanelProfile {
   const balance = normalizeProviderNumber(profile?.balance);
   return {
@@ -161,5 +166,7 @@ export async function fetchPusatPanelServices() {
     throw new Error(message);
   }
 
-  return response.data.map((service) => normalizePusatPanelService(service));
+  return response.data
+    .filter((service) => !isBlockedPusatPanelService(service))
+    .map((service) => normalizePusatPanelService(service));
 }

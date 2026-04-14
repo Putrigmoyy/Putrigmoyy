@@ -943,11 +943,30 @@ a {
   flex-shrink: 0;
 }
 
+.smm-platform-icon svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
 .smm-platform-icon--large {
   width: 46px;
   height: 46px;
   border-radius: 14px;
   font-size: 0.96rem;
+}
+
+.smm-platform-icon--large svg {
+  width: 26px;
+  height: 26px;
+}
+
+.smm-platform-fallback {
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
 }
 
 .smm-platform-label {
@@ -971,6 +990,10 @@ a {
   display: grid;
   justify-items: center;
   gap: 10px;
+}
+
+.smm-stage-platform--inline {
+  margin-bottom: 16px;
 }
 
 .smm-stage-platform strong {
