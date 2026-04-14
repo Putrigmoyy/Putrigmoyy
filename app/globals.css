@@ -302,6 +302,7 @@ a {
 
 .quick-shortcuts,
 .category-grid,
+.showcase-grid,
 .spotlight-row,
 .trust-grid,
 .faq-grid {
@@ -345,6 +346,66 @@ a {
 
 .spotlight-row {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.showcase-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.showcase-card {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 30px;
+  background:
+    linear-gradient(180deg, rgba(18, 28, 47, 0.98), rgba(9, 15, 27, 1)),
+    linear-gradient(135deg, rgba(40, 215, 255, 0.06), rgba(255, 191, 71, 0.04));
+  padding: 14px;
+  box-shadow: 0 22px 62px rgba(0, 0, 0, 0.26);
+}
+
+.showcase-media {
+  position: relative;
+  overflow: hidden;
+  min-height: 220px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(40, 215, 255, 0.18), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(255, 191, 71, 0.16), transparent 28%),
+    linear-gradient(180deg, #132038 0%, #0d1626 100%);
+}
+
+.showcase-media::after {
+  content: '';
+  position: absolute;
+  inset: auto 18px 16px 18px;
+  height: 44px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(6, 13, 22, 0), rgba(6, 13, 22, 0.72));
+  pointer-events: none;
+}
+
+.showcase-image {
+  object-fit: cover;
+}
+
+.showcase-copy {
+  display: grid;
+  gap: 8px;
+  padding: 2px 4px 6px;
+}
+
+.showcase-copy h3 {
+  margin: 0;
+  font-size: 1.18rem;
+  line-height: 1.25;
+}
+
+.showcase-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
 }
 
 .trust-grid,
@@ -768,6 +829,7 @@ a {
   .smm-stage,
   .quick-shortcuts,
   .category-grid,
+  .showcase-grid,
   .spotlight-row,
   .trust-grid,
   .faq-grid,
@@ -858,6 +920,7 @@ a {
   .hero-card,
   .stack-card,
   .shortcut-card,
+  .showcase-card,
   .category-card,
   .spotlight-card,
   .trust-card,
@@ -871,6 +934,20 @@ a {
   .section-headline h2,
   .cta-banner h2 {
     font-size: 1.68rem;
+  }
+
+  .showcase-card {
+    padding: 12px;
+    border-radius: 24px;
+  }
+
+  .showcase-media {
+    min-height: 190px;
+    border-radius: 20px;
+  }
+
+  .showcase-copy h3 {
+    font-size: 1.06rem;
   }
 
   .catalog-toolbar {

@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 
 const heroSlides = [
@@ -43,6 +44,37 @@ const shortcutModes = [
     subtitle: 'Mode utama',
     description: 'Panel order jasa social media berbasis provider dan siap dibungkus UI premium.',
     href: '/social-media',
+  },
+];
+
+const storefrontShowcase = [
+  {
+    title: 'APK Premium',
+    subtitle: 'Etalase akun digital',
+    description: 'Canva, Netflix, YouTube Premium, CapCut, dan produk akun lain ditata sebagai etalase visual yang lebih hidup.',
+    href: '/apk-premium',
+    image: '/showcase-apk-premium.svg',
+  },
+  {
+    title: 'Social Media',
+    subtitle: 'Etalase kebutuhan SMM',
+    description: 'Kategori layanan, speed, min-max, dan detail provider bisa terlihat seperti rak marketplace mobile.',
+    href: '/social-media',
+    image: '/showcase-social-media.svg',
+  },
+  {
+    title: 'Sewa Bot',
+    subtitle: 'Etalase layanan bot',
+    description: 'Satu ruang khusus untuk calon penyewa bot dengan landing yang lebih menjual dan rapi di HP.',
+    href: process.env.NEXT_PUBLIC_BOT_RENTAL_URL || '#',
+    image: '/showcase-bot-rental.svg',
+  },
+  {
+    title: 'OTP Nokos',
+    subtitle: 'Etalase verifikasi',
+    description: 'Jalur OTP dan nomor virtual tampil sebagai mode tersendiri, tetapi tetap satu ekosistem store.',
+    href: process.env.NEXT_PUBLIC_OTP_URL || '#',
+    image: '/showcase-otp-nokos.svg',
   },
 ];
 
@@ -113,7 +145,7 @@ const faqs = [
   },
   {
     title: 'Apakah OTP dan sewa bot tetap bisa terpisah?',
-    answer: 'Bisa. Dua mode itu dibuat sebagai shortcut / landing mode tambahan tanpa merusak dua mode utama.',
+    answer: 'Bisa. Dua mode itu dibuat sebagai shortcut dan landing mode tambahan tanpa merusak dua mode utama.',
   },
 ];
 
@@ -230,8 +262,48 @@ export default function HomePage() {
 
       <section className="section-block">
         <div className="section-headline">
+          <span className="section-kicker">ETALASE BERGAMBAR</span>
+          <h2>Empat etalase utama dibuat visual agar storefront terasa lebih premium di mobile</h2>
+        </div>
+        <div className="showcase-grid">
+          {storefrontShowcase.map((item) => {
+            const isExternal = item.href.startsWith('http') || item.href === '#';
+            const content = (
+              <>
+                <div className="showcase-media">
+                  <Image
+                    src={item.image}
+                    alt={item.title}
+                    fill
+                    sizes="(max-width: 920px) 100vw, 50vw"
+                    className="showcase-image"
+                  />
+                </div>
+                <div className="showcase-copy">
+                  <span className="shortcut-badge">{item.subtitle}</span>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                </div>
+              </>
+            );
+
+            return isExternal ? (
+              <a key={item.title} href={item.href} className="showcase-card" target="_blank" rel="noreferrer">
+                {content}
+              </a>
+            ) : (
+              <Link key={item.title} href={item.href} className="showcase-card">
+                {content}
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="section-block">
+        <div className="section-headline">
           <span className="section-kicker">KENAPA MODEL INI COCOK</span>
-          <h2>Website terasa lebih “jadi” walau backend masih kita sambung bertahap</h2>
+          <h2>Website terasa lebih jadi walau backend masih kita sambung bertahap</h2>
         </div>
         <div className="trust-grid">
           {trustItems.map((item) => (
