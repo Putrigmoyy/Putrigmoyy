@@ -1,0 +1,248 @@
+:root {
+  color-scheme: dark;
+  --bg: #07111c;
+  --panel: rgba(11, 23, 38, 0.82);
+  --panel-strong: rgba(8, 18, 32, 0.92);
+  --line: rgba(140, 198, 255, 0.14);
+  --text: #eef6ff;
+  --muted: #9db1c8;
+  --accent: #46d5ff;
+  --accent-strong: #00a9e6;
+  --accent-soft: rgba(70, 213, 255, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top left, rgba(70, 213, 255, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(38, 255, 187, 0.12), transparent 24%),
+    linear-gradient(180deg, #08111d 0%, #07111c 48%, #050c15 100%);
+  color: var(--text);
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 40px 0 64px;
+}
+
+.hero,
+.split-layout,
+.section-grid {
+  margin-top: 28px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.25fr 0.95fr;
+  gap: 20px;
+}
+
+.hero-copy,
+.hero-panel,
+.feature-card,
+.glass-panel {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  backdrop-filter: blur(18px);
+  border-radius: 28px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+}
+
+.hero-copy {
+  padding: 30px;
+}
+
+.hero-copy h1,
+.section-header h2,
+.glass-panel h2,
+.feature-card h3 {
+  margin: 0;
+  letter-spacing: -0.03em;
+}
+
+.hero-copy h1 {
+  font-size: clamp(2.3rem, 5vw, 4.2rem);
+  line-height: 1.02;
+}
+
+.hero-copy p,
+.feature-card p,
+.glass-panel p,
+.roadmap-list li,
+.link-list li {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.primary-link,
+.secondary-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  border-radius: 999px;
+  padding: 0 18px;
+  font-weight: 700;
+}
+
+.primary-link {
+  background: linear-gradient(135deg, var(--accent), #73ffe3);
+  color: #04243a;
+}
+
+.secondary-link {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.hero-panel {
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.status-card {
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  border-radius: 22px;
+  padding: 18px;
+}
+
+.status-card strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.05rem;
+}
+
+.status-card p {
+  margin: 10px 0 0;
+}
+
+.status-label,
+.eyebrow,
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+
+.badge,
+.status-label {
+  background: var(--accent-soft);
+  color: #92efff;
+  padding: 7px 11px;
+}
+
+.section-header {
+  margin-bottom: 16px;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.feature-card {
+  padding: 22px;
+  transition: transform 180ms ease, border-color 180ms ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(70, 213, 255, 0.32);
+}
+
+.feature-card h3 {
+  margin-top: 18px;
+  font-size: 1.35rem;
+}
+
+.split-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.glass-panel {
+  padding: 24px;
+}
+
+.link-list,
+.roadmap-list {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+
+.link-list li,
+.roadmap-list li {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+
+.link-list span {
+  display: block;
+  color: var(--text);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.link-list code {
+  word-break: break-all;
+  color: #98ebff;
+  font-family: "Consolas", "Courier New", monospace;
+}
+
+@media (max-width: 920px) {
+  .hero,
+  .split-layout,
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .shell {
+    width: min(100% - 24px, 1180px);
+    padding-top: 20px;
+  }
+
+  .hero-copy,
+  .glass-panel,
+  .feature-card {
+    padding: 20px;
+  }
+}
