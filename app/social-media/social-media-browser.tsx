@@ -740,14 +740,13 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                       <strong>{activePlatform.label}</strong>
                     </div>
                     <div className="smm-select-stack">
-                      <label className="apk-app-form-field">
-                        <span>Cari kategori layanan</span>
+                      <div className="apk-app-form-field">
                         <input
                           value={categoryQuery}
                           onChange={(event) => setCategoryQuery(event.target.value)}
                           placeholder="Cari kategori yang sesuai"
                         />
-                      </label>
+                      </div>
                       <div className="smm-manual-list">
                         {filteredCategories.length ? (
                           filteredCategories.map((category) => {
@@ -776,14 +775,13 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                   <div className="apk-app-form-card">
                     <span className="apk-app-section-label">Pilih Layanan</span>
                     <div className="smm-select-stack">
-                      <label className="apk-app-form-field">
-                        <span>Cari layanan</span>
+                      <div className="apk-app-form-field">
                         <input
                           value={serviceQuery}
                           onChange={(event) => setServiceQuery(event.target.value)}
                           placeholder="Cari nama layanan"
                         />
-                      </label>
+                      </div>
                       <div className="smm-manual-list smm-manual-list--service">
                         {filteredServices.length ? (
                           filteredServices.map((service) => (
