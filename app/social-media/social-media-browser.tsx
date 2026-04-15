@@ -292,6 +292,17 @@ function calculateSmmTotal(service: NormalizedPusatPanelService | null, quantity
   return Math.max(0, Math.ceil((service.price * units) / 1000));
 }
 
+function formatPaymentStatusLabel(status: string) {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (normalized === 'awaiting-payment') return 'menunggu pembayaran';
+  if (normalized === 'paid') return 'paid';
+  if (normalized === 'expire' || normalized === 'expired') return 'expired';
+  if (normalized === 'cancel') return 'cancel';
+  if (normalized === 'deny') return 'deny';
+  if (normalized === 'failed') return 'failed';
+  return status || '-';
+}
+
 function mapStatusTone(status: string) {
   const normalized = String(status || '').trim().toLowerCase();
   if (normalized.includes('success') || normalized.includes('complete') || normalized.includes('completed')) {
@@ -1049,6 +1060,11 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     () => sortedAccountOrderItems.filter((item) => mapStatusTone(item.orderStatus) === 'pending').length,
     [sortedAccountOrderItems],
   );
+  const showPendingQris =
+    activeCheckoutOrder?.paymentMethod === 'midtrans' && activeCheckoutOrder.paymentStatus === 'awaiting-payment';
+  const showPaidCheckoutResult =
+    activeCheckoutOrder?.paymentMethod === 'midtrans' && activeCheckoutOrder.paymentStatus === 'paid';
+  const activeCheckoutProviderId = String(activeCheckoutOrder?.providerOrderId || '').trim();
 
   const submitOrder = () => {
     if (!selectedService) {
@@ -1190,7 +1206,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                       <span className="smm-platform-icon" style={{ background: activePlatform.accent, boxShadow: `0 12px 28px ${activePlatform.accent}28` }}>
                         <SocialPlatformIcon icon={activePlatform.icon} />
                       </span>
-                      <span>{activePlatform.label}</span>
+                      <span className="smm-stage-platform-label">{activePlatform.label}</span>
                     </div>
                     <div className="smm-select-stack">
                       <button
@@ -1431,65 +1447,84 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                         : 'Jika ingin prioritas memakai saldo akun, login akun dulu. Kalau belum login, pembayaran akan langsung memakai QRIS.'}
                     </div>
 
-                    {activeCheckoutOrder && activeCheckoutOrder.paymentMethod === 'midtrans' ? (
+                    {showPendingQris ? (
                       <div className="apk-app-qris-shell">
                         <div className="apk-app-qris-head">
                           <div>
                             <span className="apk-app-section-label">QRIS Payment</span>
-                            <strong>{activeCheckoutOrder.orderCode}</strong>
                           </div>
-                          <div className={`apk-app-order-pill apk-app-order-pill--${activeCheckoutOrder.paymentStatus === 'paid' ? 'success' : activeCheckoutOrder.paymentStatus === 'awaiting-payment' ? 'pending' : 'failed'}`}>
-                            {activeCheckoutOrder.paymentStatus === 'awaiting-payment' ? 'Menunggu bayar' : activeCheckoutOrder.paymentStatus}
+                          <div className="apk-app-order-pill apk-app-order-pill--pending">
+                            Menunggu bayar
                           </div>
                         </div>
                         <div className="apk-app-qris-card smm-qris-card">
                           {activeCheckoutOrder.qris?.qrUrl ? (
-                            <img src={activeCheckoutOrder.qris.qrUrl} alt={`QRIS ${activeCheckoutOrder.orderCode}`} className="apk-app-qris-image" />
+                            <img src={activeCheckoutOrder.qris.qrUrl} alt="QRIS pembayaran sosial media" className="apk-app-qris-image" />
                           ) : (
                             <div className="apk-app-qris-fallback">QRIS siap, tetapi gambar belum tersedia.</div>
                           )}
-                          <div className="apk-app-qris-copy smm-qris-copy">
-                            <p>{activeCheckoutOrder.nextStep}</p>
-                            {activeCheckoutOrder.qris?.expiryTime ? <small>Berlaku sampai {new Date(activeCheckoutOrder.qris.expiryTime).toLocaleString('id-ID')}</small> : null}
-                            <div className="apk-app-action-row apk-app-action-row--compact">
-                              <button type="button" className="apk-app-primary-button" onClick={refreshCheckoutStatus} disabled={isRefreshingCheckoutStatus}>
-                                {isRefreshingCheckoutStatus ? 'Memuat...' : 'Cek Status'}
-                              </button>
-                              {activeCheckoutOrder.qris?.deeplinkUrl ? (
-                                <a className="apk-app-ghost-button apk-app-link-button" href={activeCheckoutOrder.qris.deeplinkUrl} target="_blank" rel="noreferrer">
-                                  Buka Pembayaran
-                                </a>
-                              ) : null}
-                            </div>
-                            <div className="apk-app-live-total-card apk-app-live-total-card--compact smm-qris-total-card">
-                              <span>Total Bayar</span>
-                              <strong>Rp {activeCheckoutOrder.totalPriceLabel}</strong>
-                            </div>
-                          </div>
                         </div>
 
+                        <div className="apk-app-live-total-card apk-app-live-total-card--compact smm-qris-total-card">
+                          <span>Total Bayar</span>
+                          <strong>Rp {activeCheckoutOrder.totalPriceLabel}</strong>
+                        </div>
+
+                        {activeCheckoutOrder.qris?.expiryTime ? (
+                          <div className="smm-qris-expiry-note">
+                            Berlaku sampai {new Date(activeCheckoutOrder.qris.expiryTime).toLocaleString('id-ID')}
+                          </div>
+                        ) : null}
+
                         <div className="smm-qris-detail-frame">
-                          <p>Order Code : {activeCheckoutOrder.orderCode}</p>
+                          <p>Order ID : {activeCheckoutProviderId || 'Menunggu sinkron provider'}</p>
+                          <p>Status bayar : {formatPaymentStatusLabel(activeCheckoutOrder.paymentStatus)}</p>
                           <p>Layanan : {activeCheckoutOrder.serviceName}</p>
                           <p>Kategori : {activeCheckoutOrder.category}</p>
                           <p>Target : {activeCheckoutOrder.targetData}</p>
                           <p>Jumlah : {activeCheckoutOrder.quantity == null ? '-' : String(activeCheckoutOrder.quantity)}</p>
-                          <p>Metode : QRIS Midtrans</p>
+                          <p>Total : Rp {activeCheckoutOrder.totalPriceLabel}</p>
+                        </div>
+
+                        <div className="apk-app-action-row smm-qris-status-row">
+                          <button type="button" className="apk-app-primary-button" onClick={refreshCheckoutStatus} disabled={isRefreshingCheckoutStatus}>
+                            {isRefreshingCheckoutStatus ? 'Memuat...' : 'Cek Status'}
+                          </button>
                         </div>
                       </div>
                     ) : null}
 
-                    {orderFeedback.tone !== 'idle' ? (
+                    {showPaidCheckoutResult ? (
+                      <div className="smm-qris-detail-frame smm-qris-detail-frame--success">
+                        <p>Order ID : {activeCheckoutProviderId || '-'}</p>
+                        <p>Status bayar : {formatPaymentStatusLabel(activeCheckoutOrder.paymentStatus)}</p>
+                        <p>Layanan : {activeCheckoutOrder.serviceName}</p>
+                        <p>Kategori : {activeCheckoutOrder.category}</p>
+                        <p>Target : {activeCheckoutOrder.targetData}</p>
+                        <p>Jumlah : {activeCheckoutOrder.quantity == null ? '-' : String(activeCheckoutOrder.quantity)}</p>
+                        <p>Total : Rp {activeCheckoutOrder.totalPriceLabel}</p>
+                      </div>
+                    ) : null}
+
+                    {showPaidCheckoutResult ? (
+                      <div className="apk-app-feedback apk-app-feedback--success">
+                        Transaksi berhasil, silahkan cek menu status order untuk pantau pesananmu.
+                      </div>
+                    ) : null}
+
+                    {orderFeedback.tone !== 'idle' && !showPendingQris && !showPaidCheckoutResult ? (
                       <div className={`apk-app-feedback apk-app-feedback--${orderFeedback.tone}`}>
                         {orderFeedback.text}
                       </div>
                     ) : null}
 
+                    {!showPendingQris && !showPaidCheckoutResult ? (
                     <div className="apk-app-action-row">
                       <button type="button" className="apk-app-primary-button" onClick={submitOrder} disabled={isOrdering}>
                         {isOrdering ? 'Mengirim...' : 'Lanjutkan Pembayaran'}
                       </button>
                     </div>
+                    ) : null}
                   </div>
                 </>
               ) : (
@@ -1740,12 +1775,12 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                                   <tr>
                                     <td colSpan={8}>
                                       <div className="smm-status-detail-panel">
-                                        <p>Order Code : {item.orderCode || '-'}</p>
-                                        <p>Provider ID : {item.providerOrderId || '-'}</p>
+                                        <p>Order ID : {item.providerOrderId || '-'}</p>
+                                        <p>Referensi : {item.orderCode || '-'}</p>
                                         <p>Kategori : {item.category || '-'}</p>
                                         <p>Service ID : {item.serviceId || '-'}</p>
                                         <p>Metode bayar : {item.paymentMethod === 'balance' ? 'Saldo akun' : item.paymentMethod === 'midtrans' ? 'QRIS Midtrans' : '-'}</p>
-                                        <p>Status bayar : {item.paymentStatus || '-'}</p>
+                                        <p>Status bayar : {formatPaymentStatusLabel(item.paymentStatus)}</p>
                                         <p>Username : {item.username || '-'}</p>
                                         <p>Komentar : {item.comments || '-'}</p>
                                         <p>Update terakhir : {formatDate(item.updatedAt)}</p>

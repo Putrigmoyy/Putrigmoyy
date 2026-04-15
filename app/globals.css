@@ -35,6 +35,13 @@ body {
   padding-bottom: 88px;
 }
 
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -366,6 +373,10 @@ a {
 
 .smm-app-page .apk-app-section-label {
   gap: 0;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .smm-app-page .apk-app-section-label::before {
@@ -489,6 +500,40 @@ a {
   color: #111111;
   font-size: 1.08rem;
   line-height: 1.25;
+}
+
+.smm-app-page .apk-app-panel-head h3 {
+  margin-top: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.smm-app-page .apk-app-form-field span,
+.smm-app-page .smm-profile-title,
+.smm-app-page .smm-monitoring-filter-actions > span {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.smm-app-page .apk-app-form-field input,
+.smm-app-page .apk-app-form-field textarea,
+.smm-app-page .apk-app-form-field select,
+.smm-app-page .smm-picker-trigger,
+.smm-app-page .smm-manual-item-copy strong,
+.smm-app-page .apk-app-empty,
+.smm-app-page .apk-app-inline-helper,
+.smm-app-page .smm-section-copy,
+.smm-app-page .smm-service-note-card p,
+.smm-app-page .smm-service-stats-card p,
+.smm-app-page .smm-qris-detail-frame p,
+.smm-app-page .smm-qris-expiry-note,
+.smm-app-page .apk-app-feedback,
+.smm-app-page .smm-profile-lines p,
+.smm-app-page .smm-profile-links a {
+  font-size: 10px;
 }
 
 .apk-app-count-pill,
@@ -1169,8 +1214,8 @@ a {
 
 .smm-platform-label {
   color: #111111;
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   line-height: 1.3;
 }
 
@@ -1199,10 +1244,10 @@ a {
 }
 
 .smm-stage-platform strong,
-.smm-stage-platform span {
+.smm-stage-platform-label {
   color: #111111;
-  font-size: 0.86rem;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .smm-select-stack {
@@ -1224,7 +1269,7 @@ a {
   background: #ffffff;
   color: #111111;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 10px;
   text-align: left;
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
@@ -1237,7 +1282,7 @@ a {
 }
 
 .smm-picker-trigger--placeholder span {
-  font-size: 0.78rem;
+  font-size: 10px;
   color: rgba(17, 17, 17, 0.56);
 }
 
@@ -1353,8 +1398,8 @@ a {
 .smm-manual-item-copy strong,
 .smm-manual-item small {
   color: #111111;
-  font-size: 0.8rem;
-  font-weight: 500;
+  font-size: 10px;
+  font-weight: 400;
   line-height: 1.45;
 }
 
@@ -1443,8 +1488,8 @@ a {
 .smm-service-note-card span {
   display: block;
   color: rgba(17, 17, 17, 0.64);
-  font-size: 0.76rem;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .smm-service-note-card p {
@@ -1467,7 +1512,7 @@ a {
 .smm-service-stats-card p {
   margin: 0;
   color: rgba(17, 17, 17, 0.78);
-  font-size: 0.88rem;
+  font-size: 10px;
   line-height: 1.6;
 }
 
@@ -1477,7 +1522,7 @@ a {
 
 .smm-service-stats-card strong {
   color: #111111;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .apk-app-form-field input.smm-readonly-input {
@@ -1498,11 +1543,16 @@ a {
 .smm-qris-card .apk-app-qris-image,
 .smm-qris-card .apk-app-qris-fallback {
   aspect-ratio: 1 / 1;
-  min-height: 280px;
+  min-height: 320px;
 }
 
 .smm-qris-card .apk-app-qris-image {
-  padding: 10px;
+  padding: 16px;
+}
+
+.smm-qris-card {
+  grid-template-columns: 1fr;
+  gap: 0;
 }
 
 .smm-qris-copy {
@@ -1511,6 +1561,14 @@ a {
 
 .smm-qris-total-card {
   width: 100%;
+  margin-top: 14px;
+}
+
+.smm-qris-expiry-note {
+  margin-top: 8px;
+  color: rgba(17, 17, 17, 0.68);
+  line-height: 1.5;
+  text-align: center;
 }
 
 .smm-qris-detail-frame {
@@ -1526,8 +1584,15 @@ a {
 .smm-qris-detail-frame p {
   margin: 0;
   color: #111111;
-  font-size: 0.84rem;
   line-height: 1.55;
+}
+
+.smm-qris-detail-frame--success {
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.04), rgba(210, 9, 209, 0.04));
+}
+
+.smm-qris-status-row {
+  margin-top: 14px;
 }
 
 .smm-panel-head {
@@ -1537,7 +1602,6 @@ a {
 .smm-section-copy {
   margin: 8px 0 0;
   color: rgba(17, 17, 17, 0.72);
-  font-size: 0.82rem;
   line-height: 1.6;
 }
 
@@ -1560,10 +1624,7 @@ a {
 
 .smm-profile-title {
   color: rgba(17, 17, 17, 0.72);
-  font-size: 0.76rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  font-weight: 500;
 }
 
 .smm-profile-lines {
@@ -1574,7 +1635,6 @@ a {
 .smm-profile-lines p {
   margin: 0;
   color: #111111;
-  font-size: 0.88rem;
   font-weight: 400;
   line-height: 1.55;
 }
@@ -1590,7 +1650,6 @@ a {
 
 .smm-profile-links a {
   color: #111111;
-  font-size: 0.88rem;
   font-weight: 400;
   line-height: 1.55;
   text-decoration: none;
@@ -1676,13 +1735,13 @@ a {
 
 .smm-status-table {
   width: 100%;
-  min-width: 880px;
+  min-width: 760px;
   border-collapse: collapse;
 }
 
 .smm-status-table th,
 .smm-status-table td {
-  padding: 14px 16px;
+  padding: 10px 12px;
   border-bottom: 1px solid rgba(23, 153, 242, 0.08);
   border-right: 1px solid rgba(23, 153, 242, 0.08);
   text-align: left;
@@ -1696,22 +1755,22 @@ a {
 
 .smm-status-table thead th {
   color: #111111;
-  font-size: 0.86rem;
-  font-weight: 800;
+  font-size: 10px;
+  font-weight: 500;
   background: rgba(23, 153, 242, 0.03);
 }
 
 .smm-status-table tbody td {
   color: #111111;
-  font-size: 0.9rem;
-  line-height: 1.55;
+  font-size: 10px;
+  line-height: 1.45;
   word-break: break-word;
 }
 
 .smm-status-target {
-  min-width: 180px;
-  max-width: 240px;
-  padding: 10px 12px;
+  min-width: 140px;
+  max-width: 210px;
+  padding: 8px 10px;
   border: 1px solid rgba(23, 153, 242, 0.12);
   border-radius: 14px;
   background: #ffffff;
@@ -1722,11 +1781,11 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 28px;
-  padding: 0 12px;
+  min-height: 24px;
+  padding: 0 10px;
   border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 800;
+  font-size: 10px;
+  font-weight: 500;
 }
 
 .smm-status-badge--success {
@@ -1745,14 +1804,14 @@ a {
 }
 
 .smm-status-detail-button {
-  min-height: 36px;
-  padding: 0 14px;
+  min-height: 32px;
+  padding: 0 12px;
   border: 0;
   border-radius: 999px;
   background: #1554b5;
   color: #ffffff;
-  font-size: 0.8rem;
-  font-weight: 800;
+  font-size: 10px;
+  font-weight: 500;
   box-shadow: 0 12px 24px rgba(21, 84, 181, 0.22);
 }
 
@@ -1765,7 +1824,7 @@ a {
 .smm-status-detail-panel p {
   margin: 0;
   color: #111111;
-  font-size: 0.86rem;
+  font-size: 10px;
   line-height: 1.55;
 }
 
@@ -2062,9 +2121,13 @@ a {
     align-items: start;
   }
 
+  .smm-qris-card {
+    grid-template-columns: 1fr;
+  }
+
   .smm-qris-card .apk-app-qris-image,
   .smm-qris-card .apk-app-qris-fallback {
-    min-height: 320px;
+    min-height: 360px;
   }
 
   .smm-order-summary,
