@@ -247,8 +247,11 @@ function formatServicePickerLabel(service?: NormalizedPusatPanelService | null) 
 
 function mapStatusTone(status: string) {
   const normalized = String(status || '').trim().toLowerCase();
-  if (normalized.includes('success') || normalized.includes('complete') || normalized.includes('completed') || normalized.includes('processing')) {
+  if (normalized.includes('success') || normalized.includes('complete') || normalized.includes('completed')) {
     return 'success';
+  }
+  if (normalized.includes('process') || normalized.includes('pending') || normalized.includes('waiting')) {
+    return 'pending';
   }
   if (normalized.includes('cancel') || normalized.includes('error') || normalized.includes('fail') || normalized.includes('partial') || normalized.includes('expired')) {
     return 'failed';
@@ -535,6 +538,21 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       window.clearInterval(intervalId);
     };
   }, [activeTab, accountProfile.contact, accountProfile.loggedIn]);
+
+  useEffect(() => {
+    if (activeTab !== 'riwayat') {
+      return;
+    }
+
+    refreshHistory();
+    const intervalId = window.setInterval(() => {
+      refreshHistory();
+    }, 30000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [activeTab]);
 
   const platformGroups = useMemo<PlatformGroup[]>(() => {
     const buckets = new Map<string, PlatformGroup>();
