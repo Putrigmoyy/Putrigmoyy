@@ -3,8 +3,12 @@ import { getCoreWalletBundle } from '@/lib/core-store';
 
 export async function GET(request: NextRequest) {
   try {
-    const contact = request.nextUrl.searchParams.get('contact') || '';
-    const bundle = await getCoreWalletBundle(contact, true);
+    const username =
+      request.nextUrl.searchParams.get('username') ||
+      request.nextUrl.searchParams.get('contact') ||
+      request.nextUrl.searchParams.get('account') ||
+      '';
+    const bundle = await getCoreWalletBundle(username, true);
 
     if (!bundle) {
       return NextResponse.json(

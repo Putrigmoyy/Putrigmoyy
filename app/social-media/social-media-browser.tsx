@@ -52,6 +52,7 @@ type CoreBundlePayload = {
     registered?: boolean;
     loggedIn?: boolean;
     name?: string;
+    username?: string;
     contact?: string;
     balance?: number;
   };
@@ -325,7 +326,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const [accountProfile, setAccountProfile] = useState({
     loggedIn: false,
     name: '',
-    contact: '',
+    username: '',
     balance: 0,
   });
   const [selectedPlatformKey, setSelectedPlatformKey] = useState('');
@@ -413,10 +414,10 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     return years.map(String);
   }, [sortedAccountOrderItems]);
 
-  const syncAccountBundle = async (contact: string) => {
-    const normalizedContact = String(contact || '').trim();
-    if (!normalizedContact) return false;
-    const response = await fetch(`/api/core/account?contact=${encodeURIComponent(normalizedContact)}`, {
+  const syncAccountBundle = async (username: string) => {
+    const normalizedUsername = String(username || '').trim();
+    if (!normalizedUsername) return false;
+    const response = await fetch(`/api/core/account?username=${encodeURIComponent(normalizedUsername)}`, {
       method: 'GET',
       cache: 'no-store',
     });
@@ -431,7 +432,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     setAccountProfile({
       loggedIn: account.loggedIn === true,
       name: String(account.name || ''),
-      contact: String(account.contact || ''),
+      username: String(account.username || account.contact || ''),
       balance: Math.max(0, Number(account.balance || 0)),
     });
     return true;
@@ -473,9 +474,9 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     });
   };
 
-  const refreshAccountOrders = (contactOverride?: string) => {
-    const normalizedContact = String(contactOverride || accountProfile.contact || '').trim();
-    if (!normalizedContact) {
+  const refreshAccountOrders = (usernameOverride?: string) => {
+    const normalizedUsername = String(usernameOverride || accountProfile.username || '').trim();
+    if (!normalizedUsername) {
       setAccountOrderItems([]);
       setExpandedStatusHistoryId(null);
       return;
@@ -483,7 +484,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
     startAccountOrdersRefresh(async () => {
       try {
-        const response = await fetch(`/api/smm/history?limit=150&contact=${encodeURIComponent(normalizedContact)}`, {
+        const response = await fetch(`/api/smm/history?limit=150&contact=${encodeURIComponent(normalizedUsername)}`, {
           method: 'GET',
           cache: 'no-store',
         });
@@ -516,10 +517,10 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
         text: payload.nextStep,
       });
       refreshHistory();
-      if (accountProfile.contact) {
-        refreshAccountOrders(accountProfile.contact);
+      if (accountProfile.username) {
+        refreshAccountOrders(accountProfile.username);
         try {
-          await syncAccountBundle(accountProfile.contact);
+          await syncAccountBundle(accountProfile.username);
         } catch {
           // keep current account banner if refresh fails
         }
@@ -532,8 +533,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
         tone: 'error',
         text: payload.nextStep,
       });
-      if (accountProfile.contact) {
-        refreshAccountOrders(accountProfile.contact);
+      if (accountProfile.username) {
+        refreshAccountOrders(accountProfile.username);
       }
     }
   };
@@ -597,9 +598,9 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   useEffect(() => {
     const hydrateSession = async () => {
       try {
-        const savedContact = window.localStorage.getItem(WEBSITE_ACCOUNT_SESSION_KEY);
-        if (savedContact) {
-          await syncAccountBundle(savedContact);
+        const savedUsername = window.localStorage.getItem(WEBSITE_ACCOUNT_SESSION_KEY);
+        if (savedUsername) {
+          await syncAccountBundle(savedUsername);
         }
       } catch {
         // ignore session hydration issues
@@ -610,28 +611,28 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   }, []);
 
   useEffect(() => {
-    if (accountProfile.loggedIn && accountProfile.contact) {
-      refreshAccountOrders(accountProfile.contact);
+    if (accountProfile.loggedIn && accountProfile.username) {
+      refreshAccountOrders(accountProfile.username);
       return;
     }
     setAccountOrderItems([]);
     setExpandedStatusHistoryId(null);
-  }, [accountProfile.contact, accountProfile.loggedIn]);
+  }, [accountProfile.loggedIn, accountProfile.username]);
 
   useEffect(() => {
-    if (activeTab !== 'status' || !accountProfile.loggedIn || !accountProfile.contact) {
+    if (activeTab !== 'status' || !accountProfile.loggedIn || !accountProfile.username) {
       return;
     }
 
-    refreshAccountOrders(accountProfile.contact);
+    refreshAccountOrders(accountProfile.username);
     const intervalId = window.setInterval(() => {
-      refreshAccountOrders(accountProfile.contact);
+      refreshAccountOrders(accountProfile.username);
     }, 30000);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [activeTab, accountProfile.contact, accountProfile.loggedIn]);
+  }, [activeTab, accountProfile.loggedIn, accountProfile.username]);
 
   useEffect(() => {
     if (activeTab !== 'riwayat') {
@@ -884,7 +885,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            accountContact: accountProfile.loggedIn ? accountProfile.contact : '',
+            accountContact: accountProfile.loggedIn ? accountProfile.username : '',
             customerName: accountProfile.loggedIn ? accountProfile.name : 'Pelanggan Sosmed',
             service: selectedService.id,
             serviceName: selectedService.name,
@@ -913,10 +914,10 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             text: result.data.nextStep,
           });
           refreshHistory();
-          if (accountProfile.contact) {
-            refreshAccountOrders(accountProfile.contact);
+          if (accountProfile.username) {
+            refreshAccountOrders(accountProfile.username);
             try {
-              await syncAccountBundle(accountProfile.contact);
+              await syncAccountBundle(accountProfile.username);
             } catch {
               // keep current account banner if sync fails
             }
@@ -1416,11 +1417,11 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                   <div className="apk-app-info-card smm-status-account-banner">
                     <div>
                       <span>Akun aktif</span>
-                      <strong>{accountProfile.name || accountProfile.contact || 'Akun pengguna'}</strong>
+                      <strong>{accountProfile.name || accountProfile.username || 'Akun pengguna'}</strong>
                     </div>
                     <div>
-                      <span>Kontak</span>
-                      <strong>{accountProfile.contact || '-'}</strong>
+                      <span>Username</span>
+                      <strong>{accountProfile.username ? `@${accountProfile.username}` : '-'}</strong>
                     </div>
                     <div>
                       <span>Total transaksi</span>
@@ -1489,7 +1490,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                           <button
                             type="button"
                             className="apk-app-ghost-button"
-                            onClick={() => refreshAccountOrders(accountProfile.contact)}
+                            onClick={() => refreshAccountOrders(accountProfile.username)}
                             disabled={isRefreshingAccountOrders}
                           >
                             {isRefreshingAccountOrders ? 'Memuat...' : 'Refresh'}

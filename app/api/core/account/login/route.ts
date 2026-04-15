@@ -4,13 +4,15 @@ import { loginCoreWalletAccount } from '@/lib/core-store';
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
+      username?: string;
+      password?: string;
       contact?: string;
       pin?: string;
     };
 
     const bundle = await loginCoreWalletAccount({
-      contact: String(body.contact || ''),
-      pin: String(body.pin || ''),
+      username: String(body.username || body.contact || ''),
+      password: String(body.password || body.pin || ''),
     });
 
     return NextResponse.json({

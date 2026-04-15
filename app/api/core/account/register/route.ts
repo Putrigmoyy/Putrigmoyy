@@ -5,14 +5,16 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       name?: string;
+      username?: string;
+      password?: string;
       contact?: string;
       pin?: string;
     };
 
     const bundle = await registerCoreWalletAccount({
       name: String(body.name || ''),
-      contact: String(body.contact || ''),
-      pin: String(body.pin || ''),
+      username: String(body.username || body.contact || ''),
+      password: String(body.password || body.pin || ''),
     });
 
     return NextResponse.json({

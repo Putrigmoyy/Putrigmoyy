@@ -41,6 +41,7 @@ type CoreBundlePayload = {
     registered?: boolean;
     loggedIn?: boolean;
     name?: string;
+    username?: string;
     contact?: string;
     balance?: number;
   };
@@ -169,18 +170,17 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
     registered: false,
     loggedIn: false,
     name: '',
-    contact: '',
-    pin: '',
+    username: '',
     balance: 0,
   });
   const [walletRegisterDraft, setWalletRegisterDraft] = useState({
     name: '',
-    contact: '',
-    pin: '',
+    username: '',
+    password: '',
   });
   const [walletLoginDraft, setWalletLoginDraft] = useState({
-    contact: '',
-    pin: '',
+    username: '',
+    password: '',
   });
   const [depositFeedback, setDepositFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
     tone: 'idle',
@@ -215,28 +215,28 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
 
   const applyCoreBundle = (bundle: CoreBundlePayload) => {
     const account = bundle.account || {};
+    const username = String(account.username || account.contact || '');
     setWalletProfile({
       registered: account.registered === true,
       loggedIn: account.loggedIn === true,
       name: String(account.name || ''),
-      contact: String(account.contact || ''),
-      pin: '',
+      username,
       balance: Math.max(0, Number(account.balance || 0)),
     });
     setWalletLoginDraft({
-      contact: String(account.contact || ''),
-      pin: '',
+      username,
+      password: '',
     });
     setHistoryEntries(Array.isArray(bundle.history) ? bundle.history : []);
   };
 
-  const syncAccountBundle = async (contact: string) => {
-    const normalizedContact = String(contact || '').trim();
-    if (!normalizedContact) {
+  const syncAccountBundle = async (username: string) => {
+    const normalizedUsername = String(username || '').trim();
+    if (!normalizedUsername) {
       return false;
     }
 
-    const response = await fetch(`/api/core/account?contact=${encodeURIComponent(normalizedContact)}`, {
+    const response = await fetch(`/api/core/account?username=${encodeURIComponent(normalizedUsername)}`, {
       method: 'GET',
       cache: 'no-store',
     });
@@ -254,9 +254,9 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
   useEffect(() => {
     const hydrateSession = async () => {
       try {
-        const savedContact = window.localStorage.getItem(APK_ACCOUNT_SESSION_KEY);
-        if (savedContact) {
-          await syncAccountBundle(savedContact);
+        const savedUsername = window.localStorage.getItem(APK_ACCOUNT_SESSION_KEY);
+        if (savedUsername) {
+          await syncAccountBundle(savedUsername);
         }
       } catch {
         // ignore session hydration issues
@@ -370,9 +370,9 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
                 tone: 'success',
                 text: `Pembayaran ${result.data.orderCode} berhasil. Owner akan melanjutkan fulfillment order ini.`,
               });
-              if (walletProfile.loggedIn && walletProfile.contact) {
+              if (walletProfile.loggedIn && walletProfile.username) {
                 try {
-                  await syncAccountBundle(walletProfile.contact);
+                  await syncAccountBundle(walletProfile.username);
                 } catch {
                   // ignore history refresh issue
                 }
@@ -388,7 +388,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
     return () => {
       window.clearInterval(timer);
     };
-  }, [activeQrisOrder, startRefreshQris, walletProfile.contact, walletProfile.loggedIn]);
+  }, [activeQrisOrder, startRefreshQris, walletProfile.loggedIn, walletProfile.username]);
 
   const openProduct = (product: ApkPremiumProduct) => {
     setSelectedProductId(product.id);
@@ -439,7 +439,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
             quantity: Number(checkoutForm.quantity || 0),
             customerName: checkoutForm.customerName,
             customerContact: checkoutForm.customerContact,
-            accountContact: walletProfile.loggedIn ? walletProfile.contact : '',
+            accountContact: walletProfile.loggedIn ? walletProfile.username : '',
             paymentMethod: orderPaymentMethod,
             note: checkoutForm.note,
           }),
@@ -486,9 +486,9 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
               }
             : null,
         );
-        if (walletProfile.loggedIn && walletProfile.contact) {
+        if (walletProfile.loggedIn && walletProfile.username) {
           try {
-            await syncAccountBundle(walletProfile.contact);
+            await syncAccountBundle(walletProfile.username);
           } catch {
             // keep UI success state even if history refresh fails
           }
@@ -505,12 +505,12 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
   const registerWalletAccount = () => {
     startProfileSubmit(async () => {
       const name = walletRegisterDraft.name.trim();
-      const contact = walletRegisterDraft.contact.trim();
-      const pin = walletRegisterDraft.pin.trim();
-      if (!name || !contact || !pin) {
+      const username = walletRegisterDraft.username.trim().toLowerCase();
+      const password = walletRegisterDraft.password.trim();
+      if (!name || !username || !password) {
         setProfileFeedback({
           tone: 'error',
-          text: 'Isi nama, kontak, dan PIN dulu untuk membuat akun.',
+          text: 'Isi nama, username, dan password dulu untuk membuat akun.',
         });
         return;
       }
@@ -521,7 +521,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ name, contact, pin }),
+          body: JSON.stringify({ name, username, password }),
         });
         const result = (await response.json()) as CoreBundleResult;
         if (!response.ok || !result.status || !result.data || !('account' in result.data)) {
@@ -533,8 +533,8 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
         }
 
         applyCoreBundle(result.data);
-        setWalletRegisterDraft({ name: '', contact: '', pin: '' });
-        window.localStorage.setItem(APK_ACCOUNT_SESSION_KEY, contact);
+        setWalletRegisterDraft({ name: '', username: '', password: '' });
+        window.localStorage.setItem(APK_ACCOUNT_SESSION_KEY, username);
         setProfileFeedback({
           tone: 'success',
           text: 'Akun berhasil dibuat dan langsung aktif. Sekarang menu deposit sudah terbuka.',
@@ -550,12 +550,12 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
 
   const loginWalletAccount = () => {
     startProfileSubmit(async () => {
-      const contact = walletLoginDraft.contact.trim();
-      const pin = walletLoginDraft.pin.trim();
-      if (!contact || !pin) {
+      const username = walletLoginDraft.username.trim().toLowerCase();
+      const password = walletLoginDraft.password.trim();
+      if (!username || !password) {
         setProfileFeedback({
           tone: 'error',
-          text: 'Isi kontak dan PIN untuk masuk.',
+          text: 'Isi username dan password untuk masuk.',
         });
         return;
       }
@@ -566,7 +566,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ contact, pin }),
+          body: JSON.stringify({ username, password }),
         });
         const result = (await response.json()) as CoreBundleResult;
         if (!response.ok || !result.status || !result.data || !('account' in result.data)) {
@@ -578,7 +578,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
         }
 
         applyCoreBundle(result.data);
-        window.localStorage.setItem(APK_ACCOUNT_SESSION_KEY, contact);
+        window.localStorage.setItem(APK_ACCOUNT_SESSION_KEY, username);
         setProfileFeedback({
           tone: 'success',
           text: 'Login berhasil. Deposit dan saldo akun sekarang bisa dipakai.',
@@ -594,9 +594,9 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
 
   const logoutWalletAccount = () => {
     window.localStorage.removeItem(APK_ACCOUNT_SESSION_KEY);
-    setWalletProfile((current) => ({ ...current, loggedIn: false, pin: '' }));
+    setWalletProfile((current) => ({ ...current, loggedIn: false, username: '' }));
     setHistoryEntries([]);
-    setWalletLoginDraft((current) => ({ ...current, pin: '' }));
+    setWalletLoginDraft((current) => ({ ...current, username: '', password: '' }));
     setProfileFeedback({
       tone: 'success',
       text: 'Kamu sudah logout dari akun ini.',
@@ -627,7 +627,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            accountContact: walletProfile.contact,
+            accountContact: walletProfile.username,
             amount: normalizedDepositAmount,
             method: depositMethod,
           }),
@@ -691,9 +691,9 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
               ? `Pembayaran ${result.data.orderCode} berhasil. Owner akan melanjutkan fulfillment order ini.`
               : `Status ${result.data.orderCode} masih ${result.data.paymentStatus}.`,
         });
-        if (result.data.paymentStatus === 'paid' && walletProfile.loggedIn && walletProfile.contact) {
+        if (result.data.paymentStatus === 'paid' && walletProfile.loggedIn && walletProfile.username) {
           try {
-            await syncAccountBundle(walletProfile.contact);
+            await syncAccountBundle(walletProfile.username);
           } catch {
             // ignore sync failure
           }
@@ -968,7 +968,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
                   <p>
                     {depositLocked
                       ? 'Untuk menggunakan deposit, kamu perlu daftar akun lalu login dulu dari menu Profil.'
-                      : `${walletProfile.name} - ${walletProfile.contact}`}
+                      : `${walletProfile.name} - @${walletProfile.username}`}
                   </p>
                   <div className="apk-app-live-total-card">
                     <span>Saldo akun</span>
@@ -1217,19 +1217,20 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
                         />
                       </label>
                       <label className="apk-app-form-field">
-                        <span>Kontak akun</span>
+                        <span>Username akun</span>
                         <input
-                          value={walletRegisterDraft.contact}
-                          onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, contact: event.target.value }))}
-                          placeholder="WhatsApp / username"
+                          value={walletRegisterDraft.username}
+                          onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
+                          placeholder="contoh: putrigmoyy"
                         />
                       </label>
                       <label className="apk-app-form-field">
-                        <span>PIN akun</span>
+                        <span>Password akun</span>
                         <input
-                          value={walletRegisterDraft.pin}
-                          onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, pin: event.target.value.replace(/[^\d]/g, '').slice(0, 6) }))}
-                          placeholder="PIN 4-6 digit"
+                          type="password"
+                          value={walletRegisterDraft.password}
+                          onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, password: event.target.value }))}
+                          placeholder="Minimal 6 karakter"
                         />
                       </label>
                     </div>
@@ -1246,19 +1247,20 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
                     <span className="apk-app-section-label">Login Akun</span>
                     <div className="apk-app-form-grid">
                       <label className="apk-app-form-field">
-                        <span>Kontak akun</span>
+                        <span>Username akun</span>
                         <input
-                          value={walletLoginDraft.contact}
-                          onChange={(event) => setWalletLoginDraft((current) => ({ ...current, contact: event.target.value }))}
-                          placeholder="WhatsApp / username"
+                          value={walletLoginDraft.username}
+                          onChange={(event) => setWalletLoginDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
+                          placeholder="Masukkan username"
                         />
                       </label>
                       <label className="apk-app-form-field">
-                        <span>PIN akun</span>
+                        <span>Password akun</span>
                         <input
-                          value={walletLoginDraft.pin}
-                          onChange={(event) => setWalletLoginDraft((current) => ({ ...current, pin: event.target.value.replace(/[^\d]/g, '').slice(0, 6) }))}
-                          placeholder="Masukkan PIN"
+                          type="password"
+                          value={walletLoginDraft.password}
+                          onChange={(event) => setWalletLoginDraft((current) => ({ ...current, password: event.target.value }))}
+                          placeholder="Masukkan password"
                         />
                       </label>
                     </div>
@@ -1275,7 +1277,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
                     <span className="apk-app-section-label">Akun Sedang Aktif</span>
                     <div className="apk-app-history-meta">
                       <span>Nama : {walletProfile.name}</span>
-                      <span>Kontak : {walletProfile.contact}</span>
+                      <span>Username : @{walletProfile.username}</span>
                       <span>Status : Login</span>
                     </div>
                     <div className="apk-app-action-row">
