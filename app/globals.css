@@ -1085,18 +1085,18 @@ a {
 .smm-platform-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .smm-platform-card {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 54px;
-  padding: 10px 11px;
+  gap: 9px;
+  min-height: 50px;
+  padding: 8px 10px;
   border: 1px solid rgba(17, 17, 17, 0.1);
-  border-radius: 16px;
+  border-radius: 15px;
   background: #ffffff;
   color: #111111;
   text-align: left;
@@ -1117,25 +1117,25 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 10px;
   color: #ffffff;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   flex-shrink: 0;
 }
 
 .smm-platform-icon svg {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   display: block;
 }
 
 .smm-platform-icon img {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   display: block;
   object-fit: contain;
   border-radius: 5px;
@@ -1169,8 +1169,8 @@ a {
 
 .smm-platform-label {
   color: #111111;
-  font-size: 0.86rem;
-  font-weight: 700;
+  font-size: 0.8rem;
+  font-weight: 600;
   line-height: 1.3;
 }
 
@@ -1195,13 +1195,14 @@ a {
   align-items: center;
   justify-items: start;
   margin-top: 4px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
-.smm-stage-platform strong {
+.smm-stage-platform strong,
+.smm-stage-platform span {
   color: #111111;
-  font-size: 1rem;
-  font-weight: 800;
+  font-size: 0.86rem;
+  font-weight: 600;
 }
 
 .smm-select-stack {
@@ -1216,14 +1217,14 @@ a {
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  min-height: 52px;
-  padding: 0 14px;
+  min-height: 48px;
+  padding: 0 13px;
   border: 1px solid rgba(23, 153, 242, 0.14);
-  border-radius: 18px;
+  border-radius: 16px;
   background: #ffffff;
   color: #111111;
   font: inherit;
-  font-size: 0.98rem;
+  font-size: 0.9rem;
   text-align: left;
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
@@ -1235,10 +1236,15 @@ a {
   white-space: nowrap;
 }
 
+.smm-picker-trigger--placeholder span {
+  font-size: 0.78rem;
+  color: rgba(17, 17, 17, 0.56);
+}
+
 .smm-picker-trigger--multiline {
   align-items: flex-start;
-  padding-top: 12px;
-  padding-bottom: 12px;
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 .smm-picker-trigger--multiline span {
@@ -1246,7 +1252,7 @@ a {
   text-overflow: initial;
   white-space: normal;
   word-break: break-word;
-  line-height: 1.45;
+  line-height: 1.38;
   padding-right: 8px;
 }
 
@@ -1476,7 +1482,7 @@ a {
 
 .apk-app-form-field input.smm-readonly-input {
   background: linear-gradient(135deg, rgba(23, 153, 242, 0.05), rgba(210, 9, 209, 0.05));
-  font-weight: 800;
+  font-weight: 600;
   cursor: default;
 }
 
@@ -1487,6 +1493,112 @@ a {
 
 .smm-checkout-summary-grid {
   margin-top: 18px;
+}
+
+.smm-qris-card .apk-app-qris-image,
+.smm-qris-card .apk-app-qris-fallback {
+  aspect-ratio: 1 / 1;
+  min-height: 280px;
+}
+
+.smm-qris-card .apk-app-qris-image {
+  padding: 10px;
+}
+
+.smm-qris-copy {
+  gap: 12px;
+}
+
+.smm-qris-total-card {
+  width: 100%;
+}
+
+.smm-qris-detail-frame {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(23, 153, 242, 0.14);
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.smm-qris-detail-frame p {
+  margin: 0;
+  color: #111111;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.smm-panel-head {
+  margin-bottom: 12px;
+}
+
+.smm-section-copy {
+  margin: 8px 0 0;
+  color: rgba(17, 17, 17, 0.72);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.smm-profile-sheet {
+  display: grid;
+  gap: 14px;
+}
+
+.smm-profile-block {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(23, 153, 242, 0.12);
+}
+
+.smm-profile-block:last-of-type {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.smm-profile-title {
+  color: rgba(17, 17, 17, 0.72);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.smm-profile-lines {
+  display: grid;
+  gap: 8px;
+}
+
+.smm-profile-lines p {
+  margin: 0;
+  color: #111111;
+  font-size: 0.88rem;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.smm-profile-form-grid {
+  margin-top: 0;
+}
+
+.smm-profile-links {
+  display: grid;
+  gap: 8px;
+}
+
+.smm-profile-links a {
+  color: #111111;
+  font-size: 0.88rem;
+  font-weight: 400;
+  line-height: 1.55;
+  text-decoration: none;
+}
+
+.smm-profile-action-row,
+.smm-profile-logout-row {
+  margin-top: 0;
 }
 
 .smm-status-order-note {
@@ -1948,6 +2060,11 @@ a {
   .apk-app-qris-card {
     grid-template-columns: 0.92fr 1fr;
     align-items: start;
+  }
+
+  .smm-qris-card .apk-app-qris-image,
+  .smm-qris-card .apk-app-qris-fallback {
+    min-height: 320px;
   }
 
   .smm-order-summary,

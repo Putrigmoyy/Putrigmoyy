@@ -276,6 +276,22 @@ function formatServicePickerLabel(service?: NormalizedPusatPanelService | null) 
   return `${service.id} - ${service.name} - Rp${service.priceLabel}`;
 }
 
+function calculateSmmTotal(service: NormalizedPusatPanelService | null, quantity: number) {
+  if (!service) {
+    return 0;
+  }
+  if (service.menuType === '4') {
+    return Math.max(0, service.price);
+  }
+
+  const units = Math.max(0, Number(quantity || 0));
+  if (units <= 0) {
+    return 0;
+  }
+
+  return Math.max(0, Math.ceil((service.price * units) / 1000));
+}
+
 function mapStatusTone(status: string) {
   const normalized = String(status || '').trim().toLowerCase();
   if (normalized.includes('success') || normalized.includes('complete') || normalized.includes('completed')) {
@@ -965,7 +981,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       ...prev,
       quantity:
         nextService.menuType === '4'
-          ? ''
+          ? '1'
           : prev.quantity && nextService.id === selectedServiceId
             ? prev.quantity
             : String(Math.max(0, nextService.min || 0)),
@@ -989,10 +1005,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   }, [orderForm.comments, orderForm.quantity, selectedService]);
 
   const liveTotal = useMemo(() => {
-    if (!selectedService) return 0;
-    if (selectedService.menuType === '4') return selectedService.price;
-    const units = Math.max(0, calculatedQuantity);
-    return selectedService.price * units;
+    return calculateSmmTotal(selectedService, calculatedQuantity);
   }, [calculatedQuantity, selectedService]);
 
   const filteredMonitoringItems = useMemo(() => {
@@ -1048,6 +1061,12 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     const username = orderForm.username.trim();
     const comments = orderForm.comments.trim();
     const menuType = selectedService.menuType;
+    const submittedQuantity =
+      menuType === '4'
+        ? ''
+        : menuType === '2'
+          ? String(calculatedQuantity || 0)
+          : quantity;
 
     if (!data) {
       setOrderFeedback({ tone: 'error', text: 'Data target wajib diisi.' });
@@ -1086,7 +1105,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             serviceName: selectedService.name,
             category: selectedService.category,
             data,
-            quantity,
+            quantity: submittedQuantity,
             unitPrice: selectedService.price,
             totalPrice: liveTotal,
             username,
@@ -1146,34 +1165,43 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             <section className="apk-app-panel apk-app-panel--plain">
               {activePlatform ? (
                 <>
-                  <div className="smm-platform-grid">
-                    {platformGroups.map((platform) => (
-                      <button
-                        key={platform.key}
-                        type="button"
-                        className={platform.key === activePlatform.key ? 'smm-platform-card smm-platform-card--active' : 'smm-platform-card'}
-                        onClick={() => setSelectedPlatformKey(platform.key)}
-                      >
-                        <span className="smm-platform-icon" style={{ background: platform.accent, boxShadow: `0 12px 28px ${platform.accent}28` }}>
-                          <SocialPlatformIcon icon={platform.icon} />
-                        </span>
-                        <span className="smm-platform-label">{platform.label}</span>
-                      </button>
-                    ))}
+                  <div className="apk-app-form-card">
+                    <span className="apk-app-section-label">Pilih Platforms</span>
+                    <div className="smm-platform-grid">
+                      {platformGroups.map((platform) => (
+                        <button
+                          key={platform.key}
+                          type="button"
+                          className={platform.key === activePlatform.key ? 'smm-platform-card smm-platform-card--active' : 'smm-platform-card'}
+                          onClick={() => setSelectedPlatformKey(platform.key)}
+                        >
+                          <span className="smm-platform-icon" style={{ background: platform.accent, boxShadow: `0 12px 28px ${platform.accent}28` }}>
+                            <SocialPlatformIcon icon={platform.icon} />
+                          </span>
+                          <span className="smm-platform-label">{platform.label}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="apk-app-form-card">
                     <span className="apk-app-section-label">Kategori Layanan</span>
                     <div className="smm-stage-platform smm-stage-platform--inline">
-                      <span className="smm-platform-icon smm-platform-icon--large" style={{ background: activePlatform.accent, boxShadow: `0 12px 28px ${activePlatform.accent}28` }}>
+                      <span className="smm-platform-icon" style={{ background: activePlatform.accent, boxShadow: `0 12px 28px ${activePlatform.accent}28` }}>
                         <SocialPlatformIcon icon={activePlatform.icon} />
                       </span>
-                      <strong>{activePlatform.label}</strong>
+                      <span>{activePlatform.label}</span>
                     </div>
                     <div className="smm-select-stack">
                       <button
                         type="button"
-                        className={categoryPickerOpen ? 'smm-picker-trigger smm-picker-trigger--open' : 'smm-picker-trigger'}
+                        className={
+                          categoryPickerOpen
+                            ? `smm-picker-trigger${!selectedCategory ? ' smm-picker-trigger--placeholder' : ''} smm-picker-trigger--open`
+                            : !selectedCategory
+                              ? 'smm-picker-trigger smm-picker-trigger--placeholder'
+                              : 'smm-picker-trigger'
+                        }
                         onClick={() => {
                           setCategoryPickerOpen((current) => !current);
                           setServicePickerOpen(false);
@@ -1236,7 +1264,13 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                     <div className="smm-select-stack">
                       <button
                         type="button"
-                        className={servicePickerOpen ? 'smm-picker-trigger smm-picker-trigger--multiline smm-picker-trigger--open' : 'smm-picker-trigger smm-picker-trigger--multiline'}
+                        className={
+                          servicePickerOpen
+                            ? `smm-picker-trigger smm-picker-trigger--multiline${!selectedService ? ' smm-picker-trigger--placeholder' : ''} smm-picker-trigger--open`
+                            : !selectedService
+                              ? 'smm-picker-trigger smm-picker-trigger--multiline smm-picker-trigger--placeholder'
+                              : 'smm-picker-trigger smm-picker-trigger--multiline'
+                        }
                         onClick={() => {
                           if (!selectedCategory) return;
                           setServicePickerOpen((current) => !current);
@@ -1296,9 +1330,10 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                     {selectedCategory && platformServices.length === 0 ? <div className="apk-app-empty">Tidak ada layanan yang cocok di kategori ini.</div> : null}
                   </div>
 
-                  {selectedService ? (
-                    <div className="apk-app-form-card">
-                      <span className="apk-app-section-label">Data Pesanan</span>
+                  <div className="apk-app-form-card">
+                    <span className="apk-app-section-label">Data Pesanan</span>
+                    {selectedService ? (
+                      <>
                       <div className="smm-service-note-card">
                         <span>Deskripsi Layanan</span>
                         <p>{selectedService.note || 'Deskripsi layanan belum tersedia dari provider.'}</p>
@@ -1315,151 +1350,147 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                           <strong>Harga/1000:</strong> Rp {selectedService.priceLabel}
                         </p>
                       </div>
+                      </>
+                    ) : null}
 
-                      <div className="apk-app-form-grid">
+                    <div className="apk-app-form-grid">
+                      <label className="apk-app-form-field">
+                        <span>Target (URL/Username)</span>
+                        <input
+                          value={orderForm.data}
+                          onChange={(event) => setOrderForm((prev) => ({ ...prev, data: event.target.value }))}
+                          placeholder="Masukkan link/username target"
+                        />
+                      </label>
+
+                      <label className="apk-app-form-field">
+                        <span>Jumlah</span>
+                        <input
+                          value={
+                            selectedService?.menuType === '2'
+                              ? String(calculatedQuantity || 0)
+                              : selectedService?.menuType === '4'
+                                ? '1'
+                                : orderForm.quantity
+                          }
+                          onChange={(event) => setOrderForm((prev) => ({ ...prev, quantity: event.target.value.replace(/[^\d]/g, '') }))}
+                          placeholder={
+                            selectedService
+                              ? selectedService.menuType === '2'
+                                ? 'Otomatis dari jumlah komentar'
+                                : selectedService.menuType === '4'
+                                  ? 'Otomatis 1'
+                                  : `Minimal ${selectedService.min.toLocaleString('id-ID')}`
+                              : 'Isi jumlah order'
+                          }
+                          readOnly={selectedService?.menuType === '2' || selectedService?.menuType === '4'}
+                        />
+                      </label>
+
+                      <label className="apk-app-form-field">
+                        <span>Email Notifikasi</span>
+                        <input
+                          value={orderForm.emailNotification}
+                          onChange={(event) => setOrderForm((prev) => ({ ...prev, emailNotification: event.target.value }))}
+                          placeholder="Masukkan email penerima notifikasi"
+                        />
+                      </label>
+
+                      <label className="apk-app-form-field">
+                        <span>Total Harga</span>
+                        <input value={`Rp ${liveTotal.toLocaleString('id-ID')}`} readOnly className="smm-readonly-input" />
+                      </label>
+
+                      {selectedService?.menuType === '3' ? (
                         <label className="apk-app-form-field">
-                          <span>Target (URL/Username)</span>
+                          <span>Username komentar</span>
                           <input
-                            value={orderForm.data}
-                            onChange={(event) => setOrderForm((prev) => ({ ...prev, data: event.target.value }))}
-                            placeholder="Masukkan link/username target"
+                            value={orderForm.username}
+                            onChange={(event) => setOrderForm((prev) => ({ ...prev, username: event.target.value }))}
+                            placeholder="Username pemilik komentar"
                           />
                         </label>
+                      ) : null}
 
-                        {selectedService.menuType !== '4' && selectedService.menuType !== '2' ? (
-                          <label className="apk-app-form-field">
-                            <span>Jumlah</span>
-                            <input
-                              value={orderForm.quantity}
-                              onChange={(event) => setOrderForm((prev) => ({ ...prev, quantity: event.target.value.replace(/[^\d]/g, '') }))}
-                              placeholder={`Minimal ${selectedService.min.toLocaleString('id-ID')}`}
-                            />
-                          </label>
-                        ) : null}
-
+                      {selectedService?.menuType === '2' || selectedService?.menuType === '5' ? (
                         <label className="apk-app-form-field">
-                          <span>Email Notifikasi</span>
-                          <input
-                            value={orderForm.emailNotification}
-                            onChange={(event) => setOrderForm((prev) => ({ ...prev, emailNotification: event.target.value }))}
-                            placeholder="Masukkan email penerima notifikasi"
+                          <span>{selectedService.menuType === '2' ? 'Daftar komentar' : 'Daftar keyword / komen'}</span>
+                          <textarea
+                            value={orderForm.comments}
+                            onChange={(event) => setOrderForm((prev) => ({ ...prev, comments: event.target.value }))}
+                            rows={6}
+                            placeholder={selectedService.menuType === '2' ? 'Satu komentar per baris' : 'Satu keyword per baris'}
                           />
                         </label>
-
-                        <label className="apk-app-form-field">
-                          <span>Total Harga</span>
-                          <input value={`Rp ${liveTotal.toLocaleString('id-ID')}`} readOnly className="smm-readonly-input" />
-                        </label>
-
-                        {selectedService.menuType === '3' ? (
-                          <label className="apk-app-form-field">
-                            <span>Username komentar</span>
-                            <input
-                              value={orderForm.username}
-                              onChange={(event) => setOrderForm((prev) => ({ ...prev, username: event.target.value }))}
-                              placeholder="Username pemilik komentar"
-                            />
-                          </label>
-                        ) : null}
-
-                        {selectedService.menuType === '2' || selectedService.menuType === '5' ? (
-                          <label className="apk-app-form-field">
-                            <span>{selectedService.menuType === '2' ? 'Daftar komentar' : 'Daftar keyword / komen'}</span>
-                            <textarea
-                              value={orderForm.comments}
-                              onChange={(event) => setOrderForm((prev) => ({ ...prev, comments: event.target.value }))}
-                              rows={6}
-                              placeholder={selectedService.menuType === '2' ? 'Satu komentar per baris' : 'Satu keyword per baris'}
-                            />
-                          </label>
-                        ) : null}
-                      </div>
-
-                      <div className="apk-app-inline-helper">
-                        {accountProfile.loggedIn
-                          ? `Saldo aktif kamu Rp ${accountProfile.balance.toLocaleString('id-ID')}. Sistem akan memakai saldo dulu jika cukup, lalu otomatis dialihkan ke QRIS jika saldo kurang.`
-                          : 'Jika ingin prioritas memakai saldo akun, login akun dulu. Kalau belum login, pembayaran akan langsung memakai QRIS.'}
-                      </div>
-
-                      {activeCheckoutOrder && activeCheckoutOrder.paymentMethod === 'midtrans' ? (
-                        <div className="apk-app-qris-shell">
-                          <div className="apk-app-qris-head">
-                            <div>
-                              <span className="apk-app-section-label">QRIS Payment</span>
-                              <strong>{activeCheckoutOrder.orderCode}</strong>
-                            </div>
-                            <div className={`apk-app-order-pill apk-app-order-pill--${activeCheckoutOrder.paymentStatus === 'paid' ? 'success' : activeCheckoutOrder.paymentStatus === 'awaiting-payment' ? 'pending' : 'failed'}`}>
-                              {activeCheckoutOrder.paymentStatus === 'awaiting-payment' ? 'Menunggu bayar' : activeCheckoutOrder.paymentStatus}
-                            </div>
-                          </div>
-                          <div className="apk-app-qris-card">
-                            {activeCheckoutOrder.qris?.qrUrl ? (
-                              <img src={activeCheckoutOrder.qris.qrUrl} alt={`QRIS ${activeCheckoutOrder.orderCode}`} className="apk-app-qris-image" />
-                            ) : (
-                              <div className="apk-app-qris-fallback">QRIS siap, tetapi gambar belum tersedia.</div>
-                            )}
-                            <div className="apk-app-qris-copy">
-                              <div className="apk-app-live-total-card apk-app-live-total-card--compact">
-                                <span>Total Bayar</span>
-                                <strong>Rp {activeCheckoutOrder.totalPriceLabel}</strong>
-                              </div>
-                              <p>{activeCheckoutOrder.nextStep}</p>
-                              {activeCheckoutOrder.qris?.expiryTime ? <small>Berlaku sampai {new Date(activeCheckoutOrder.qris.expiryTime).toLocaleString('id-ID')}</small> : null}
-                              <div className="apk-app-action-row apk-app-action-row--compact">
-                                <button type="button" className="apk-app-primary-button" onClick={refreshCheckoutStatus} disabled={isRefreshingCheckoutStatus}>
-                                  {isRefreshingCheckoutStatus ? 'Memuat...' : 'Cek Status'}
-                                </button>
-                                {activeCheckoutOrder.qris?.deeplinkUrl ? (
-                                  <a className="apk-app-ghost-button apk-app-link-button" href={activeCheckoutOrder.qris.deeplinkUrl} target="_blank" rel="noreferrer">
-                                    Buka Pembayaran
-                                  </a>
-                                ) : null}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="apk-app-form-grid smm-checkout-summary-grid">
-                            <label className="apk-app-form-field">
-                              <span>Order Code</span>
-                              <input value={activeCheckoutOrder.orderCode} readOnly className="smm-readonly-input" />
-                            </label>
-                            <label className="apk-app-form-field">
-                              <span>Layanan</span>
-                              <input value={activeCheckoutOrder.serviceName} readOnly className="smm-readonly-input" />
-                            </label>
-                            <label className="apk-app-form-field">
-                              <span>Kategori</span>
-                              <input value={activeCheckoutOrder.category} readOnly className="smm-readonly-input" />
-                            </label>
-                            <label className="apk-app-form-field">
-                              <span>Target</span>
-                              <input value={activeCheckoutOrder.targetData} readOnly className="smm-readonly-input" />
-                            </label>
-                            <label className="apk-app-form-field">
-                              <span>Jumlah</span>
-                              <input value={activeCheckoutOrder.quantity == null ? '-' : String(activeCheckoutOrder.quantity)} readOnly className="smm-readonly-input" />
-                            </label>
-                            <label className="apk-app-form-field">
-                              <span>Metode</span>
-                              <input value="QRIS Midtrans" readOnly className="smm-readonly-input" />
-                            </label>
-                          </div>
-                        </div>
                       ) : null}
-
-                      {orderFeedback.tone !== 'idle' ? (
-                        <div className={`apk-app-feedback apk-app-feedback--${orderFeedback.tone}`}>
-                          {orderFeedback.text}
-                        </div>
-                      ) : null}
-
-                      <div className="apk-app-action-row">
-                        <button type="button" className="apk-app-primary-button" onClick={submitOrder} disabled={isOrdering}>
-                          {isOrdering ? 'Mengirim...' : 'Lanjutkan Pembayaran'}
-                        </button>
-                      </div>
                     </div>
-                  ) : null}
+
+                    <div className="apk-app-inline-helper">
+                      {accountProfile.loggedIn
+                        ? `Saldo aktif kamu Rp ${accountProfile.balance.toLocaleString('id-ID')}. Sistem akan memakai saldo dulu jika cukup, lalu otomatis dialihkan ke QRIS jika saldo kurang.`
+                        : 'Jika ingin prioritas memakai saldo akun, login akun dulu. Kalau belum login, pembayaran akan langsung memakai QRIS.'}
+                    </div>
+
+                    {activeCheckoutOrder && activeCheckoutOrder.paymentMethod === 'midtrans' ? (
+                      <div className="apk-app-qris-shell">
+                        <div className="apk-app-qris-head">
+                          <div>
+                            <span className="apk-app-section-label">QRIS Payment</span>
+                            <strong>{activeCheckoutOrder.orderCode}</strong>
+                          </div>
+                          <div className={`apk-app-order-pill apk-app-order-pill--${activeCheckoutOrder.paymentStatus === 'paid' ? 'success' : activeCheckoutOrder.paymentStatus === 'awaiting-payment' ? 'pending' : 'failed'}`}>
+                            {activeCheckoutOrder.paymentStatus === 'awaiting-payment' ? 'Menunggu bayar' : activeCheckoutOrder.paymentStatus}
+                          </div>
+                        </div>
+                        <div className="apk-app-qris-card smm-qris-card">
+                          {activeCheckoutOrder.qris?.qrUrl ? (
+                            <img src={activeCheckoutOrder.qris.qrUrl} alt={`QRIS ${activeCheckoutOrder.orderCode}`} className="apk-app-qris-image" />
+                          ) : (
+                            <div className="apk-app-qris-fallback">QRIS siap, tetapi gambar belum tersedia.</div>
+                          )}
+                          <div className="apk-app-qris-copy smm-qris-copy">
+                            <p>{activeCheckoutOrder.nextStep}</p>
+                            {activeCheckoutOrder.qris?.expiryTime ? <small>Berlaku sampai {new Date(activeCheckoutOrder.qris.expiryTime).toLocaleString('id-ID')}</small> : null}
+                            <div className="apk-app-action-row apk-app-action-row--compact">
+                              <button type="button" className="apk-app-primary-button" onClick={refreshCheckoutStatus} disabled={isRefreshingCheckoutStatus}>
+                                {isRefreshingCheckoutStatus ? 'Memuat...' : 'Cek Status'}
+                              </button>
+                              {activeCheckoutOrder.qris?.deeplinkUrl ? (
+                                <a className="apk-app-ghost-button apk-app-link-button" href={activeCheckoutOrder.qris.deeplinkUrl} target="_blank" rel="noreferrer">
+                                  Buka Pembayaran
+                                </a>
+                              ) : null}
+                            </div>
+                            <div className="apk-app-live-total-card apk-app-live-total-card--compact smm-qris-total-card">
+                              <span>Total Bayar</span>
+                              <strong>Rp {activeCheckoutOrder.totalPriceLabel}</strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="smm-qris-detail-frame">
+                          <p>Order Code : {activeCheckoutOrder.orderCode}</p>
+                          <p>Layanan : {activeCheckoutOrder.serviceName}</p>
+                          <p>Kategori : {activeCheckoutOrder.category}</p>
+                          <p>Target : {activeCheckoutOrder.targetData}</p>
+                          <p>Jumlah : {activeCheckoutOrder.quantity == null ? '-' : String(activeCheckoutOrder.quantity)}</p>
+                          <p>Metode : QRIS Midtrans</p>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {orderFeedback.tone !== 'idle' ? (
+                      <div className={`apk-app-feedback apk-app-feedback--${orderFeedback.tone}`}>
+                        {orderFeedback.text}
+                      </div>
+                    ) : null}
+
+                    <div className="apk-app-action-row">
+                      <button type="button" className="apk-app-primary-button" onClick={submitOrder} disabled={isOrdering}>
+                        {isOrdering ? 'Mengirim...' : 'Lanjutkan Pembayaran'}
+                      </button>
+                    </div>
+                  </div>
                 </>
               ) : (
                 <div className="apk-app-empty">Belum ada layanan dari provider yang bisa dipilih.</div>
@@ -1469,6 +1500,14 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
           {activeTab === 'riwayat' ? (
             <section className="apk-app-panel apk-app-panel--plain">
+              <div className="apk-app-panel-head smm-panel-head">
+                <div>
+                  <span className="apk-app-section-label">Monitoring Sosmed</span>
+                  <h3>Monitoring sosmed</h3>
+                  <p className="smm-section-copy">Direkomendasikan untuk pantau monitoring sosmed terlebih dahulu, sebelum melakukan order untuk melihat layanan yang bagus dan lancar untuk saat ini, agar tidak ada kendala error atau proses lama saat pemesanan.</p>
+                </div>
+              </div>
+
               <div className="apk-app-form-card">
                 <div className="smm-monitoring-filter-grid">
                   <label className="apk-app-form-field">
@@ -1570,6 +1609,16 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
           {activeTab === 'status' ? (
             <section className="apk-app-panel apk-app-panel--plain">
+              <div className="apk-app-panel-head smm-panel-head">
+                <div>
+                  <span className="apk-app-section-label">Status Order</span>
+                  <h3>Status order</h3>
+                </div>
+                <span className="apk-app-count-pill">
+                  {pendingAccountOrderCount.toLocaleString('id-ID')} Pending
+                </span>
+              </div>
+
               {accountProfile.loggedIn ? (
                 <>
                   <div className="apk-app-form-card">
@@ -1735,26 +1784,21 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                 </div>
               </div>
 
-              <div className="apk-app-info-stack">
-                <article id="profile-account" className="apk-app-info-card">
-                  <strong>Status akun</strong>
-                  <p>
-                    {accountProfile.registered
-                      ? accountProfile.loggedIn
-                        ? `Akun aktif atas nama ${accountProfile.name}.`
-                        : `Akun ${accountProfile.name} sudah terdaftar, tetapi belum login.`
-                      : 'Belum ada akun yang terdaftar untuk akses saldo dan transaksi website.'}
-                  </p>
-                  <div className="apk-app-live-total-card">
-                    <span>Saldo akun</span>
-                    <strong>Rp {accountProfile.balance.toLocaleString('id-ID')}</strong>
+              <article className="apk-app-form-card smm-profile-sheet">
+                <div id="profile-account" className="smm-profile-block">
+                  <span className="smm-profile-title">Status akun</span>
+                  <div className="smm-profile-lines">
+                    <p>Nama akun : {accountProfile.name || '-'}</p>
+                    <p>Username : {accountProfile.username ? `@${accountProfile.username}` : '-'}</p>
+                    <p>Saldo : Rp {accountProfile.balance.toLocaleString('id-ID')}</p>
+                    <p>Status : {accountProfile.loggedIn ? 'Login' : accountProfile.registered ? 'Belum login' : 'Belum terdaftar'}</p>
                   </div>
-                </article>
+                </div>
 
                 {!accountProfile.registered ? (
-                  <article className="apk-app-form-card">
-                    <span className="apk-app-section-label">Daftar Akun Baru</span>
-                    <div className="apk-app-form-grid">
+                  <div className="smm-profile-block">
+                    <span className="smm-profile-title">Daftar akun baru</span>
+                    <div className="apk-app-form-grid smm-profile-form-grid">
                       <label className="apk-app-form-field">
                         <span>Nama akun</span>
                         <input
@@ -1781,18 +1825,18 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                         />
                       </label>
                     </div>
-                    <div className="apk-app-action-row">
+                    <div className="apk-app-action-row smm-profile-action-row">
                       <button type="button" className="apk-app-primary-button" onClick={registerAccount} disabled={isSubmittingProfile}>
                         {isSubmittingProfile ? 'Memproses...' : 'Daftar Akun'}
                       </button>
                     </div>
-                  </article>
+                  </div>
                 ) : null}
 
                 {accountProfile.registered && !accountProfile.loggedIn ? (
-                  <article className="apk-app-form-card">
-                    <span className="apk-app-section-label">Login Akun</span>
-                    <div className="apk-app-form-grid">
+                  <div className="smm-profile-block">
+                    <span className="smm-profile-title">Login akun</span>
+                    <div className="apk-app-form-grid smm-profile-form-grid">
                       <label className="apk-app-form-field">
                         <span>Username akun</span>
                         <input
@@ -1811,78 +1855,46 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                         />
                       </label>
                     </div>
-                    <div className="apk-app-action-row">
+                    <div className="apk-app-action-row smm-profile-action-row">
                       <button type="button" className="apk-app-primary-button" onClick={loginAccount} disabled={isSubmittingProfile}>
                         {isSubmittingProfile ? 'Memproses...' : 'Login'}
                       </button>
                     </div>
-                  </article>
+                  </div>
                 ) : null}
 
-                {accountProfile.registered && accountProfile.loggedIn ? (
-                  <article className="apk-app-form-card">
-                    <span className="apk-app-section-label">Akun Sedang Aktif</span>
-                    <div className="apk-app-history-meta">
-                      <span>Nama : {accountProfile.name}</span>
-                      <span>Username : @{accountProfile.username}</span>
-                      <span>Status : Login</span>
-                    </div>
-                    <div className="apk-app-action-row">
-                      <button type="button" className="apk-app-ghost-button" onClick={logoutAccount}>
-                        Logout
-                      </button>
-                    </div>
-                  </article>
-                ) : null}
-
-                <article className="apk-app-form-card">
-                  <span className="apk-app-section-label">Menu Utama</span>
-                  <div className="apk-app-info-stack">
-                    <article className="apk-app-info-card apk-app-history-card">
-                      <strong>Deposit</strong>
-                      <p>Menu deposit dan riwayat deposit tetap memakai akun yang sama dengan mode App Premium.</p>
-                      <p>
-                        <Link href="/apk-premium?tab=deposit">Buka menu deposit</Link>
-                      </p>
-                    </article>
-                    <article className="apk-app-info-card apk-app-history-card">
-                      <strong>Riwayat Deposit</strong>
-                      <p>Lihat histori deposit akun yang sama dari halaman riwayat website.</p>
-                      <p>
-                        <Link href="/apk-premium?tab=riwayat#deposit-history">Buka riwayat deposit</Link>
-                      </p>
-                    </article>
+                <div className="smm-profile-block">
+                  <span className="smm-profile-title">Menu utama</span>
+                  <div className="smm-profile-links">
+                    <Link href="/apk-premium?tab=deposit">Deposit</Link>
+                    <Link href="/apk-premium?tab=riwayat#deposit-history">Riwayat Deposit</Link>
                   </div>
-                </article>
+                </div>
 
-                <article className="apk-app-form-card">
-                  <span className="apk-app-section-label">Panduan Mulai Transaksi</span>
-                  <div className="apk-app-info-stack">
-                    <article id="guide-deposit" className="apk-app-info-card apk-app-history-card">
-                      <strong>Cara Deposit</strong>
-                      <p>Masuk ke menu Deposit, isi nominal, lalu selesaikan pembayaran sampai status deposit berubah berhasil.</p>
-                    </article>
-                    <article id="guide-status" className="apk-app-info-card apk-app-history-card">
-                      <strong>Informasi Status Order</strong>
-                      <p>Status order akan otomatis diperbarui. Jika pembayaran sukses maka order lanjut diproses, sedangkan jika QRIS expired kamu perlu membuat order baru.</p>
-                    </article>
-                    <article id="guide-order" className="apk-app-info-card apk-app-history-card">
-                      <strong>Panduan Cara Pesanan</strong>
-                      <p>Pilih platform, kategori, layanan, lalu cek total harga dan selesaikan pembayaran. Setelah lunas, order otomatis diteruskan sesuai API provider.</p>
-                    </article>
-                    <article id="guide-contact" className="apk-app-info-card apk-app-history-card">
-                      <strong>Kontak</strong>
-                      <p>Jika ada kendala transaksi, gunakan kontak store yang aktif pada website atau WhatsApp admin yang kamu pakai saat bertransaksi.</p>
-                    </article>
+                <div className="smm-profile-block">
+                  <span className="smm-profile-title">Panduan mulai transaksi</span>
+                  <div className="smm-profile-lines">
+                    <p id="guide-deposit">Cara deposit : buka menu deposit, isi nominal, lalu selesaikan pembayaran sampai status berhasil.</p>
+                    <p id="guide-status">Informasi status order : status order akan otomatis diperbarui. Jika QRIS expired maka kamu perlu membuat order baru.</p>
+                    <p id="guide-order">Panduan cara pesanan : pilih platform, kategori, layanan, isi data pesanan, lalu lanjutkan pembayaran.</p>
+                    <p id="guide-contact">Kontak : gunakan kontak store atau admin aktif jika ada kendala transaksi.</p>
                   </div>
-                </article>
+                </div>
 
                 {profileFeedback.text ? (
                   <div className={`apk-app-feedback apk-app-feedback--${profileFeedback.tone}`}>
                     {profileFeedback.text}
                   </div>
                 ) : null}
-              </div>
+
+                {accountProfile.registered && accountProfile.loggedIn ? (
+                  <div className="apk-app-action-row smm-profile-logout-row">
+                    <button type="button" className="apk-app-ghost-button" onClick={logoutAccount}>
+                      Logout
+                    </button>
+                  </div>
+                ) : null}
+              </article>
             </section>
           ) : null}
         </div>
