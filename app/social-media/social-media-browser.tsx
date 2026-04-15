@@ -156,7 +156,7 @@ const PLATFORM_VISUALS: Array<{ matchers: string[]; visual: SocialPlatformVisual
   { matchers: ['kwai'], visual: { label: 'Kwai', accent: '#ff5b24', icon: 'kwai' } },
   { matchers: ['podcast', 'itunes'], visual: { label: 'Podcast [iTunes Store]', accent: '#a141ff', icon: 'podcast' } },
   { matchers: ['reddit'], visual: { label: 'Reddit', accent: '#ff4500', icon: 'reddit' } },
-  { matchers: ['snackvideo'], visual: { label: 'SnackVideo', accent: '#111111', icon: 'snackvideo' } },
+  { matchers: ['snackvideo', 'snack video'], visual: { label: 'SnackVideo', accent: '#111111', icon: 'snackvideo' } },
   { matchers: ['twitch'], visual: { label: 'Twitch', accent: '#9146ff', icon: 'twitch' } },
 ];
 
@@ -257,6 +257,53 @@ function SocialPlatformIcon({ icon }: { icon: string }) {
     );
   }
 
+  if (icon === 'linkedin') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3.8" y="3.8" width="16.4" height="16.4" rx="3.1" fill="#0a66c2" />
+        <circle cx="8.35" cy="8.25" r="1.2" fill="#ffffff" />
+        <path d="M7.2 10.35h2.3v6.45H7.2Zm3.6 0h2.2v.88c.48-.67 1.3-1.13 2.45-1.13 2.03 0 3.33 1.3 3.33 4.04v2.66h-2.36v-2.4c0-1.31-.45-2.12-1.54-2.12-.83 0-1.33.56-1.54 1.1-.08.2-.1.47-.1.74v2.68H10.8Z" fill="#ffffff" />
+      </svg>
+    );
+  }
+
+  if (icon === 'likee') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <defs>
+          <linearGradient id="likee-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#ffe35f" />
+            <stop offset="38%" stopColor="#ff7e55" />
+            <stop offset="68%" stopColor="#ff4f9f" />
+            <stop offset="100%" stopColor="#7b61ff" />
+          </linearGradient>
+        </defs>
+        <path
+          d="M12 20.1c-.3 0-.6-.08-.83-.22-1.22-.75-5.8-3.7-7.18-7.14C2.83 9.9 4.1 6.45 6.95 5.1A5.4 5.4 0 0 1 12 5.4a5.4 5.4 0 0 1 5.05-.3c2.85 1.35 4.12 4.8 2.96 7.64-1.38 3.44-5.96 6.4-7.18 7.14-.23.14-.53.22-.83.22Z"
+          fill="url(#likee-gradient)"
+        />
+        <path
+          d="M12 18.2c-1.7-1.06-5.18-3.54-6.15-5.95-.82-2.03.1-4.4 2.1-5.34 1.55-.74 3.2-.26 4.05.9 0 0 1.57-2.15 4.05-.9 2 .94 2.92 3.31 2.1 5.34-.97 2.41-4.45 4.89-6.15 5.95Z"
+          fill="none"
+          stroke="#111111"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.1"
+        />
+      </svg>
+    );
+  }
+
+  if (icon === 'snackvideo') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" fill="#f4d53b" />
+        <circle cx="12" cy="12" r="5.1" fill="#111111" />
+        <path d="M13.9 12.05 10.55 10v4.1l3.35-2.05Z" fill="#f4d53b" />
+      </svg>
+    );
+  }
+
   const remoteLogo = REMOTE_LOGO_MAP[icon];
   if (remoteLogo) {
     return <img src={remoteLogo} alt="" loading="lazy" referrerPolicy="no-referrer" />;
@@ -283,6 +330,31 @@ function formatDate(value: string) {
     .format(date)
     .replace(/\./g, ':');
   return `${datePart}, ${timePart}`;
+}
+
+function formatDateParts(value: string) {
+  if (!value) {
+    return { datePart: '-', timePart: '-' };
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return { datePart: '-', timePart: '-' };
+  }
+  return {
+    datePart: new Intl.DateTimeFormat('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(date),
+    timePart: new Intl.DateTimeFormat('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    })
+      .format(date)
+      .replace(/\./g, ':'),
+  };
 }
 
 function formatServicePickerLabel(service?: NormalizedPusatPanelService | null) {
@@ -1736,9 +1808,14 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                   </thead>
                   <tbody>
                     {filteredMonitoringItems.length ? (
-                      filteredMonitoringItems.map((item) => (
+                      filteredMonitoringItems.map((item) => {
+                        const createdAt = formatDateParts(item.createdAt);
+                        return (
                         <tr key={item.id}>
-                          <td className="smm-status-cell--nowrap">{formatDate(item.createdAt)}</td>
+                          <td className="smm-status-time-cell">
+                            <span>{createdAt.datePart}</span>
+                            <span>{createdAt.timePart}</span>
+                          </td>
                           <td><div className="smm-status-service-name">{item.category || '-'}</div></td>
                           <td className="smm-status-cell--nowrap">{item.serviceId || '-'}</td>
                           <td><div className="smm-status-service-name">{item.serviceName || '-'}</div></td>
@@ -1748,7 +1825,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                             <span className={`smm-status-badge smm-status-badge--${mapStatusTone(item.orderStatus)}`}>{item.orderStatus || '-'}</span>
                           </td>
                         </tr>
-                      ))
+                      );
+                      })
                     ) : (
                       <tr>
                         <td colSpan={7}>
@@ -1863,10 +1941,14 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                       <tbody>
                         {filteredStatusOrders.length ? (
                           filteredStatusOrders.map((item) => {
+                            const createdAt = formatDateParts(item.createdAt);
                             return (
                               <tr key={item.id}>
                                 <td className="smm-status-cell--nowrap">{item.providerOrderId || item.orderCode || '-'}</td>
-                                <td className="smm-status-cell--nowrap">{formatDate(item.createdAt)}</td>
+                                <td className="smm-status-time-cell">
+                                  <span>{createdAt.datePart}</span>
+                                  <span>{createdAt.timePart}</span>
+                                </td>
                                 <td><div className="smm-status-service-name">{item.serviceName || '-'}</div></td>
                                 <td>
                                   <div className="smm-status-target">{item.targetData || '-'}</div>

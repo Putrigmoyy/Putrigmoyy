@@ -1282,8 +1282,8 @@ a {
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  min-height: 48px;
-  padding: 0 13px;
+  min-height: 40px;
+  padding: 0 12px;
   border: 1px solid rgba(23, 153, 242, 0.14);
   border-radius: 16px;
   background: #ffffff;
@@ -1308,9 +1308,9 @@ a {
 
 .smm-picker-trigger--multiline {
   align-items: flex-start;
-  min-height: 44px;
-  padding-top: 8px;
-  padding-bottom: 8px;
+  min-height: 40px;
+  padding-top: 7px;
+  padding-bottom: 7px;
 }
 
 .smm-picker-trigger--multiline span {
@@ -1447,10 +1447,10 @@ a {
 
 .smm-select {
   width: 100%;
-  min-height: 50px;
-  padding: 0 42px 0 14px;
+  min-height: 40px;
+  padding: 0 38px 0 12px;
   border: 1px solid rgba(23, 153, 242, 0.14);
-  border-radius: 18px;
+  border-radius: 16px;
   background:
     linear-gradient(45deg, transparent 50%, #8aa0b8 50%),
     linear-gradient(135deg, #8aa0b8 50%, transparent 50%),
@@ -1464,7 +1464,7 @@ a {
   appearance: none;
   color: #111111;
   font: inherit;
-  font-size: 0.98rem;
+  font-size: 12px;
   outline: none;
 }
 
@@ -1774,9 +1774,10 @@ a {
 
 .smm-monitoring-filter-buttons .apk-app-primary-button,
 .smm-monitoring-filter-buttons .apk-app-ghost-button {
-  min-height: 38px;
+  min-height: 40px;
   font-size: 12px;
   font-weight: 500;
+  border-radius: 16px;
 }
 
 .smm-status-table-wrap {
@@ -1822,6 +1823,19 @@ a {
 
 .smm-status-cell--nowrap {
   white-space: nowrap;
+}
+
+.smm-status-time-cell {
+  min-width: 126px;
+}
+
+.smm-status-time-cell span {
+  display: block;
+  white-space: nowrap;
+}
+
+.smm-status-time-cell span + span {
+  margin-top: 2px;
 }
 
 .smm-status-service-name {
