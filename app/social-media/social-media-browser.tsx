@@ -45,6 +45,7 @@ type Props = {
 type SocialTab = 'sosmed' | 'riwayat' | 'status' | 'provider';
 type DepositMethod = 'midtrans' | 'balance';
 type AccountModalView = 'profil' | 'deposit' | 'riwayat';
+type HelperModalView = 'kontak' | 'mulai' | 'cara-deposit' | 'status-info' | 'target' | 'api-docs';
 
 type CoreDepositQrisState = {
   reference: string;
@@ -544,6 +545,85 @@ function AccountPopupGlyph({ type }: { type: AccountModalView }) {
   );
 }
 
+function MenuBurgerGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 7h14M5 12h14M5 17h14" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function DrawerMenuGlyph({
+  type,
+}: {
+  type:
+    | 'dashboard'
+    | 'profil'
+    | 'order'
+    | 'status'
+    | 'deposit'
+    | 'riwayat'
+    | 'monitoring'
+    | 'kontak'
+    | 'mulai'
+    | 'cara-deposit'
+    | 'status-info'
+    | 'target'
+    | 'api-docs';
+}) {
+  if (type === 'dashboard') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4.8 5.1h6.5v6.5H4.8zm7.9 0h6.5v6.5h-6.5zm-7.9 7.9h6.5v6.5H4.8zm7.9 0h6.5v6.5h-6.5Z" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.6" />
+      </svg>
+    );
+  }
+  if (type === 'profil') return <AccountPopupGlyph type="profil" />;
+  if (type === 'deposit') return <AccountPopupGlyph type="deposit" />;
+  if (type === 'riwayat') return <AccountPopupGlyph type="riwayat" />;
+  if (type === 'order') return <SocialNavGlyph type="sosmed" />;
+  if (type === 'status' || type === 'status-info') return <SocialNavGlyph type="status" />;
+  if (type === 'monitoring') return <SocialNavGlyph type="riwayat" />;
+  if (type === 'kontak') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6.2 6.2h11.6v11.6H6.2z" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path d="m7.9 9.1 4.1 3.2 4.1-3.2" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" />
+      </svg>
+    );
+  }
+  if (type === 'mulai') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M8.1 5.8 18 12l-9.9 6.2z" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.6" />
+      </svg>
+    );
+  }
+  if (type === 'cara-deposit') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4.5 8.2h15v9.1a1.8 1.8 0 0 1-1.8 1.8H6.3a1.8 1.8 0 0 1-1.8-1.8V8.2Z" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.6" />
+        <path d="M4.5 10.2h15M8.1 6.2h7.8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" />
+      </svg>
+    );
+  }
+  if (type === 'target') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="7.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="12" cy="12" r="2.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M12 3.8v2.2M12 18v2.2M20.2 12H18M6 12H3.8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5.5 7.2h13M5.5 11.2h13M5.5 15.2h7.2" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" />
+      <path d="M15.2 15.4h3.3v3.2h-3.3z" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
 function normalizeSocialTab(value: string | null) {
   const normalized = String(value || '').trim().toLowerCase();
   if (normalized === 'sosmed') return 'sosmed' satisfies SocialTab;
@@ -571,6 +651,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     balance: 0,
   });
   const [accountModalView, setAccountModalView] = useState<AccountModalView | null>(null);
+  const [helperModalView, setHelperModalView] = useState<HelperModalView | null>(null);
+  const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
   const [accountRegisterDraft, setAccountRegisterDraft] = useState({
     name: '',
     username: '',
@@ -738,7 +820,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   }, []);
 
   useEffect(() => {
-    if (!accountModalView) {
+    if (!accountModalView && !helperModalView && !isSideMenuOpen) {
       return;
     }
 
@@ -748,7 +830,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [accountModalView]);
+  }, [accountModalView, helperModalView, isSideMenuOpen]);
 
   useEffect(() => {
     if (accountProfile.loggedIn) {
@@ -1436,6 +1518,44 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     });
   };
 
+  const openDrawerTab = (tab: SocialTab, selector?: string) => {
+    setIsSideMenuOpen(false);
+    setHelperModalView(null);
+    setAccountModalView(null);
+    setActiveTab(tab);
+    if (!selector || typeof window === 'undefined') {
+      return;
+    }
+    window.setTimeout(() => {
+      const target = window.document.querySelector(selector);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 180);
+  };
+
+  const openDrawerModal = (view: AccountModalView) => {
+    setIsSideMenuOpen(false);
+    setHelperModalView(null);
+    setAccountModalView(view);
+  };
+
+  const openHelperModal = (view: HelperModalView) => {
+    setIsSideMenuOpen(false);
+    setAccountModalView(null);
+    setHelperModalView(view);
+  };
+
+  const helperModalTitle = (() => {
+    if (helperModalView === 'kontak') return 'Kontak';
+    if (helperModalView === 'mulai') return 'Mulai Transaksi';
+    if (helperModalView === 'cara-deposit') return 'Cara Deposit';
+    if (helperModalView === 'status-info') return 'Informasi Status Order';
+    if (helperModalView === 'target') return 'Informasi Target Pesanan';
+    if (helperModalView === 'api-docs') return 'Dokumentasi API';
+    return '';
+  })();
+
   const platformGroups = useMemo<PlatformGroup[]>(() => {
     const buckets = new Map<string, PlatformGroup>();
     for (const service of services) {
@@ -1716,18 +1836,115 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       <ActionLoadingOverlay visible={isActionLoading} label="Memuat..." />
       <FloatingNotice notice={floatingNotice} />
       <div className="apk-app-phone">
-        <div className="apk-app-top-strip">
+        <div className="apk-app-top-strip apk-app-top-strip--with-menu">
+          <button
+            type="button"
+            className={isSideMenuOpen ? 'apk-app-top-menu-button apk-app-top-menu-button--open' : 'apk-app-top-menu-button'}
+            onClick={() => setIsSideMenuOpen(true)}
+            aria-label="Buka menu utama sosial media"
+          >
+            <MenuBurgerGlyph />
+          </button>
           <TopAccountMenu
             displayName={accountProfile.loggedIn ? accountProfile.name : 'Profil'}
             balance={accountProfile.balance}
           />
         </div>
+        {isSideMenuOpen ? (
+          <div className="site-side-drawer-backdrop" onClick={() => setIsSideMenuOpen(false)}>
+            <aside className="site-side-drawer" onClick={(event) => event.stopPropagation()}>
+              <div className="site-side-drawer__head">
+                <strong>Menu</strong>
+                <button type="button" className="site-side-drawer__close" onClick={() => setIsSideMenuOpen(false)} aria-label="Tutup menu">
+                  <ModalCloseGlyph />
+                </button>
+              </div>
+              <div className="site-side-drawer__body">
+                <section className="site-side-drawer__section">
+                  <span className="site-side-drawer__title">Menu Utama</span>
+                  <div className="site-side-drawer__list">
+                    <a href="/" className="site-side-drawer__item" onClick={() => setIsSideMenuOpen(false)}>
+                      <span className="site-side-drawer__icon"><DrawerMenuGlyph type="dashboard" /></span>
+                      <span>Dashboard</span>
+                    </a>
+                    <button type="button" className="site-side-drawer__item" onClick={() => openDrawerModal('profil')}>
+                      <span className="site-side-drawer__icon"><DrawerMenuGlyph type="profil" /></span>
+                      <span>Profil</span>
+                    </button>
+                    <button type="button" className="site-side-drawer__item" onClick={() => openDrawerTab('sosmed', '#smm-target-pesanan')}>
+                      <span className="site-side-drawer__icon"><DrawerMenuGlyph type="order" /></span>
+                      <span>Order</span>
+                    </button>
+                    <button type="button" className="site-side-drawer__item" onClick={() => openDrawerTab('status', '#smm-status-order')}>
+                      <span className="site-side-drawer__icon"><DrawerMenuGlyph type="status" /></span>
+                      <span>Status Order</span>
+                    </button>
+                    <button type="button" className="site-side-drawer__item" onClick={() => openDrawerModal('deposit')}>
+                      <span className="site-side-drawer__icon"><DrawerMenuGlyph type="deposit" /></span>
+                      <span>Deposit</span>
+                    </button>
+                    <button type="button" className="site-side-drawer__item" onClick={() => openDrawerModal('riwayat')}>
+                      <span className="site-side-drawer__icon"><DrawerMenuGlyph type="riwayat" /></span>
+                      <span>Riwayat Deposit</span>
+                    </button>
+                    <button type="button" className="site-side-drawer__item" onClick={() => openDrawerTab('riwayat', '#smm-monitoring-sosmed')}>
+                      <span className="site-side-drawer__icon"><DrawerMenuGlyph type="monitoring" /></span>
+                      <span>Monitoring Sosmed</span>
+                    </button>
+                  </div>
+                </section>
+
+                <section className="site-side-drawer__section">
+                  <span className="site-side-drawer__title">Bantuan</span>
+                  <div className="site-side-drawer__list">
+                    <button type="button" className="site-side-drawer__item" onClick={() => openHelperModal('kontak')}>
+                      <span className="site-side-drawer__icon"><DrawerMenuGlyph type="kontak" /></span>
+                      <span>Kontak</span>
+                    </button>
+                  </div>
+                  <div className="site-side-drawer__subsection">
+                    <span className="site-side-drawer__subtitle">Panduan</span>
+                    <div className="site-side-drawer__sublist">
+                      <button type="button" className="site-side-drawer__subitem" onClick={() => openHelperModal('mulai')}>
+                        <span className="site-side-drawer__icon"><DrawerMenuGlyph type="mulai" /></span>
+                        <span>Mulai Transaksi</span>
+                      </button>
+                      <button type="button" className="site-side-drawer__subitem" onClick={() => openHelperModal('cara-deposit')}>
+                        <span className="site-side-drawer__icon"><DrawerMenuGlyph type="cara-deposit" /></span>
+                        <span>Cara Deposit</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="site-side-drawer__subsection">
+                    <span className="site-side-drawer__subtitle">Informasi</span>
+                    <div className="site-side-drawer__sublist">
+                      <button type="button" className="site-side-drawer__subitem" onClick={() => openHelperModal('status-info')}>
+                        <span className="site-side-drawer__icon"><DrawerMenuGlyph type="status-info" /></span>
+                        <span>Status Order</span>
+                      </button>
+                      <button type="button" className="site-side-drawer__subitem" onClick={() => openHelperModal('target')}>
+                        <span className="site-side-drawer__icon"><DrawerMenuGlyph type="target" /></span>
+                        <span>Target Pesanan</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="site-side-drawer__list">
+                    <button type="button" className="site-side-drawer__item" onClick={() => openHelperModal('api-docs')}>
+                      <span className="site-side-drawer__icon"><DrawerMenuGlyph type="api-docs" /></span>
+                      <span>Dokumentasi API</span>
+                    </button>
+                  </div>
+                </section>
+              </div>
+            </aside>
+          </div>
+        ) : null}
         <div className="apk-app-content apk-app-content--tight">
           {activeTab === 'sosmed' ? (
-            <section className="apk-app-panel apk-app-panel--plain">
+            <section id="smm-start-transaction" className="apk-app-panel apk-app-panel--plain">
               {activePlatform ? (
                 <>
-                  <div className="apk-app-form-card">
+                  <div className="apk-app-form-card" id="smm-target-pesanan">
                     <span className="apk-app-section-label">Pilih Platforms</span>
                     <div className="smm-platform-grid">
                       {platformGroups.map((platform) => (
@@ -2083,7 +2300,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
           ) : null}
 
           {activeTab === 'riwayat' ? (
-            <section className="apk-app-panel apk-app-panel--plain">
+            <section id="smm-monitoring-sosmed" className="apk-app-panel apk-app-panel--plain">
               <div className="apk-app-panel-head smm-panel-head">
                 <div>
                   <span className="apk-app-section-label">Monitoring Sosmed</span>
@@ -2204,7 +2421,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
           ) : null}
 
           {activeTab === 'status' ? (
-            <section className="apk-app-panel apk-app-panel--plain">
+            <section id="smm-status-order" className="apk-app-panel apk-app-panel--plain">
               <div className="apk-app-panel-head smm-panel-head">
                 <div>
                   <span className="apk-app-section-label">Status Order</span>
@@ -2457,6 +2674,73 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             </div>
           ) : null}
 
+          {helperModalView ? (
+            <div className="smm-detail-modal-backdrop" onClick={() => setHelperModalView(null)}>
+              <div className="smm-detail-modal" onClick={(event) => event.stopPropagation()}>
+                <div className="smm-detail-modal-head">
+                  <strong>{helperModalTitle}</strong>
+                  <button
+                    type="button"
+                    className="smm-detail-modal-close"
+                    onClick={() => setHelperModalView(null)}
+                    aria-label="Tutup bantuan"
+                  >
+                    <ModalCloseGlyph />
+                  </button>
+                </div>
+
+                <div className="smm-detail-modal-body">
+                  <div className="account-popup-stack">
+                    <div className="account-popup-card">
+                      {helperModalView === 'kontak' ? (
+                        <div className="smm-profile-lines">
+                          <p>Gunakan kontak admin store yang aktif untuk bantuan transaksi, deposit, atau kendala order.</p>
+                          <p>Jika kamu belum menampilkan kontak khusus di website, pastikan admin store selalu bisa dihubungi dari channel utama tokomu.</p>
+                        </div>
+                      ) : null}
+
+                      {helperModalView === 'mulai' ? (
+                        <div className="smm-profile-lines">
+                          <p>Pilih platform yang sesuai dulu, lalu pilih kategori layanan dan layanan yang paling stabil.</p>
+                          <p>Setelah itu isi target, jumlah, dan email notifikasi, lalu lanjutkan pembayaran untuk membuat order.</p>
+                        </div>
+                      ) : null}
+
+                      {helperModalView === 'cara-deposit' ? (
+                        <div className="smm-profile-lines">
+                          <p>Buka menu deposit, isi nominal minimal Rp 10.000, lalu tekan tombol deposit untuk memunculkan QRIS.</p>
+                          <p>Setelah pembayaran berhasil, saldo akun akan otomatis bertambah dan bisa dipakai di mode website yang memakai akun yang sama.</p>
+                        </div>
+                      ) : null}
+
+                      {helperModalView === 'status-info' ? (
+                        <div className="smm-profile-lines">
+                          <p>Menu status order dipakai untuk memantau pesanan akun yang sedang login, termasuk ID order, target, harga, dan status prosesnya.</p>
+                          <p>Kalau pembayaran sudah sukses, detail order bisa dibuka dari tombol detail pesanan untuk melihat progress lebih lengkap.</p>
+                        </div>
+                      ) : null}
+
+                      {helperModalView === 'target' ? (
+                        <div className="smm-profile-lines">
+                          <p>Kolom target diisi sesuai kebutuhan layanan, misalnya URL postingan, username akun, atau link video.</p>
+                          <p>Pastikan target benar dan aktif agar provider bisa memproses order dengan lancar tanpa error atau pending terlalu lama.</p>
+                        </div>
+                      ) : null}
+
+                      {helperModalView === 'api-docs' ? (
+                        <div className="smm-profile-lines">
+                          <p>API aktif saat ini memakai endpoint provider langsung.</p>
+                          <p>API URL : {providerMeta.apiUrl}</p>
+                          <p>Aksi yang dipakai website ini meliputi profile, services, order, dan status.</p>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
         </div>
 
         <nav className="apk-app-bottom-nav">
@@ -2544,7 +2828,14 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                 {accountModalView === 'profil' ? (
                   <div className="account-popup-stack">
                     <div className="account-popup-card">
-                      <span className="smm-profile-title">Status akun</span>
+                      <div className="account-popup-card__head">
+                        <span className="smm-profile-title">Status akun</span>
+                        {accountProfile.loggedIn ? (
+                          <button type="button" className="account-popup-inline-action" onClick={logoutAccount}>
+                            Log out
+                          </button>
+                        ) : null}
+                      </div>
                       <div className="smm-profile-lines">
                         <p>Nama akun : {accountProfile.name || '-'}</p>
                         <p>Username : {accountProfile.username ? `@${accountProfile.username}` : '-'}</p>
