@@ -3,7 +3,14 @@ import { SocialMediaBrowser } from './social-media-browser';
 
 export const dynamic = 'force-dynamic';
 
-export default async function SocialMediaPage() {
+type Props = {
+  searchParams?: Promise<{
+    tab?: string;
+  }>;
+};
+
+export default async function SocialMediaPage({ searchParams }: Props) {
+  const resolvedSearchParams = await searchParams;
   const provider = getPusatPanelMeta();
   const [profileResult, servicesResult] = await Promise.allSettled([
     fetchPusatPanelProfile(),
@@ -21,6 +28,7 @@ export default async function SocialMediaPage() {
         providerMeta={provider}
         services={services}
         categories={categories}
+        requestedTab={resolvedSearchParams?.tab || null}
       />
     </main>
   );

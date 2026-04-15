@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Fragment, useEffect, useMemo, useState, useTransition } from 'react';
 import {
   siApplepodcasts,
@@ -36,6 +37,7 @@ type Props = {
   };
   services: NormalizedPusatPanelService[];
   categories: string[];
+  requestedTab?: string | null;
 };
 
 type SocialTab = 'sosmed' | 'riwayat' | 'status' | 'provider';
@@ -321,13 +323,36 @@ function SocialNavGlyph({ type }: { type: SocialTab }) {
   );
 }
 
-export function SocialMediaBrowser({ profile, providerMeta, services, categories }: Props) {
+function normalizeSocialTab(value: string | null) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'sosmed') return 'sosmed' satisfies SocialTab;
+  if (normalized === 'riwayat') return 'riwayat' satisfies SocialTab;
+  if (normalized === 'status') return 'status' satisfies SocialTab;
+  if (normalized === 'profil' || normalized === 'provider') return 'provider' satisfies SocialTab;
+  return null;
+}
+
+export function SocialMediaBrowser({ profile, providerMeta, services, categories, requestedTab }: Props) {
   const [activeTab, setActiveTab] = useState<SocialTab>('sosmed');
   const [accountProfile, setAccountProfile] = useState({
+    registered: false,
     loggedIn: false,
     name: '',
     username: '',
     balance: 0,
+  });
+  const [accountRegisterDraft, setAccountRegisterDraft] = useState({
+    name: '',
+    username: '',
+    password: '',
+  });
+  const [accountLoginDraft, setAccountLoginDraft] = useState({
+    username: '',
+    password: '',
+  });
+  const [profileFeedback, setProfileFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
+    tone: 'idle',
+    text: '',
   });
   const [selectedPlatformKey, setSelectedPlatformKey] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -371,6 +396,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const [isRefreshingHistory, startHistoryRefresh] = useTransition();
   const [isRefreshingAccountOrders, startAccountOrdersRefresh] = useTransition();
   const [isRefreshingCheckoutStatus, startCheckoutStatusRefresh] = useTransition();
+  const [isSubmittingProfile, startProfileSubmit] = useTransition();
   const sortedHistoryItems = useMemo(
     () =>
       [...historyItems].sort(
@@ -414,6 +440,22 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     return years.map(String);
   }, [sortedAccountOrderItems]);
 
+  const applyCoreBundle = (bundle: CoreBundlePayload) => {
+    const account = bundle.account || {};
+    const username = String(account.username || account.contact || '');
+    setAccountProfile({
+      registered: account.registered === true,
+      loggedIn: account.loggedIn === true,
+      name: String(account.name || ''),
+      username,
+      balance: Math.max(0, Number(account.balance || 0)),
+    });
+    setAccountLoginDraft({
+      username,
+      password: '',
+    });
+  };
+
   const syncAccountBundle = async (username: string) => {
     const normalizedUsername = String(username || '').trim();
     if (!normalizedUsername) return false;
@@ -428,13 +470,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       );
     }
 
-    const account = result.data.account || {};
-    setAccountProfile({
-      loggedIn: account.loggedIn === true,
-      name: String(account.name || ''),
-      username: String(account.username || account.contact || ''),
-      balance: Math.max(0, Number(account.balance || 0)),
-    });
+    applyCoreBundle(result.data);
     return true;
   };
 
@@ -611,6 +647,31 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   }, []);
 
   useEffect(() => {
+    const nextTab = normalizeSocialTab(requestedTab || null);
+    if (nextTab && nextTab !== activeTab) {
+      setActiveTab(nextTab);
+    }
+  }, [activeTab, requestedTab]);
+
+  useEffect(() => {
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    if (!hash) {
+      return;
+    }
+
+    const timerId = window.setTimeout(() => {
+      const target = window.document.querySelector(hash);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [activeTab, requestedTab]);
+
+  useEffect(() => {
     if (accountProfile.loggedIn && accountProfile.username) {
       refreshAccountOrders(accountProfile.username);
       return;
@@ -672,6 +733,115 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     };
   }, [activeCheckoutOrder?.orderCode, activeCheckoutOrder?.paymentMethod, activeCheckoutOrder?.paymentStatus]);
 
+  const registerAccount = () => {
+    startProfileSubmit(async () => {
+      const name = accountRegisterDraft.name.trim();
+      const username = accountRegisterDraft.username.trim().toLowerCase();
+      const password = accountRegisterDraft.password.trim();
+      if (!name || !username || !password) {
+        setProfileFeedback({
+          tone: 'error',
+          text: 'Isi nama, username, dan password dulu untuk membuat akun.',
+        });
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/core/account/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name, username, password }),
+        });
+        const result = (await response.json()) as CoreBundleResult;
+        if (!response.ok || !result.status || !result.data || !('account' in result.data)) {
+          setProfileFeedback({
+            tone: 'error',
+            text: result.data && 'msg' in result.data ? String(result.data.msg || 'Gagal membuat akun.') : 'Gagal membuat akun.',
+          });
+          return;
+        }
+
+        applyCoreBundle(result.data);
+        setAccountRegisterDraft({ name: '', username: '', password: '' });
+        window.localStorage.setItem(WEBSITE_ACCOUNT_SESSION_KEY, username);
+        setProfileFeedback({
+          tone: 'success',
+          text: 'Akun berhasil dibuat dan langsung aktif.',
+        });
+      } catch (error) {
+        setProfileFeedback({
+          tone: 'error',
+          text: error instanceof Error ? error.message : 'Gagal membuat akun.',
+        });
+      }
+    });
+  };
+
+  const loginAccount = () => {
+    startProfileSubmit(async () => {
+      const username = accountLoginDraft.username.trim().toLowerCase();
+      const password = accountLoginDraft.password.trim();
+      if (!username || !password) {
+        setProfileFeedback({
+          tone: 'error',
+          text: 'Isi username dan password untuk masuk.',
+        });
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/core/account/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ username, password }),
+        });
+        const result = (await response.json()) as CoreBundleResult;
+        if (!response.ok || !result.status || !result.data || !('account' in result.data)) {
+          setProfileFeedback({
+            tone: 'error',
+            text: result.data && 'msg' in result.data ? String(result.data.msg || 'Login gagal.') : 'Login gagal.',
+          });
+          return;
+        }
+
+        applyCoreBundle(result.data);
+        window.localStorage.setItem(WEBSITE_ACCOUNT_SESSION_KEY, username);
+        setProfileFeedback({
+          tone: 'success',
+          text: 'Login berhasil. Saldo akun sekarang bisa dipakai di mode sosial media.',
+        });
+      } catch (error) {
+        setProfileFeedback({
+          tone: 'error',
+          text: error instanceof Error ? error.message : 'Login gagal.',
+        });
+      }
+    });
+  };
+
+  const logoutAccount = () => {
+    window.localStorage.removeItem(WEBSITE_ACCOUNT_SESSION_KEY);
+    setAccountProfile((current) => ({
+      ...current,
+      loggedIn: false,
+      username: '',
+      balance: 0,
+    }));
+    setAccountOrderItems([]);
+    setAccountLoginDraft({
+      username: '',
+      password: '',
+    });
+    setProfileFeedback({
+      tone: 'success',
+      text: 'Kamu sudah logout dari akun ini.',
+    });
+  };
+
   const platformGroups = useMemo<PlatformGroup[]>(() => {
     const buckets = new Map<string, PlatformGroup>();
     for (const service of services) {
@@ -711,6 +881,31 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   }, [platformGroups]);
 
   const activePlatform = platformGroups.find((group) => group.key === selectedPlatformKey) || platformGroups[0] || null;
+  const socialAccountMenuSections = useMemo(
+    () =>
+      STORE_ACCOUNT_MENU_SECTIONS.map((section) => ({
+        ...section,
+        items: section.items.map((item) => {
+          if (item.label === 'Profil') {
+            return { ...item, href: '/social-media?tab=profil#profile-account' };
+          }
+          if (item.label === 'Cara Deposit') {
+            return { ...item, href: '/social-media?tab=profil#guide-deposit' };
+          }
+          if (item.label === 'Informasi Status Order') {
+            return { ...item, href: '/social-media?tab=profil#guide-status' };
+          }
+          if (item.label === 'Panduan Cara Pesanan') {
+            return { ...item, href: '/social-media?tab=profil#guide-order' };
+          }
+          if (item.label === 'Kontak') {
+            return { ...item, href: '/social-media?tab=profil#guide-contact' };
+          }
+          return item;
+        }),
+      })),
+    [],
+  );
 
   useEffect(() => {
     if (!activePlatform) {
@@ -943,7 +1138,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
           <TopAccountMenu
             displayName={accountProfile.loggedIn ? accountProfile.name : 'Profil'}
             balance={accountProfile.balance}
-            sections={STORE_ACCOUNT_MENU_SECTIONS}
+            sections={socialAccountMenuSections}
           />
         </div>
         <div className="apk-app-content apk-app-content--tight">
@@ -951,14 +1146,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             <section className="apk-app-panel apk-app-panel--plain">
               {activePlatform ? (
                 <>
-                  <div className="apk-app-panel-head">
-                    <div>
-                      <span className="apk-app-section-label">Pilih Platforms dan Layanan</span>
-                      <h3>Pilih Platform & Layanan</h3>
-                      <p className="smm-platform-copy">Klik salah satu logo platform untuk memuat kategori layanan dari API provider secara langsung.</p>
-                    </div>
-                  </div>
-
                   <div className="smm-platform-grid">
                     {platformGroups.map((platform) => (
                       <button
@@ -1282,21 +1469,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
           {activeTab === 'riwayat' ? (
             <section className="apk-app-panel apk-app-panel--plain">
-              <div className="smm-monitoring-header">
-                <div className="smm-monitoring-title">
-                  <span className="smm-monitoring-title-icon" aria-hidden="true">
-                    <SocialNavGlyph type="riwayat" />
-                  </span>
-                  <div>
-                    <span className="apk-app-section-label">Monitoring Layanan Sosial Media</span>
-                    <h3>Pantau order sesuai API key aktif</h3>
-                  </div>
-                </div>
-                <p className="smm-provider-copy">
-                  Monitoring ini membaca histori order social media yang dikirim menggunakan API key aktif milik {profile?.username || 'provider'}.
-                </p>
-              </div>
-
               <div className="apk-app-form-card">
                 <div className="smm-monitoring-filter-grid">
                   <label className="apk-app-form-field">
@@ -1398,37 +1570,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
           {activeTab === 'status' ? (
             <section className="apk-app-panel apk-app-panel--plain">
-              <div className="apk-app-panel-head">
-                <div>
-                  <span className="apk-app-section-label">Status Order</span>
-                  <h3>Riwayat pemesanan sosmed realtime</h3>
-                </div>
-                <span className="apk-app-count-pill">
-                  {pendingAccountOrderCount.toLocaleString('id-ID')} Pending
-                </span>
-              </div>
-
-              <div className="smm-status-order-note">
-                Data ini otomatis diperbarui berkala saat halaman status sedang dibuka. Klik tombol detail untuk melihat rincian pesanan akun yang sedang login.
-              </div>
-
               {accountProfile.loggedIn ? (
                 <>
-                  <div className="apk-app-info-card smm-status-account-banner">
-                    <div>
-                      <span>Akun aktif</span>
-                      <strong>{accountProfile.name || accountProfile.username || 'Akun pengguna'}</strong>
-                    </div>
-                    <div>
-                      <span>Username</span>
-                      <strong>{accountProfile.username ? `@${accountProfile.username}` : '-'}</strong>
-                    </div>
-                    <div>
-                      <span>Total transaksi</span>
-                      <strong>{sortedAccountOrderItems.length.toLocaleString('id-ID')}</strong>
-                    </div>
-                  </div>
-
                   <div className="apk-app-form-card">
                     <div className="smm-status-filter-grid">
                       <label className="apk-app-form-field">
@@ -1588,51 +1731,157 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
               <div className="apk-app-panel-head">
                 <div>
                   <span className="apk-app-section-label">Profil</span>
-                  <h3>Profil akun provider aktif</h3>
+                  <h3>Daftar akun, login, dan akses saldo website</h3>
                 </div>
               </div>
 
-              <div className="apk-app-history-card">
-                <article className="apk-app-info-card">
-                  <strong>{profile?.fullName || 'Profil provider belum terbaca'}</strong>
-                  <p className="smm-provider-copy">Profil ini dibaca langsung dari API key dan secret key aktif di Vercel.</p>
-                </article>
-                <article className="apk-app-info-card smm-provider-grid">
-                  <div>
-                    <span>Username</span>
-                    <strong>{profile?.username || '-'}</strong>
-                  </div>
-                  <div>
-                    <span>Email</span>
-                    <strong>{profile?.email || '-'}</strong>
-                  </div>
-                  <div>
-                    <span>Balance</span>
-                    <strong>Rp {profile?.balanceLabel || '0'}</strong>
-                  </div>
-                  <div>
-                    <span>API URL</span>
-                    <strong>{providerMeta.apiUrl}</strong>
+              <div className="apk-app-info-stack">
+                <article id="profile-account" className="apk-app-info-card">
+                  <strong>Status akun</strong>
+                  <p>
+                    {accountProfile.registered
+                      ? accountProfile.loggedIn
+                        ? `Akun aktif atas nama ${accountProfile.name}.`
+                        : `Akun ${accountProfile.name} sudah terdaftar, tetapi belum login.`
+                      : 'Belum ada akun yang terdaftar untuk akses saldo dan transaksi website.'}
+                  </p>
+                  <div className="apk-app-live-total-card">
+                    <span>Saldo akun</span>
+                    <strong>Rp {accountProfile.balance.toLocaleString('id-ID')}</strong>
                   </div>
                 </article>
-                <article className="apk-app-info-card smm-provider-grid">
-                  <div>
-                    <span>Status API</span>
-                    <strong>{providerMeta.configured ? 'Terhubung' : 'Belum lengkap'}</strong>
-                  </div>
-                  <div>
-                    <span>Total layanan live</span>
-                    <strong>{services.length.toLocaleString('id-ID')}</strong>
-                  </div>
-                  <div>
-                    <span>Total kategori</span>
-                    <strong>{categories.length.toLocaleString('id-ID')}</strong>
-                  </div>
-                  <div>
-                    <span>Mode data</span>
-                    <strong>Direct provider</strong>
+
+                {!accountProfile.registered ? (
+                  <article className="apk-app-form-card">
+                    <span className="apk-app-section-label">Daftar Akun Baru</span>
+                    <div className="apk-app-form-grid">
+                      <label className="apk-app-form-field">
+                        <span>Nama akun</span>
+                        <input
+                          value={accountRegisterDraft.name}
+                          onChange={(event) => setAccountRegisterDraft((current) => ({ ...current, name: event.target.value }))}
+                          placeholder="Nama lengkap"
+                        />
+                      </label>
+                      <label className="apk-app-form-field">
+                        <span>Username akun</span>
+                        <input
+                          value={accountRegisterDraft.username}
+                          onChange={(event) => setAccountRegisterDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
+                          placeholder="contoh: putrigmoyy"
+                        />
+                      </label>
+                      <label className="apk-app-form-field">
+                        <span>Password akun</span>
+                        <input
+                          type="password"
+                          value={accountRegisterDraft.password}
+                          onChange={(event) => setAccountRegisterDraft((current) => ({ ...current, password: event.target.value }))}
+                          placeholder="Minimal 6 karakter"
+                        />
+                      </label>
+                    </div>
+                    <div className="apk-app-action-row">
+                      <button type="button" className="apk-app-primary-button" onClick={registerAccount} disabled={isSubmittingProfile}>
+                        {isSubmittingProfile ? 'Memproses...' : 'Daftar Akun'}
+                      </button>
+                    </div>
+                  </article>
+                ) : null}
+
+                {accountProfile.registered && !accountProfile.loggedIn ? (
+                  <article className="apk-app-form-card">
+                    <span className="apk-app-section-label">Login Akun</span>
+                    <div className="apk-app-form-grid">
+                      <label className="apk-app-form-field">
+                        <span>Username akun</span>
+                        <input
+                          value={accountLoginDraft.username}
+                          onChange={(event) => setAccountLoginDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
+                          placeholder="Masukkan username"
+                        />
+                      </label>
+                      <label className="apk-app-form-field">
+                        <span>Password akun</span>
+                        <input
+                          type="password"
+                          value={accountLoginDraft.password}
+                          onChange={(event) => setAccountLoginDraft((current) => ({ ...current, password: event.target.value }))}
+                          placeholder="Masukkan password"
+                        />
+                      </label>
+                    </div>
+                    <div className="apk-app-action-row">
+                      <button type="button" className="apk-app-primary-button" onClick={loginAccount} disabled={isSubmittingProfile}>
+                        {isSubmittingProfile ? 'Memproses...' : 'Login'}
+                      </button>
+                    </div>
+                  </article>
+                ) : null}
+
+                {accountProfile.registered && accountProfile.loggedIn ? (
+                  <article className="apk-app-form-card">
+                    <span className="apk-app-section-label">Akun Sedang Aktif</span>
+                    <div className="apk-app-history-meta">
+                      <span>Nama : {accountProfile.name}</span>
+                      <span>Username : @{accountProfile.username}</span>
+                      <span>Status : Login</span>
+                    </div>
+                    <div className="apk-app-action-row">
+                      <button type="button" className="apk-app-ghost-button" onClick={logoutAccount}>
+                        Logout
+                      </button>
+                    </div>
+                  </article>
+                ) : null}
+
+                <article className="apk-app-form-card">
+                  <span className="apk-app-section-label">Menu Utama</span>
+                  <div className="apk-app-info-stack">
+                    <article className="apk-app-info-card apk-app-history-card">
+                      <strong>Deposit</strong>
+                      <p>Menu deposit dan riwayat deposit tetap memakai akun yang sama dengan mode App Premium.</p>
+                      <p>
+                        <Link href="/apk-premium?tab=deposit">Buka menu deposit</Link>
+                      </p>
+                    </article>
+                    <article className="apk-app-info-card apk-app-history-card">
+                      <strong>Riwayat Deposit</strong>
+                      <p>Lihat histori deposit akun yang sama dari halaman riwayat website.</p>
+                      <p>
+                        <Link href="/apk-premium?tab=riwayat#deposit-history">Buka riwayat deposit</Link>
+                      </p>
+                    </article>
                   </div>
                 </article>
+
+                <article className="apk-app-form-card">
+                  <span className="apk-app-section-label">Panduan Mulai Transaksi</span>
+                  <div className="apk-app-info-stack">
+                    <article id="guide-deposit" className="apk-app-info-card apk-app-history-card">
+                      <strong>Cara Deposit</strong>
+                      <p>Masuk ke menu Deposit, isi nominal, lalu selesaikan pembayaran sampai status deposit berubah berhasil.</p>
+                    </article>
+                    <article id="guide-status" className="apk-app-info-card apk-app-history-card">
+                      <strong>Informasi Status Order</strong>
+                      <p>Status order akan otomatis diperbarui. Jika pembayaran sukses maka order lanjut diproses, sedangkan jika QRIS expired kamu perlu membuat order baru.</p>
+                    </article>
+                    <article id="guide-order" className="apk-app-info-card apk-app-history-card">
+                      <strong>Panduan Cara Pesanan</strong>
+                      <p>Pilih platform, kategori, layanan, lalu cek total harga dan selesaikan pembayaran. Setelah lunas, order otomatis diteruskan sesuai API provider.</p>
+                    </article>
+                    <article id="guide-contact" className="apk-app-info-card apk-app-history-card">
+                      <strong>Kontak</strong>
+                      <p>Jika ada kendala transaksi, gunakan kontak store yang aktif pada website atau WhatsApp admin yang kamu pakai saat bertransaksi.</p>
+                    </article>
+                  </div>
+                </article>
+
+                {profileFeedback.text ? (
+                  <div className={`apk-app-feedback apk-app-feedback--${profileFeedback.tone}`}>
+                    {profileFeedback.text}
+                  </div>
+                ) : null}
               </div>
             </section>
           ) : null}
