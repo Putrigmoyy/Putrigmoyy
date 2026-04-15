@@ -304,6 +304,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const [selectedPlatformKey, setSelectedPlatformKey] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedServiceId, setSelectedServiceId] = useState('');
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const [servicePickerOpen, setServicePickerOpen] = useState(false);
   const [categoryQuery, setCategoryQuery] = useState('');
   const [serviceQuery, setServiceQuery] = useState('');
   const [orderForm, setOrderForm] = useState(createInitialOrderForm(services[0] || null));
@@ -485,16 +487,19 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       setSelectedCategory('');
       return;
     }
-    setSelectedCategory((current) => (current && activePlatform.categories.includes(current) ? current : activePlatform.categories[0] || ''));
+    setSelectedCategory((current) => (current && activePlatform.categories.includes(current) ? current : ''));
   }, [activePlatform]);
 
   useEffect(() => {
     setCategoryQuery('');
     setServiceQuery('');
+    setCategoryPickerOpen(false);
+    setServicePickerOpen(false);
   }, [selectedPlatformKey]);
 
   useEffect(() => {
     setServiceQuery('');
+    setServicePickerOpen(false);
   }, [selectedCategory]);
 
   const filteredCategories = useMemo(() => {
@@ -505,8 +510,9 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
   const platformServices = useMemo(() => {
     if (!activePlatform) return [];
+    if (!selectedCategory) return [];
     return activePlatform.services.filter((service) => {
-      const matchesCategory = !selectedCategory || service.category === selectedCategory;
+      const matchesCategory = service.category === selectedCategory;
       return matchesCategory;
     });
   }, [activePlatform, selectedCategory]);
@@ -521,7 +527,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   }, [platformServices, serviceQuery]);
 
   useEffect(() => {
-    const nextService = filteredServices.find((service) => service.id === selectedServiceId) || filteredServices[0] || null;
+    const nextService = filteredServices.find((service) => service.id === selectedServiceId) || null;
     setSelectedServiceId(nextService?.id || '');
     if (nextService) {
       setOrderForm((prev) => ({
@@ -740,92 +746,133 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                       <strong>{activePlatform.label}</strong>
                     </div>
                     <div className="smm-select-stack">
-                      <div className="apk-app-form-field">
-                        <input
-                          value={categoryQuery}
-                          onChange={(event) => setCategoryQuery(event.target.value)}
-                          placeholder="Cari kategori yang sesuai"
-                        />
-                      </div>
-                      <div className="smm-manual-list">
-                        {filteredCategories.length ? (
-                          filteredCategories.map((category) => {
-                            const totalServices = activePlatform.services.filter((service) => service.category === category).length;
-                            return (
-                              <button
-                                key={category}
-                                type="button"
-                                className={selectedCategory === category ? 'smm-manual-item smm-manual-item--active' : 'smm-manual-item'}
-                                onClick={() => setSelectedCategory(category)}
-                              >
-                                <div className="smm-manual-item-copy">
-                                  <strong>{category}</strong>
-                                  <span>{totalServices.toLocaleString('id-ID')} layanan</span>
-                                </div>
-                              </button>
-                            );
-                          })
-                        ) : (
-                          <div className="apk-app-empty">Kategori yang kamu cari belum ada di platform ini.</div>
-                        )}
-                      </div>
+                      <button
+                        type="button"
+                        className={categoryPickerOpen ? 'smm-picker-trigger smm-picker-trigger--open' : 'smm-picker-trigger'}
+                        onClick={() => {
+                          setCategoryPickerOpen((current) => !current);
+                          setServicePickerOpen(false);
+                        }}
+                      >
+                        <span>{selectedCategory || 'Pilih Salah Satu'}</span>
+                        <i aria-hidden="true" />
+                      </button>
+                      {categoryPickerOpen ? (
+                        <div className="smm-picker-panel">
+                          <div className="apk-app-form-field">
+                            <input
+                              value={categoryQuery}
+                              onChange={(event) => setCategoryQuery(event.target.value)}
+                              placeholder="Cari kategori yang sesuai"
+                            />
+                          </div>
+                          <div className="smm-manual-list">
+                            <button
+                              type="button"
+                              className={!selectedCategory ? 'smm-manual-item smm-manual-item--active' : 'smm-manual-item'}
+                              onClick={() => {
+                                setSelectedCategory('');
+                                setCategoryPickerOpen(false);
+                              }}
+                            >
+                              <div className="smm-manual-item-copy">
+                                <strong>Pilih Salah Satu</strong>
+                              </div>
+                            </button>
+                            {filteredCategories.length ? (
+                              filteredCategories.map((category) => (
+                                <button
+                                  key={category}
+                                  type="button"
+                                  className={selectedCategory === category ? 'smm-manual-item smm-manual-item--active' : 'smm-manual-item'}
+                                  onClick={() => {
+                                    setSelectedCategory(category);
+                                    setSelectedServiceId('');
+                                    setCategoryPickerOpen(false);
+                                  }}
+                                >
+                                  <div className="smm-manual-item-copy">
+                                    <strong>{category}</strong>
+                                  </div>
+                                </button>
+                              ))
+                            ) : (
+                              <div className="apk-app-empty">Kategori yang kamu cari belum ada di platform ini.</div>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
                   <div className="apk-app-form-card">
                     <span className="apk-app-section-label">Pilih Layanan</span>
                     <div className="smm-select-stack">
-                      <div className="apk-app-form-field">
-                        <input
-                          value={serviceQuery}
-                          onChange={(event) => setServiceQuery(event.target.value)}
-                          placeholder="Cari nama layanan"
-                        />
-                      </div>
-                      <div className="smm-manual-list smm-manual-list--service">
-                        {filteredServices.length ? (
-                          filteredServices.map((service) => (
+                      <button
+                        type="button"
+                        className={servicePickerOpen ? 'smm-picker-trigger smm-picker-trigger--open' : 'smm-picker-trigger'}
+                        onClick={() => {
+                          if (!selectedCategory) return;
+                          setServicePickerOpen((current) => !current);
+                          setCategoryPickerOpen(false);
+                        }}
+                        disabled={!selectedCategory}
+                      >
+                        <span>{selectedService?.name || 'Pilih Salah Satu'}</span>
+                        <i aria-hidden="true" />
+                      </button>
+                      {servicePickerOpen ? (
+                        <div className="smm-picker-panel">
+                          <div className="apk-app-form-field">
+                            <input
+                              value={serviceQuery}
+                              onChange={(event) => setServiceQuery(event.target.value)}
+                              placeholder="Cari nama layanan"
+                            />
+                          </div>
+                          <div className="smm-manual-list smm-manual-list--service">
                             <button
-                              key={service.id}
                               type="button"
-                              className={selectedService?.id === service.id ? 'smm-manual-item smm-manual-item--active' : 'smm-manual-item'}
-                              onClick={() => setSelectedServiceId(service.id)}
+                              className={!selectedService?.id ? 'smm-manual-item smm-manual-item--active' : 'smm-manual-item'}
+                              onClick={() => {
+                                setSelectedServiceId('');
+                                setServicePickerOpen(false);
+                              }}
                             >
                               <div className="smm-manual-item-copy">
-                                <strong>{service.name}</strong>
-                                <span>Rp {service.priceLabel} / 1000</span>
+                                <strong>Pilih Salah Satu</strong>
                               </div>
-                              <small>
-                                Min {service.min.toLocaleString('id-ID')} • Max {service.max.toLocaleString('id-ID')}
-                              </small>
                             </button>
-                          ))
-                        ) : (
-                          <div className="apk-app-empty">Layanan yang kamu cari belum ada di kategori ini.</div>
-                        )}
-                      </div>
+                            {filteredServices.length ? (
+                              filteredServices.map((service) => (
+                                <button
+                                  key={service.id}
+                                  type="button"
+                                  className={selectedService?.id === service.id ? 'smm-manual-item smm-manual-item--active' : 'smm-manual-item'}
+                                  onClick={() => {
+                                    setSelectedServiceId(service.id);
+                                    setServicePickerOpen(false);
+                                  }}
+                                >
+                                  <div className="smm-manual-item-copy">
+                                    <strong>{service.name}</strong>
+                                  </div>
+                                </button>
+                              ))
+                            ) : (
+                              <div className="apk-app-empty">Layanan yang kamu cari belum ada di kategori ini.</div>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
-                    {platformServices.length === 0 ? <div className="apk-app-empty">Tidak ada layanan yang cocok di platform ini.</div> : null}
+                    {!selectedCategory ? <div className="apk-app-empty">Pilih kategori dulu untuk menampilkan layanan.</div> : null}
+                    {selectedCategory && platformServices.length === 0 ? <div className="apk-app-empty">Tidak ada layanan yang cocok di kategori ini.</div> : null}
                   </div>
 
                   {selectedService ? (
                     <div className="apk-app-form-card">
                       <span className="apk-app-section-label">Data Pesanan</span>
-                      <div className="smm-order-summary-card">
-                        <div>
-                          <span>Harga / 1000</span>
-                          <strong>Rp {selectedService.priceLabel}</strong>
-                        </div>
-                        <div>
-                          <span>Min Order</span>
-                          <strong>{selectedService.min.toLocaleString('id-ID')}</strong>
-                        </div>
-                        <div>
-                          <span>Max Order</span>
-                          <strong>{selectedService.max.toLocaleString('id-ID')}</strong>
-                        </div>
-                      </div>
-
                       <div className="smm-service-note-card">
                         <span>Deskripsi Layanan</span>
                         <p>{selectedService.note || 'Deskripsi layanan belum tersedia dari provider.'}</p>

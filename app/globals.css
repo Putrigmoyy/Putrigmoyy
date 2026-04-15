@@ -1124,6 +1124,66 @@ a {
   gap: 14px;
 }
 
+.smm-picker-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid rgba(23, 153, 242, 0.14);
+  border-radius: 18px;
+  background: #ffffff;
+  color: #111111;
+  font: inherit;
+  font-size: 0.98rem;
+  text-align: left;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.smm-picker-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.smm-picker-trigger i {
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid rgba(17, 17, 17, 0.34);
+  border-bottom: 2px solid rgba(17, 17, 17, 0.34);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 0.18s ease;
+}
+
+.smm-picker-trigger--open {
+  border-color: rgba(210, 9, 209, 0.38);
+  box-shadow: 0 0 0 4px rgba(23, 153, 242, 0.08);
+}
+
+.smm-picker-trigger--open i {
+  transform: rotate(-135deg) translateY(-1px);
+}
+
+.smm-picker-trigger:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  background: rgba(23, 153, 242, 0.04);
+}
+
+.smm-picker-panel {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(23, 153, 242, 0.14);
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 16px 34px rgba(23, 153, 242, 0.08);
+  animation: apk-app-fade-up 0.22s ease;
+}
+
 .smm-manual-list {
   display: grid;
   gap: 10px;
@@ -1175,12 +1235,6 @@ a {
   font-size: 0.84rem;
   font-weight: 700;
   line-height: 1.45;
-}
-
-.smm-manual-item-copy span {
-  color: rgba(17, 17, 17, 0.62);
-  font-size: 0.72rem;
-  line-height: 1.4;
 }
 
 .smm-manual-item small {
