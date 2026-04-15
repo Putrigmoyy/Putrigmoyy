@@ -1,3 +1,5 @@
+import { applySmmPricingProfit, getSmmPricingSettings } from '@/lib/smm-pricing';
+
 type PusatPanelResponse<T> = {
   status: boolean;
   data: T | {
@@ -166,7 +168,17 @@ export async function fetchPusatPanelServices() {
     throw new Error(message);
   }
 
+  const pricingSettings = await getSmmPricingSettings();
+
   return response.data
     .filter((service) => !isBlockedPusatPanelService(service))
-    .map((service) => normalizePusatPanelService(service));
+    .map((service) => {
+      const normalizedService = normalizePusatPanelService(service);
+      const adjustedPrice = applySmmPricingProfit(normalizedService.price, pricingSettings.profitPercent);
+      return {
+        ...normalizedService,
+        price: adjustedPrice,
+        priceLabel: adjustedPrice.toLocaleString('id-ID'),
+      };
+    });
 }

@@ -1890,7 +1890,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
               </div>
 
               <div className="smm-detail-modal-body account-popup-modal__body">
-                <div className="account-popup-tabs">
+                <div className="account-popup-tabs account-popup-tabs--dual">
                   {([
                     ['profil', 'Profil'],
                     ['deposit', 'Deposit'],

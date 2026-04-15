@@ -221,7 +221,7 @@ function mapHistoryRow(row: HistoryRow): CoreHistoryEntry {
   };
 }
 
-async function ensureCoreTables() {
+export async function ensureCoreTables() {
   const sql = getNeonClient('core');
   await sql`
     create table if not exists core_wallet_accounts (
@@ -1053,4 +1053,173 @@ export async function getCoreDepositStatus(reference: string) {
     bundle,
     depositState: buildCoreDepositState(normalizedReference, payment),
   };
+}
+
+export type AdminCoreWalletUser = {
+  id: number;
+  name: string;
+  username: string;
+  balance: number;
+  createdAt: string;
+  updatedAt: string;
+  historyCount: number;
+  lastHistoryAt: string;
+  loggedInReady: boolean;
+};
+
+export async function listAdminCoreWalletUsers() {
+  if (!isCoreConfigured()) {
+    return [] as AdminCoreWalletUser[];
+  }
+
+  await ensureCoreTables();
+  const sql = getNeonClient('core');
+  const rows = (await sql`
+    select
+      account.id,
+      account.display_name,
+      account.username,
+      account.contact,
+      account.balance,
+      account.created_at,
+      account.updated_at,
+      count(history.id) as history_count,
+      max(history.created_at) as last_history_at
+    from core_wallet_accounts account
+    left join core_transaction_history history
+      on history.account_contact = account.username
+      or history.account_contact = account.contact
+    group by
+      account.id,
+      account.display_name,
+      account.username,
+      account.contact,
+      account.balance,
+      account.created_at,
+      account.updated_at
+    order by account.updated_at desc, account.created_at desc
+  `) as Array<{
+    id: number;
+    display_name: string | null;
+    username: string | null;
+    contact: string | null;
+    balance: number | null;
+    created_at: string;
+    updated_at: string;
+    history_count: number | string | null;
+    last_history_at: string | null;
+  }>;
+
+  return rows.map((row): AdminCoreWalletUser => ({
+    id: Number(row.id),
+    name: String(row.display_name || '').trim(),
+    username: normalizeUsername(row.username || row.contact || ''),
+    balance: Math.max(0, Number(row.balance || 0)),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    historyCount: Math.max(0, Number(row.history_count || 0)),
+    lastHistoryAt: String(row.last_history_at || ''),
+    loggedInReady: Boolean(String(row.username || row.contact || '').trim()),
+  }));
+}
+
+export async function adminUpdateCoreWalletUser(input: {
+  currentUsername: string;
+  displayName?: string;
+  nextUsername?: string;
+  newPassword?: string;
+  balanceDelta?: number;
+}) {
+  if (!isCoreConfigured()) {
+    throw new Error('DATABASE_URL_CORE belum diisi.');
+  }
+
+  await ensureCoreTables();
+  const currentUsername = normalizeUsername(input.currentUsername);
+  const displayName = String(input.displayName || '').trim();
+  const nextUsername = normalizeUsername(input.nextUsername || '');
+  const newPassword = String(input.newPassword || '').trim();
+  const balanceDelta = Number(input.balanceDelta || 0);
+
+  if (!currentUsername) {
+    throw new Error('Username akun wajib dipilih.');
+  }
+
+  const row = await getWalletRow(currentUsername);
+  if (!row) {
+    throw new Error('Akun user tidak ditemukan.');
+  }
+
+  const resolvedCurrentUsername = resolveAccountKey(row) || currentUsername;
+  const finalUsername = nextUsername || resolvedCurrentUsername;
+  const finalDisplayName = displayName || String(row.display_name || '').trim() || resolvedCurrentUsername;
+  const currentBalance = Math.max(0, Number(row.balance || 0));
+
+  if (!validateUsername(finalUsername)) {
+    throw new Error('Username hanya boleh 4-24 karakter, huruf kecil, angka, titik, garis bawah, atau strip.');
+  }
+
+  if (finalUsername !== resolvedCurrentUsername) {
+    const existing = await getWalletRow(finalUsername);
+    if (existing && resolveAccountKey(existing) !== resolvedCurrentUsername) {
+      throw new Error('Username baru sudah dipakai user lain.');
+    }
+  }
+
+  if (newPassword && newPassword.length < 6) {
+    throw new Error('Password baru minimal 6 karakter.');
+  }
+
+  const nextBalance = currentBalance + balanceDelta;
+  if (nextBalance < 0) {
+    throw new Error('Saldo user tidak boleh minus.');
+  }
+
+  const sql = getNeonClient('core');
+  await sql`
+    update core_wallet_accounts
+    set
+      display_name = ${finalDisplayName},
+      username = ${finalUsername},
+      contact = ${finalUsername},
+      balance = ${nextBalance},
+      password_hash = case
+        when ${newPassword} <> '' then ${hashPassword(newPassword)}
+        else password_hash
+      end,
+      updated_at = now()
+    where lower(username) = ${resolvedCurrentUsername}
+      or lower(contact) = ${resolvedCurrentUsername}
+  `;
+
+  if (finalUsername !== resolvedCurrentUsername) {
+    await sql`
+      update core_transaction_history
+      set account_contact = ${finalUsername}
+      where account_contact = ${resolvedCurrentUsername}
+    `;
+    await sql`
+      update core_deposit_payments
+      set account_contact = ${finalUsername}
+      where account_contact = ${resolvedCurrentUsername}
+    `;
+  }
+
+  if (balanceDelta !== 0) {
+    await insertCoreHistory({
+      accountContact: finalUsername,
+      kind: 'deposit',
+      title: balanceDelta > 0 ? 'Penyesuaian saldo admin' : 'Pengurangan saldo admin',
+      subjectName: finalDisplayName,
+      amount: Math.abs(balanceDelta),
+      statusLabel: 'Berhasil',
+      status: 'success',
+      detail: `Penyesuaian saldo oleh admin portal.\nPerubahan: ${balanceDelta > 0 ? '+' : ''}${balanceDelta.toLocaleString('id-ID')}`,
+      methodLabel: 'Admin portal',
+      reference: `ADMIN-${Date.now()}`,
+    });
+  }
+
+  const users = await listAdminCoreWalletUsers();
+  return users.find((user) => user.username === finalUsername) || null;
 }

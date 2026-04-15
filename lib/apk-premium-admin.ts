@@ -3,6 +3,19 @@ import { getNeonClient } from '@/lib/neon-clients';
 import type { ApkPremiumProduct } from '@/lib/apk-premium';
 import { getApkPremiumCatalog } from '@/lib/apk-premium-store';
 
+export type AdminApkVariantRow = {
+  variantId: string;
+  productId: string;
+  productTitle: string;
+  category: string;
+  variantTitle: string;
+  duration: string;
+  price: number;
+  stock: number;
+  badge: string;
+  productUpdatedAt: string;
+};
+
 type OwnerCatalogVariant = {
   id?: string;
   title?: string;
@@ -123,11 +136,183 @@ function normalizeOwnerProducts(catalog: OwnerCatalogPayload) {
   }>;
 }
 
+export async function ensureApkAdminTables() {
+  const config = getAppDataSourceConfig();
+  if (!config.apk.databaseConfigured) {
+    throw new Error('DATABASE_URL_APK belum diisi.');
+  }
+
+  const sql = getNeonClient('apk');
+  await sql`
+    create table if not exists apk_products (
+      id text primary key,
+      title text not null default '',
+      subtitle text not null default '',
+      category text not null default 'App Premium',
+      stock integer not null default 0,
+      sold integer not null default 0,
+      rating text not null default '4.9/5',
+      delivery text not null default 'Auto kirim akun',
+      accent text not null default 'cyan',
+      note text not null default '',
+      guarantee text not null default '',
+      sort_order integer not null default 0,
+      is_active boolean not null default true,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `;
+  await sql`
+    create table if not exists apk_product_variants (
+      id text primary key,
+      product_id text not null references apk_products(id) on delete cascade,
+      title text not null default '',
+      duration text not null default '',
+      price integer not null default 0,
+      stock integer not null default 0,
+      badge text,
+      sort_order integer not null default 0,
+      is_active boolean not null default true,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `;
+  await sql`create index if not exists apk_product_variants_product_idx on apk_product_variants(product_id)`;
+}
+
+export async function listAdminApkVariants() {
+  await ensureApkAdminTables();
+  const sql = getNeonClient('apk');
+  const rows = (await sql`
+    select
+      variant.id as variant_id,
+      product.id as product_id,
+      product.title as product_title,
+      product.category as category,
+      variant.title as variant_title,
+      variant.duration as duration,
+      variant.price as price,
+      variant.stock as stock,
+      coalesce(variant.badge, '') as badge,
+      product.updated_at as product_updated_at
+    from apk_product_variants variant
+    inner join apk_products product
+      on product.id = variant.product_id
+    where product.is_active = true
+      and variant.is_active = true
+    order by product.sort_order asc, product.title asc, variant.sort_order asc, variant.title asc
+  `) as Array<{
+    variant_id: string;
+    product_id: string;
+    product_title: string;
+    category: string;
+    variant_title: string;
+    duration: string;
+    price: number | null;
+    stock: number | null;
+    badge: string | null;
+    product_updated_at: string;
+  }>;
+
+  return rows.map((row): AdminApkVariantRow => ({
+    variantId: row.variant_id,
+    productId: row.product_id,
+    productTitle: row.product_title,
+    category: row.category,
+    variantTitle: row.variant_title,
+    duration: row.duration,
+    price: Math.max(0, Number(row.price || 0)),
+    stock: Math.max(0, Number(row.stock || 0)),
+    badge: String(row.badge || ''),
+    productUpdatedAt: row.product_updated_at,
+  }));
+}
+
+export async function adminUpdateApkVariant(input: {
+  variantId: string;
+  variantTitle?: string;
+  duration?: string;
+  price?: number;
+  stockDelta?: number;
+  badge?: string;
+}) {
+  await ensureApkAdminTables();
+  const variantId = cleanText(input.variantId);
+  if (!variantId) {
+    throw new Error('Variant wajib dipilih.');
+  }
+
+  const sql = getNeonClient('apk');
+  const currentRows = (await sql`
+    select
+      id,
+      product_id,
+      title,
+      duration,
+      price,
+      stock,
+      badge
+    from apk_product_variants
+    where id = ${variantId}
+    limit 1
+  `) as Array<{
+    id: string;
+    product_id: string;
+    title: string;
+    duration: string;
+    price: number | null;
+    stock: number | null;
+    badge: string | null;
+  }>;
+
+  const current = currentRows[0];
+  if (!current) {
+    throw new Error('Variant App Premium tidak ditemukan.');
+  }
+
+  const nextTitle = cleanText(input.variantTitle, current.title);
+  const nextDuration = cleanText(input.duration, current.duration || 'Sesuai deskripsi');
+  const nextPrice = Math.max(0, Number(input.price ?? current.price ?? 0));
+  const stockDelta = Math.trunc(Number(input.stockDelta || 0));
+  const nextStock = Math.max(0, Number(current.stock || 0) + stockDelta);
+  const nextBadge = cleanText(input.badge, current.badge || '');
+
+  await sql`
+    update apk_product_variants
+    set
+      title = ${nextTitle},
+      duration = ${nextDuration},
+      price = ${nextPrice},
+      stock = ${nextStock},
+      badge = ${nextBadge || null},
+      updated_at = now()
+    where id = ${variantId}
+  `;
+
+  await sql`
+    update apk_products product
+    set
+      stock = coalesce((
+        select sum(variant.stock)
+        from apk_product_variants variant
+        where variant.product_id = product.id
+          and variant.is_active = true
+      ), 0),
+      updated_at = now()
+    where product.id = ${current.product_id}
+  `;
+
+  const variants = await listAdminApkVariants();
+  return variants.find((variant) => variant.variantId === variantId) || null;
+}
+
 export async function importOwnerCatalogToApkNeon(catalog: OwnerCatalogPayload) {
   const config = getAppDataSourceConfig();
   if (!config.apk.databaseConfigured) {
     throw new Error('DATABASE_URL_APK belum diisi.');
   }
+
+  await ensureApkAdminTables();
 
   const products = normalizeOwnerProducts(catalog);
   if (products.length === 0) {

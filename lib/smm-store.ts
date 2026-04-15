@@ -64,6 +64,21 @@ export async function ensureSmmTables() {
       updated_at timestamptz not null default now()
     )
   `;
+  await sql`
+    create table if not exists smm_services_cache (
+      id text primary key,
+      category text not null default '',
+      name text not null default '',
+      note text not null default '',
+      min integer not null default 0,
+      max integer not null default 0,
+      price integer not null default 0,
+      menu_type text not null default '1',
+      logo_type text not null default '',
+      speed text not null default '',
+      last_synced_at timestamptz not null default now()
+    )
+  `;
 }
 
 export async function saveSmmOrder(input: {

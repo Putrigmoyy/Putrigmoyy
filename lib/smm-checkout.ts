@@ -10,7 +10,7 @@ import {
 } from '@/lib/core-store';
 import { createMidtransQrisCharge, getMidtransPublicConfig, getMidtransTransactionStatus, isMidtransConfigured } from '@/lib/midtrans';
 import { getNeonClient } from '@/lib/neon-clients';
-import { requestPusatPanel } from '@/lib/pusatpanel';
+import { fetchPusatPanelServices, requestPusatPanel } from '@/lib/pusatpanel';
 import { ensureSmmTables } from '@/lib/smm-store';
 
 type CheckoutInput = {
@@ -115,6 +115,19 @@ function buildOrderDetail(input: {
     `Username: ${input.username || '-'}`,
     `Komentar: ${input.comments || '-'}`,
   ].join('\n');
+}
+
+function calculateSmmCheckoutTotal(service: { menuType: string; price: number }, quantity: number | null) {
+  if (String(service.menuType || '').trim() === '4') {
+    return Math.max(0, Math.round(Number(service.price || 0)));
+  }
+
+  const units = Math.max(0, Number(quantity || 0));
+  if (units <= 0) {
+    return 0;
+  }
+
+  return Math.max(0, Math.ceil((Math.max(0, Number(service.price || 0)) * units) / 1000));
 }
 
 function buildSnapshot(order: SmmOrderRow, payment: SmmPaymentRow | null, fallbackNotice = ''): SmmCheckoutSnapshot {
@@ -447,15 +460,29 @@ export async function submitSmmCheckoutOrder(input: CheckoutInput): Promise<SmmC
   const accountContact = String(input.accountContact || '').trim();
   const customerName = String(input.customerName || '').trim() || 'Pelanggan Sosmed';
   const service = String(input.service || '').trim();
-  const serviceName = String(input.serviceName || '').trim() || service;
-  const category = String(input.category || '').trim() || 'Tanpa Kategori';
   const targetData = String(input.data || '').trim();
   const username = String(input.username || '').trim();
   const comments = String(input.comments || '').trim();
   const quantity = input.quantity == null ? null : Math.max(0, Number(input.quantity || 0));
-  const unitPrice = Math.max(0, Math.round(Number(input.unitPrice || 0)));
-  const totalPrice = Math.max(0, Math.round(Number(input.totalPrice || 0)));
   const orderCode = createSmmOrderCode();
+
+  if (!service) {
+    throw new Error('Service wajib diisi.');
+  }
+  if (!targetData) {
+    throw new Error('Data target wajib diisi.');
+  }
+
+  const providerServices = await fetchPusatPanelServices();
+  const selectedService = providerServices.find((item) => item.id === service);
+  if (!selectedService) {
+    throw new Error('Layanan sosial media tidak ditemukan atau sudah tidak aktif.');
+  }
+
+  const serviceName = selectedService.name;
+  const category = selectedService.category || 'Tanpa Kategori';
+  const unitPrice = Math.max(0, Math.round(Number(selectedService.price || 0)));
+  const totalPrice = calculateSmmCheckoutTotal(selectedService, quantity);
   const detail = buildOrderDetail({
     serviceName,
     category,
@@ -465,11 +492,14 @@ export async function submitSmmCheckoutOrder(input: CheckoutInput): Promise<SmmC
     username,
   });
 
-  if (!service) {
-    throw new Error('Service wajib diisi.');
+  if (selectedService.menuType !== '4' && (!quantity || quantity <= 0)) {
+    throw new Error('Jumlah order belum valid.');
   }
-  if (!targetData) {
-    throw new Error('Data target wajib diisi.');
+  if (quantity != null && quantity > 0 && quantity < selectedService.min) {
+    throw new Error(`Jumlah minimal untuk layanan ini adalah ${selectedService.min.toLocaleString('id-ID')}.`);
+  }
+  if (quantity != null && quantity > selectedService.max) {
+    throw new Error(`Jumlah maksimal untuk layanan ini adalah ${selectedService.max.toLocaleString('id-ID')}.`);
   }
   if (totalPrice <= 0) {
     throw new Error('Total harga belum valid.');

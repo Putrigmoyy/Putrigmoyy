@@ -674,7 +674,8 @@ a {
   background: linear-gradient(135deg, #d209d1, #1799f2);
 }
 
-.smm-app-page .apk-app-section-label {
+.smm-app-page .apk-app-section-label,
+.apk-app-page .apk-app-section-label {
   gap: 0;
   font-size: 14px;
   font-weight: 500;
@@ -682,7 +683,8 @@ a {
   text-transform: none;
 }
 
-.smm-app-page .apk-app-section-label::before {
+.smm-app-page .apk-app-section-label::before,
+.apk-app-page .apk-app-section-label::before {
   display: none;
 }
 
@@ -700,7 +702,10 @@ a {
 
 .smm-app-page .apk-app-form-card > .apk-app-section-label,
 .smm-app-page .apk-app-panel-head .apk-app-section-label,
-.smm-app-page .smm-monitoring-title .apk-app-section-label {
+.smm-app-page .smm-monitoring-title .apk-app-section-label,
+.apk-app-page .apk-app-form-card > .apk-app-section-label,
+.apk-app-page .apk-app-panel-head .apk-app-section-label,
+.apk-app-page .smm-monitoring-title .apk-app-section-label {
   margin-bottom: 12px;
 }
 
@@ -817,7 +822,8 @@ a {
   line-height: 1.25;
 }
 
-.smm-app-page .apk-app-panel-head h3 {
+.smm-app-page .apk-app-panel-head h3,
+.apk-app-page .apk-app-panel-head h3 {
   margin-top: 0;
   font-size: 14px;
   font-weight: 500;
@@ -826,7 +832,11 @@ a {
 
 .smm-app-page .apk-app-form-field span,
 .smm-app-page .smm-profile-title,
-.smm-app-page .smm-monitoring-filter-actions > span {
+.smm-app-page .smm-monitoring-filter-actions > span,
+.apk-app-page .apk-app-form-field span,
+.apk-app-page .smm-profile-title,
+.apk-app-page .smm-monitoring-filter-actions > span,
+.apk-app-page .apk-app-search span {
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0;
@@ -847,8 +857,53 @@ a {
 .smm-app-page .smm-qris-expiry-note,
 .smm-app-page .apk-app-feedback,
 .smm-app-page .smm-profile-lines p,
-.smm-app-page .smm-profile-links a {
+.smm-app-page .smm-profile-links a,
+.apk-app-page .apk-app-form-field input,
+.apk-app-page .apk-app-form-field textarea,
+.apk-app-page .apk-app-form-field select,
+.apk-app-page .smm-picker-trigger,
+.apk-app-page .smm-manual-item-copy strong,
+.apk-app-page .apk-app-empty,
+.apk-app-page .apk-app-inline-helper,
+.apk-app-page .smm-section-copy,
+.apk-app-page .smm-service-note-card p,
+.apk-app-page .smm-service-stats-card p,
+.apk-app-page .smm-qris-detail-frame p,
+.apk-app-page .smm-qris-expiry-note,
+.apk-app-page .apk-app-feedback,
+.apk-app-page .smm-profile-lines p,
+.apk-app-page .smm-profile-links a,
+.apk-app-page .apk-app-product-meta span,
+.apk-app-page .apk-app-product-copy em,
+.apk-app-page .apk-app-variant-card span,
+.apk-app-page .apk-app-variant-meta small,
+.apk-app-page .apk-app-inline-stats span,
+.apk-app-page .apk-app-history-meta span,
+.apk-app-page .apk-app-history-detail p,
+.apk-app-page .apk-app-info-card p,
+.apk-app-page .apk-app-selected-copy span,
+.apk-app-page .apk-app-category-row-copy span,
+.apk-app-page .apk-app-product-copy span {
   font-size: 10px;
+}
+
+.apk-app-page .apk-app-product-copy strong,
+.apk-app-page .apk-app-category-row-copy strong,
+.apk-app-page .apk-app-selected-copy strong,
+.apk-app-page .apk-app-variant-card strong,
+.apk-app-page .apk-app-order-head-copy h3,
+.apk-app-page .apk-app-info-card strong,
+.apk-app-page .apk-app-method-card strong {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.apk-app-page .apk-app-inline-stats span,
+.apk-app-page .apk-app-product-meta span,
+.apk-app-page .apk-app-variant-badge,
+.apk-app-page .apk-app-history-status {
+  font-weight: 500;
 }
 
 .apk-app-count-pill,
@@ -1196,6 +1251,7 @@ a {
   display: grid;
   gap: 12px;
   margin-top: 14px;
+  min-width: 0;
 }
 
 .apk-app-form-field {
@@ -2037,6 +2093,7 @@ a {
   max-width: min(calc(100vw - 24px), 420px);
   max-height: min(88dvh, 760px);
   border-radius: 28px;
+  overflow: hidden;
 }
 
 .account-popup-modal__body {
@@ -2045,12 +2102,17 @@ a {
   min-width: 0;
   gap: 14px;
   box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .account-popup-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.account-popup-tabs--dual {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .account-popup-tabs > * {
@@ -2139,6 +2201,7 @@ a {
   font: inherit;
   font-size: 11px;
   font-weight: 500;
+  flex-shrink: 0;
   transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 
@@ -2181,6 +2244,176 @@ a {
   line-height: 1.4;
   min-width: 0;
   word-break: break-word;
+}
+
+.admin-portal-page {
+  background: #ffffff;
+}
+
+.admin-portal-phone {
+  gap: 14px;
+}
+
+.admin-portal-hero {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(23, 153, 242, 0.14);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(210, 9, 209, 0.1), transparent 36%),
+    radial-gradient(circle at left bottom, rgba(23, 153, 242, 0.1), transparent 34%),
+    #ffffff;
+  box-shadow: 0 18px 38px rgba(23, 153, 242, 0.08);
+}
+
+.admin-portal-hero__copy {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-portal-hero__copy h1 {
+  margin: 0;
+  color: #111111;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.admin-portal-hero__copy p {
+  margin: 0;
+  color: rgba(17, 17, 17, 0.72);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.admin-portal-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-portal-summary-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 12px;
+  border: 1px solid rgba(23, 153, 242, 0.14);
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.05), rgba(210, 9, 209, 0.06));
+}
+
+.admin-portal-summary-card span {
+  color: rgba(17, 17, 17, 0.64);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.admin-portal-summary-card strong {
+  color: #111111;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.admin-portal-tab-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-portal-tab {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(23, 153, 242, 0.14);
+  border-radius: 18px;
+  background: #ffffff;
+  color: #111111;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.admin-portal-tab:active {
+  transform: scale(0.985);
+}
+
+.admin-portal-tab--active {
+  border-color: rgba(210, 9, 209, 0.24);
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.08), rgba(210, 9, 209, 0.08));
+  box-shadow: 0 10px 20px rgba(23, 153, 242, 0.08);
+}
+
+.admin-portal-content {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-portal-grid,
+.admin-portal-split {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-portal-preview-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.admin-portal-preview-card p {
+  margin: 0;
+  color: #111111;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.admin-portal-list {
+  display: grid;
+  gap: 10px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.admin-portal-list-item {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 18px;
+  background: #ffffff;
+  color: #111111;
+  text-align: left;
+  font: inherit;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.admin-portal-list-item:active {
+  transform: scale(0.985);
+}
+
+.admin-portal-list-item--active {
+  border-color: rgba(210, 9, 209, 0.24);
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.08), rgba(210, 9, 209, 0.08));
+  box-shadow: 0 10px 20px rgba(23, 153, 242, 0.08);
+}
+
+.admin-portal-list-item strong {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.admin-portal-list-item span,
+.admin-portal-list-item small {
+  color: rgba(17, 17, 17, 0.72);
+  font-size: 10px;
+  line-height: 1.45;
 }
 
 .account-popup-auth-toggle {
