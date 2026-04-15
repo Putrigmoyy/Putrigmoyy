@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useDeferredValue, useEffect, useState, useTransition } from 'react';
 import type { ApkPremiumProduct, ApkPremiumVariant } from '@/lib/apk-premium';
 import { formatRupiah } from '@/lib/apk-premium';
+import { FloatingNotice } from '@/app/components/floating-notice';
 import { TopAccountMenu } from '@/app/components/top-account-menu';
 
 type Props = {
@@ -37,6 +38,21 @@ type DepositMethod = 'midtrans' | 'balance';
 type OrderPaymentMethod = 'midtrans' | 'balance';
 type AccountModalView = 'deposit' | 'riwayat' | 'profil';
 
+type CoreDepositQrisState = {
+  reference: string;
+  amount: number;
+  amountLabel: string;
+  paymentStatus: string;
+  qris: {
+    transactionId: string;
+    qrUrl: string;
+    qrString: string;
+    deeplinkUrl: string;
+    expiryTime: string;
+  } | null;
+  nextStep: string;
+};
+
 type CoreBundlePayload = {
   account?: {
     registered?: boolean;
@@ -62,6 +78,7 @@ type CoreDepositResult = {
     bundle?: CoreBundlePayload;
     amount?: number;
     method?: DepositMethod;
+    depositState?: CoreDepositQrisState;
     msg?: string;
   };
 };
@@ -166,7 +183,6 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const [depositAmount, setDepositAmount] = useState('10000');
-  const [depositMethod, setDepositMethod] = useState<DepositMethod>('midtrans');
   const [walletProfile, setWalletProfile] = useState({
     registered: false,
     loggedIn: false,
@@ -200,11 +216,14 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
     text: 'Pilih aplikasi premium lalu lanjutkan order langsung dari menu apprem.',
   });
   const [activeQrisOrder, setActiveQrisOrder] = useState<AppremQrisState | null>(null);
+  const [activeDepositQris, setActiveDepositQris] = useState<CoreDepositQrisState | null>(null);
   const [accountModalView, setAccountModalView] = useState<AccountModalView | null>(null);
+  const [floatingNotice, setFloatingNotice] = useState<{ tone: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [isSubmittingOrder, startOrderSubmit] = useTransition();
   const [isSubmittingProfile, startProfileSubmit] = useTransition();
   const [isSubmittingDeposit, startDepositSubmit] = useTransition();
   const [isRefreshingQris, startRefreshQris] = useTransition();
+  const [isCheckingDepositStatus, setIsCheckingDepositStatus] = useState(false);
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
   useEffect(() => {
@@ -231,6 +250,39 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
       document.body.style.overflow = previousOverflow;
     };
   }, [accountModalView]);
+
+  useEffect(() => {
+    if (!profileFeedback.text || profileFeedback.tone === 'idle') {
+      return;
+    }
+    setFloatingNotice({
+      tone: profileFeedback.tone === 'success' ? 'success' : 'error',
+      text: profileFeedback.text,
+    });
+  }, [profileFeedback]);
+
+  useEffect(() => {
+    if (!depositFeedback.text || depositFeedback.tone === 'idle') {
+      return;
+    }
+    setFloatingNotice({
+      tone: depositFeedback.tone === 'success' ? 'success' : 'error',
+      text: depositFeedback.text,
+    });
+  }, [depositFeedback]);
+
+  useEffect(() => {
+    if (!floatingNotice?.text) {
+      return;
+    }
+    const timerId = window.setTimeout(() => {
+      setFloatingNotice(null);
+    }, 2600);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [floatingNotice]);
 
   const applyCoreBundle = (bundle: CoreBundlePayload) => {
     const account = bundle.account || {};
@@ -317,18 +369,9 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
   const selectedTotal = selectedVariant ? selectedVariant.price * selectedQuantity : 0;
   const normalizedDepositAmount = Math.max(0, Number(depositAmount.replace(/[^\d]/g, '') || 0));
   const depositLocked = !walletProfile.registered || !walletProfile.loggedIn;
-  const canUseBalance = !depositLocked && normalizedDepositAmount > 0 && walletProfile.balance >= normalizedDepositAmount;
   const canPayOrderWithBalance = walletProfile.loggedIn && selectedTotal > 0 && walletProfile.balance >= selectedTotal;
   const orderHistoryEntries = historyEntries.filter((entry) => entry.kind === 'order');
   const depositHistoryEntries = historyEntries.filter((entry) => entry.kind === 'deposit');
-
-  useEffect(() => {
-    if (depositLocked || !canUseBalance) {
-      if (depositMethod === 'balance') {
-        setDepositMethod('midtrans');
-      }
-    }
-  }, [canUseBalance, depositLocked, depositMethod]);
 
   useEffect(() => {
     if (!walletProfile.loggedIn || !canPayOrderWithBalance) {
@@ -416,6 +459,20 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
       window.clearInterval(timer);
     };
   }, [activeQrisOrder, startRefreshQris, walletProfile.loggedIn, walletProfile.username]);
+
+  useEffect(() => {
+    if (!activeDepositQris || activeDepositQris.paymentStatus !== 'awaiting-payment') {
+      return;
+    }
+
+    const timerId = window.setInterval(() => {
+      void refreshDepositStatus(false);
+    }, 12000);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [activeDepositQris]);
 
   const openProduct = (product: ApkPremiumProduct) => {
     setSelectedProductId(product.id);
@@ -711,6 +768,13 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
         });
         return;
       }
+      if (normalizedDepositAmount < 10000) {
+        setDepositFeedback({
+          tone: 'error',
+          text: 'Deposit minimal Rp 10.000.',
+        });
+        return;
+      }
 
       try {
         const response = await fetch('/api/core/deposit', {
@@ -721,7 +785,6 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
           body: JSON.stringify({
             accountContact: walletProfile.username,
             amount: normalizedDepositAmount,
-            method: depositMethod,
           }),
         });
         const result = (await response.json()) as CoreDepositResult;
@@ -737,13 +800,8 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
         }
 
         applyCoreBundle(result.data.bundle);
-        setDepositFeedback({
-          tone: 'success',
-          text:
-            depositMethod === 'balance'
-              ? `Saldo akun berhasil dipakai sebesar Rp ${formatRupiah(normalizedDepositAmount)}.`
-              : `Permintaan deposit QRIS Midtrans sebesar Rp ${formatRupiah(normalizedDepositAmount)} sudah dicatat.`,
-        });
+        setActiveDepositQris(result.data.depositState || null);
+        setDepositFeedback({ tone: 'idle', text: '' });
       } catch (error) {
         setDepositFeedback({
           tone: 'error',
@@ -751,6 +809,81 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
         });
       }
     });
+  };
+
+  const refreshDepositStatus = async (manual = false) => {
+    if (!activeDepositQris?.reference) {
+      return;
+    }
+
+    if (manual) {
+      setIsCheckingDepositStatus(true);
+    }
+
+    try {
+      const response = await fetch(`/api/core/deposit/status?reference=${encodeURIComponent(activeDepositQris.reference)}`, {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const result = (await response.json()) as {
+        status?: boolean;
+        data?: {
+          bundle?: CoreBundlePayload;
+          depositState?: CoreDepositQrisState;
+          msg?: string;
+        };
+      };
+
+      if (!response.ok || !result.status || !result.data?.depositState) {
+        if (manual) {
+          setFloatingNotice({
+            tone: 'error',
+            text:
+              result.data && 'msg' in result.data && result.data.msg
+                ? String(result.data.msg)
+                : 'Status deposit belum bisa dimuat.',
+          });
+        }
+        return;
+      }
+
+      if (result.data.bundle) {
+        applyCoreBundle(result.data.bundle);
+      }
+
+      const nextState = result.data.depositState;
+      if (nextState.paymentStatus === 'paid') {
+        setActiveDepositQris(null);
+        setDepositAmount('10000');
+        setDepositFeedback({
+          tone: 'success',
+          text: `Deposit Rp ${nextState.amountLabel} berhasil dan saldo akun sudah bertambah.`,
+        });
+        return;
+      }
+
+      if (nextState.paymentStatus === 'expire' || nextState.paymentStatus === 'cancel' || nextState.paymentStatus === 'deny' || nextState.paymentStatus === 'failed') {
+        setActiveDepositQris(null);
+        setDepositFeedback({
+          tone: 'error',
+          text: nextState.nextStep,
+        });
+        return;
+      }
+
+      setActiveDepositQris(nextState);
+    } catch (error) {
+      if (manual) {
+        setFloatingNotice({
+          tone: 'error',
+          text: error instanceof Error ? error.message : 'Status deposit belum bisa diperbarui.',
+        });
+      }
+    } finally {
+      if (manual) {
+        setIsCheckingDepositStatus(false);
+      }
+    }
   };
 
   const refreshQrisStatus = () => {
@@ -802,6 +935,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
   return (
     <div className="apk-app-shell">
       <div className="apk-app-phone">
+        <FloatingNotice notice={floatingNotice} />
         <div className="apk-app-top-strip">
           <TopAccountMenu
             displayName={walletProfile.loggedIn ? walletProfile.name : 'Profil'}
@@ -1107,59 +1241,8 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
                 </article>
 
                 <article className="apk-app-form-card">
-                  <span className="apk-app-section-label">Metode Bayar</span>
-                  <div className="apk-app-method-grid">
-                    <button
-                      type="button"
-                      className={
-                        depositLocked
-                          ? 'apk-app-method-card apk-app-method-card--disabled'
-                          : depositMethod === 'midtrans'
-                            ? 'apk-app-method-card apk-app-method-card--active'
-                            : 'apk-app-method-card'
-                      }
-                      onClick={() => {
-                        if (!depositLocked) {
-                          setDepositMethod('midtrans');
-                        }
-                      }}
-                      disabled={depositLocked}
-                    >
-                      <strong>QRIS Otomatis Midtrans</strong>
-                      <p>Dipakai saat saldo akun belum cukup atau kamu ingin isi saldo manual.</p>
-                    </button>
-                    <button
-                      type="button"
-                      className={
-                        depositMethod === 'balance'
-                          ? 'apk-app-method-card apk-app-method-card--active'
-                          : !walletProfile.registered || !canUseBalance
-                            ? 'apk-app-method-card apk-app-method-card--disabled'
-                            : 'apk-app-method-card'
-                      }
-                      onClick={() => {
-                        if (walletProfile.registered && canUseBalance) {
-                          setDepositMethod('balance');
-                        }
-                      }}
-                      disabled={depositLocked}
-                    >
-                      <strong>Pakai Saldo Akun</strong>
-                      <p>
-                        {!walletProfile.registered
-                          ? 'Daftar akun dulu untuk mengaktifkan metode ini.'
-                          : canUseBalance
-                            ? 'Saldo akun cukup untuk membayar langsung.'
-                            : 'Saldo akun belum cukup untuk nominal ini.'}
-                      </p>
-                    </button>
-                  </div>
-
-                  {depositFeedback.text ? (
-                    <div className={`apk-app-feedback apk-app-feedback--${depositFeedback.tone}`}>
-                      {depositFeedback.text}
-                    </div>
-                  ) : null}
+                  <span className="apk-app-section-label">Deposit</span>
+                  <p className="smm-section-copy">Masukkan nominal minimal Rp 10.000 lalu tekan tombol deposit untuk membuka QRIS pembayaran.</p>
 
                   <div className="apk-app-action-row">
                     <button
@@ -1513,77 +1596,78 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
                     </div>
 
                     <div className="account-popup-card">
-                      <div className="apk-app-form-grid smm-profile-form-grid">
-                        <label className="apk-app-form-field">
-                          <span>Jumlah deposit</span>
-                          <input
-                            value={depositAmount}
-                            onChange={(event) => setDepositAmount(event.target.value.replace(/[^\d]/g, ''))}
-                            placeholder="Contoh : 50000"
-                            inputMode="numeric"
-                          />
-                        </label>
-                      </div>
+                      {!activeDepositQris ? (
+                        <>
+                          <div className="apk-app-form-grid smm-profile-form-grid">
+                            <label className="apk-app-form-field">
+                              <span>Jumlah deposit</span>
+                              <input
+                                value={depositAmount}
+                                onChange={(event) => setDepositAmount(event.target.value.replace(/[^\d]/g, ''))}
+                                placeholder="Minimal 10000"
+                                inputMode="numeric"
+                              />
+                            </label>
+                          </div>
 
-                      <div className="apk-app-quick-grid">
-                        {quickDepositAmounts.map((amount) => (
-                          <button
-                            key={amount}
-                            type="button"
-                            className={normalizedDepositAmount === amount ? 'apk-app-quick-chip apk-app-quick-chip--active' : 'apk-app-quick-chip'}
-                            onClick={() => setDepositAmount(String(amount))}
-                          >
-                            Rp {formatRupiah(amount)}
-                          </button>
-                        ))}
-                      </div>
+                          <div className="apk-app-quick-grid">
+                            {quickDepositAmounts.map((amount) => (
+                              <button
+                                key={amount}
+                                type="button"
+                                className={normalizedDepositAmount === amount ? 'apk-app-quick-chip apk-app-quick-chip--active' : 'apk-app-quick-chip'}
+                                onClick={() => setDepositAmount(String(amount))}
+                              >
+                                Rp {formatRupiah(amount)}
+                              </button>
+                            ))}
+                          </div>
 
-                      <div className="apk-app-method-grid">
-                        <button
-                          type="button"
-                          className={depositMethod === 'midtrans' ? 'apk-app-method-card apk-app-method-card--active' : 'apk-app-method-card'}
-                          onClick={() => setDepositMethod('midtrans')}
-                        >
-                          <strong>QRIS Otomatis</strong>
-                          <p>Isi saldo manual lewat Midtrans.</p>
-                        </button>
-                        <button
-                          type="button"
-                          className={
-                            depositMethod === 'balance'
-                              ? 'apk-app-method-card apk-app-method-card--active'
-                              : canUseBalance
-                                ? 'apk-app-method-card'
-                                : 'apk-app-method-card apk-app-method-card--disabled'
-                          }
-                          onClick={() => {
-                            if (canUseBalance) {
-                              setDepositMethod('balance');
-                            }
-                          }}
-                          disabled={!canUseBalance}
-                        >
-                          <strong>Pakai Saldo</strong>
-                          <p>{canUseBalance ? 'Saldo cukup untuk dipakai langsung.' : 'Saldo belum cukup untuk nominal ini.'}</p>
-                        </button>
-                      </div>
+                          <div className="apk-app-action-row apk-app-action-row--compact">
+                            <button
+                              type="button"
+                              className="apk-app-primary-button"
+                              onClick={submitDepositFlow}
+                              disabled={depositLocked || isSubmittingDeposit}
+                            >
+                              {isSubmittingDeposit ? 'Memproses...' : 'Deposit'}
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="apk-app-qris-shell">
+                          <div className="apk-app-qris-card smm-qris-card">
+                            {activeDepositQris.qris?.qrUrl ? (
+                              <img src={activeDepositQris.qris.qrUrl} alt={`QRIS deposit ${activeDepositQris.reference}`} className="apk-app-qris-image" />
+                            ) : (
+                              <div className="apk-app-qris-fallback">QRIS siap, tetapi gambar belum tersedia.</div>
+                            )}
+                          </div>
 
-                      {depositFeedback.text ? (
-                        <div className={`apk-app-feedback apk-app-feedback--${depositFeedback.tone}`}>
-                          {depositFeedback.text}
+                          <div className="apk-app-live-total-card apk-app-live-total-card--compact smm-qris-total-card">
+                            <span>Total Deposit</span>
+                            <strong>Rp {activeDepositQris.amountLabel}</strong>
+                          </div>
+
+                          {activeDepositQris.qris?.expiryTime ? (
+                            <div className="smm-qris-expiry-note">
+                              Berlaku sampai {new Date(activeDepositQris.qris.expiryTime).toLocaleString('id-ID')}
+                            </div>
+                          ) : null}
+
+                          <div className="smm-qris-detail-frame">
+                            <p>Deposit ID : {activeDepositQris.reference}</p>
+                            <p>Status bayar : {activeDepositQris.paymentStatus === 'awaiting-payment' ? 'menunggu pembayaran' : activeDepositQris.paymentStatus}</p>
+                            <p>Jumlah : Rp {activeDepositQris.amountLabel}</p>
+                          </div>
+
+                          <div className="apk-app-action-row smm-qris-status-row">
+                            <button type="button" className="apk-app-primary-button" onClick={() => void refreshDepositStatus(true)} disabled={isCheckingDepositStatus}>
+                              {isCheckingDepositStatus ? 'Memuat...' : 'Cek Status'}
+                            </button>
+                          </div>
                         </div>
-                      ) : null}
-
-                      <div className="apk-app-action-row apk-app-action-row--compact">
-                        <button
-                          type="button"
-                          className="apk-app-primary-button"
-                          onClick={submitDepositFlow}
-                          disabled={depositLocked || isSubmittingDeposit}
-                        >
-                          {isSubmittingDeposit ? 'Memproses...' : 'Deposit'}
-                        </button>
-                      </div>
+                      )}
                     </div>
                   </div>
                 ) : null}
@@ -1591,35 +1675,19 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
                 {accountModalView === 'riwayat' ? (
                   <div className="account-popup-stack">
                     {depositHistoryEntries.length ? (
-                      depositHistoryEntries.slice(0, 8).map((entry) => {
-                        const expanded = expandedHistoryId === entry.id;
-                        return (
-                          <article key={entry.id} className="account-popup-card account-popup-card--history">
-                            <div className="apk-app-history-head">
-                              <strong>{entry.title}</strong>
+                      <div className="account-popup-history-mini">
+                        {depositHistoryEntries.slice(0, 8).map((entry) => (
+                          <article key={entry.id} className="account-popup-history-mini__row">
+                            <div className="account-popup-history-mini__top">
+                              <span className="account-popup-history-mini__time">{entry.createdLabel}</span>
                               <span className={`apk-app-history-status apk-app-history-status--${entry.status}`}>{entry.statusLabel}</span>
                             </div>
-                            <div className="apk-app-history-meta">
-                              <span>Waktu : {entry.createdLabel}</span>
-                              <span>Nominal : {entry.amountLabel}</span>
-                              <span>Metode : {entry.methodLabel}</span>
+                            <div className="account-popup-history-mini__bottom">
+                              <span className="account-popup-history-mini__amount">{entry.amountLabel}</span>
                             </div>
-                            <button
-                              type="button"
-                              className="apk-app-ghost-button"
-                              onClick={() => setExpandedHistoryId(expanded ? null : entry.id)}
-                            >
-                              {expanded ? 'Tutup Detail' : 'Lihat Detail'}
-                            </button>
-                            {expanded ? (
-                              <div className="apk-app-history-detail">
-                                <p>{entry.detail}</p>
-                                <p>Referensi : {entry.reference}</p>
-                              </div>
-                            ) : null}
                           </article>
-                        );
-                      })
+                        ))}
+                      </div>
                     ) : (
                       <div className="apk-app-empty">Belum ada riwayat deposit.</div>
                     )}
@@ -1736,11 +1804,6 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
                       </div>
                     ) : null}
 
-                    {profileFeedback.text ? (
-                      <div className={`apk-app-feedback apk-app-feedback--${profileFeedback.tone}`}>
-                        {profileFeedback.text}
-                      </div>
-                    ) : null}
                   </div>
                 ) : null}
               </div>

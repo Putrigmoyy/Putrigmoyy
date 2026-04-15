@@ -6,13 +6,12 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       accountContact?: string;
       amount?: number | string;
-      method?: 'midtrans' | 'balance';
     };
 
     const result = await submitCoreDeposit({
       accountContact: String(body.accountContact || ''),
       amount: Number(body.amount || 0),
-      method: body.method === 'balance' ? 'balance' : 'midtrans',
+      method: 'midtrans',
     });
 
     return NextResponse.json({
