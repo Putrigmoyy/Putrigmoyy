@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export type TopAccountMenuItem = {
   label: string;
@@ -44,10 +44,6 @@ export const STORE_ACCOUNT_MENU_SECTIONS: TopAccountMenuSection[] = [
 export function TopAccountMenu({ displayName, balance, sections }: Props) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const initial = useMemo(() => {
-    const value = String(displayName || 'Profil').trim();
-    return value ? value.charAt(0).toUpperCase() : 'P';
-  }, [displayName]);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -76,9 +72,18 @@ export function TopAccountMenu({ displayName, balance, sections }: Props) {
         className={open ? 'site-mini-account__profile site-mini-account__profile--open' : 'site-mini-account__profile'}
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
-        aria-label="Buka menu profil"
+        aria-label={`Buka menu ${String(displayName || 'profil').trim() || 'profil'}`}
       >
-        <span>{initial}</span>
+        <svg className="site-mini-account__gear" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M12 8.45a3.55 3.55 0 1 0 0 7.1 3.55 3.55 0 0 0 0-7.1Zm8.25 3.55-.12-.88 1.6-1.25-1.6-2.76-1.97.5-.67-.57-.2-2.03H14.1l-.8 1.86-.84.1-.94-1.58L8.3 6.06l.42 1.97-.62.6-2.01-.48-1.6 2.76 1.56 1.24-.08.85-1.48 1.33 1.59 2.75 1.95-.5.65.56.2 2.04h3.2l.8-1.87.83-.09.95 1.58 3.22-1.86-.42-1.98.62-.58 2 .48 1.6-2.75-1.57-1.3Z"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.4"
+          />
+        </svg>
       </button>
 
       {open ? (

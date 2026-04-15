@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Fragment, useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import {
   siApplepodcasts,
   siAudiomack,
@@ -111,6 +111,12 @@ type SocialCheckoutState = {
     deeplinkUrl: string;
     expiryTime: string;
   } | null;
+};
+
+type ProviderStatusSnapshot = {
+  status: string;
+  startCount: number | null;
+  remains: number | null;
 };
 
 type SocialPlatformVisual = {
@@ -261,14 +267,22 @@ function SocialPlatformIcon({ icon }: { icon: string }) {
 
 function formatDate(value: string) {
   if (!value) return '-';
-  return new Date(value).toLocaleString('id-ID', {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  const datePart = new Intl.DateTimeFormat('id-ID', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
+  }).format(date);
+  const timePart = new Intl.DateTimeFormat('id-ID', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-  });
+    hour12: false,
+  })
+    .format(date)
+    .replace(/\./g, ':');
+  return `${datePart}, ${timePart}`;
 }
 
 function formatServicePickerLabel(service?: NormalizedPusatPanelService | null) {
@@ -350,6 +364,40 @@ function SocialNavGlyph({ type }: { type: SocialTab }) {
   );
 }
 
+function StatusDetailGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.4 6.5h11.2v11H6.4z" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M9 9.2h6M9 12h6M9 14.8h4.1" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+function ModalCloseGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7.2 7.2 16.8 16.8M16.8 7.2 7.2 16.8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function SuccessCheckGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7.5 12.3 10.5 15.3 16.8 8.9" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function StatusInfoGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" fill="currentColor" />
+      <path d="M12 10.45v5.25M12 7.95h.01" fill="none" stroke="#ffffff" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 function normalizeSocialTab(value: string | null) {
   const normalized = String(value || '').trim().toLowerCase();
   if (normalized === 'sosmed') return 'sosmed' satisfies SocialTab;
@@ -396,7 +444,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const [activeCheckoutOrder, setActiveCheckoutOrder] = useState<SocialCheckoutState | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [accountOrderItems, setAccountOrderItems] = useState<HistoryItem[]>([]);
-  const [expandedStatusHistoryId, setExpandedStatusHistoryId] = useState<number | null>(null);
+  const [detailStatusOrder, setDetailStatusOrder] = useState<HistoryItem | null>(null);
+  const [detailProviderStatus, setDetailProviderStatus] = useState<ProviderStatusSnapshot | null>(null);
   const [monitoringFilterDraft, setMonitoringFilterDraft] = useState({
     limit: '25',
     status: 'Semua',
@@ -541,7 +590,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     const normalizedUsername = String(usernameOverride || accountProfile.username || '').trim();
     if (!normalizedUsername) {
       setAccountOrderItems([]);
-      setExpandedStatusHistoryId(null);
+      setDetailStatusOrder(null);
+      setDetailProviderStatus(null);
       return;
     }
 
@@ -704,7 +754,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       return;
     }
     setAccountOrderItems([]);
-    setExpandedStatusHistoryId(null);
+    setDetailStatusOrder(null);
+    setDetailProviderStatus(null);
   }, [accountProfile.loggedIn, accountProfile.username]);
 
   useEffect(() => {
@@ -738,6 +789,28 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   }, [activeTab]);
 
   useEffect(() => {
+    if (!detailStatusOrder) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setDetailStatusOrder(null);
+        setDetailProviderStatus(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [detailStatusOrder]);
+
+  useEffect(() => {
     if (!activeCheckoutOrder || activeCheckoutOrder.paymentMethod !== 'midtrans') {
       return;
     }
@@ -759,6 +832,51 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       window.clearInterval(intervalId);
     };
   }, [activeCheckoutOrder?.orderCode, activeCheckoutOrder?.paymentMethod, activeCheckoutOrder?.paymentStatus]);
+
+  const openStatusDetail = async (item: HistoryItem) => {
+    setDetailStatusOrder(item);
+    setDetailProviderStatus({
+      status: item.orderStatus || '-',
+      startCount: null,
+      remains: null,
+    });
+
+    const providerOrderId = String(item.providerOrderId || '').trim();
+    if (!providerOrderId) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/smm/status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: providerOrderId }),
+      });
+      const result = (await response.json()) as {
+        status?: boolean;
+        data?: {
+          status?: string;
+          start_count?: number;
+          remains?: number;
+          msg?: string;
+        };
+      };
+
+      if (!response.ok || !result.status || !result.data?.status) {
+        return;
+      }
+
+      setDetailProviderStatus({
+        status: String(result.data.status || item.orderStatus || '-'),
+        startCount: Number.isFinite(Number(result.data.start_count)) ? Number(result.data.start_count) : null,
+        remains: Number.isFinite(Number(result.data.remains)) ? Number(result.data.remains) : null,
+      });
+    } catch {
+      // keep local detail readable even if provider status fetch fails
+    }
+  };
 
   const registerAccount = () => {
     startProfileSubmit(async () => {
@@ -1496,6 +1614,9 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
                     {showPaidCheckoutResult ? (
                       <div className="smm-qris-detail-frame smm-qris-detail-frame--success">
+                        <span className="smm-qris-success-mark" aria-hidden="true">
+                          <SuccessCheckGlyph />
+                        </span>
                         <p>Order ID : {activeCheckoutProviderId || '-'}</p>
                         <p>Status bayar : {formatPaymentStatusLabel(activeCheckoutOrder.paymentStatus)}</p>
                         <p>Layanan : {activeCheckoutOrder.serviceName}</p>
@@ -1538,7 +1659,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
               <div className="apk-app-panel-head smm-panel-head">
                 <div>
                   <span className="apk-app-section-label">Monitoring Sosmed</span>
-                  <h3>Monitoring sosmed</h3>
                   <p className="smm-section-copy">Direkomendasikan untuk pantau monitoring sosmed terlebih dahulu, sebelum melakukan order untuk melihat layanan yang bagus dan lancar untuk saat ini, agar tidak ada kendala error atau proses lama saat pemesanan.</p>
                 </div>
               </div>
@@ -1618,13 +1738,13 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                     {filteredMonitoringItems.length ? (
                       filteredMonitoringItems.map((item) => (
                         <tr key={item.id}>
-                          <td>{formatDate(item.createdAt)}</td>
-                          <td>{item.category || '-'}</td>
-                          <td>{item.serviceId || '-'}</td>
-                          <td>{item.serviceName || '-'}</td>
-                          <td>{item.quantity == null ? '-' : item.quantity.toLocaleString('id-ID')}</td>
-                          <td>Rp {(item.totalPrice || item.unitPrice || 0).toLocaleString('id-ID')}</td>
-                          <td>
+                          <td className="smm-status-cell--nowrap">{formatDate(item.createdAt)}</td>
+                          <td><div className="smm-status-service-name">{item.category || '-'}</div></td>
+                          <td className="smm-status-cell--nowrap">{item.serviceId || '-'}</td>
+                          <td><div className="smm-status-service-name">{item.serviceName || '-'}</div></td>
+                          <td className="smm-status-cell--nowrap">{item.quantity == null ? '-' : item.quantity.toLocaleString('id-ID')}</td>
+                          <td className="smm-status-cell--nowrap">Rp {(item.totalPrice || item.unitPrice || 0).toLocaleString('id-ID')}</td>
+                          <td className="smm-status-cell--nowrap">
                             <span className={`smm-status-badge smm-status-badge--${mapStatusTone(item.orderStatus)}`}>{item.orderStatus || '-'}</span>
                           </td>
                         </tr>
@@ -1647,7 +1767,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
               <div className="apk-app-panel-head smm-panel-head">
                 <div>
                   <span className="apk-app-section-label">Status Order</span>
-                  <h3>Status order</h3>
                 </div>
                 <span className="apk-app-count-pill">
                   {pendingAccountOrderCount.toLocaleString('id-ID')} Pending
@@ -1744,51 +1863,32 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                       <tbody>
                         {filteredStatusOrders.length ? (
                           filteredStatusOrders.map((item) => {
-                            const expanded = expandedStatusHistoryId === item.id;
                             return (
-                              <Fragment key={item.id}>
-                                <tr>
-                                  <td>{item.providerOrderId || item.orderCode || '-'}</td>
-                                  <td>{formatDate(item.createdAt)}</td>
-                                  <td>{item.serviceName || '-'}</td>
-                                  <td>
-                                    <div className="smm-status-target">{item.targetData || '-'}</div>
-                                  </td>
-                                  <td>{item.quantity == null ? '-' : item.quantity.toLocaleString('id-ID')}</td>
-                                  <td>Rp {(item.totalPrice || item.unitPrice || 0).toLocaleString('id-ID')}</td>
-                                  <td>
-                                    <span className={`smm-status-badge smm-status-badge--${mapStatusTone(item.orderStatus)}`}>
-                                      {item.orderStatus || '-'}
-                                    </span>
-                                  </td>
-                                  <td>
-                                    <button
-                                      type="button"
-                                      className="smm-status-detail-button"
-                                      onClick={() => setExpandedStatusHistoryId(expanded ? null : item.id)}
-                                    >
-                                      Detail
-                                    </button>
-                                  </td>
-                                </tr>
-                                {expanded ? (
-                                  <tr>
-                                    <td colSpan={8}>
-                                      <div className="smm-status-detail-panel">
-                                        <p>Order ID : {item.providerOrderId || '-'}</p>
-                                        <p>Referensi : {item.orderCode || '-'}</p>
-                                        <p>Kategori : {item.category || '-'}</p>
-                                        <p>Service ID : {item.serviceId || '-'}</p>
-                                        <p>Metode bayar : {item.paymentMethod === 'balance' ? 'Saldo akun' : item.paymentMethod === 'midtrans' ? 'QRIS Midtrans' : '-'}</p>
-                                        <p>Status bayar : {formatPaymentStatusLabel(item.paymentStatus)}</p>
-                                        <p>Username : {item.username || '-'}</p>
-                                        <p>Komentar : {item.comments || '-'}</p>
-                                        <p>Update terakhir : {formatDate(item.updatedAt)}</p>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ) : null}
-                              </Fragment>
+                              <tr key={item.id}>
+                                <td className="smm-status-cell--nowrap">{item.providerOrderId || item.orderCode || '-'}</td>
+                                <td className="smm-status-cell--nowrap">{formatDate(item.createdAt)}</td>
+                                <td><div className="smm-status-service-name">{item.serviceName || '-'}</div></td>
+                                <td>
+                                  <div className="smm-status-target">{item.targetData || '-'}</div>
+                                </td>
+                                <td className="smm-status-cell--nowrap">{item.quantity == null ? '-' : item.quantity.toLocaleString('id-ID')}</td>
+                                <td className="smm-status-cell--nowrap">Rp {(item.totalPrice || item.unitPrice || 0).toLocaleString('id-ID')}</td>
+                                <td className="smm-status-cell--nowrap">
+                                  <span className={`smm-status-badge smm-status-badge--${mapStatusTone(item.orderStatus)}`}>
+                                    {item.orderStatus || '-'}
+                                  </span>
+                                </td>
+                                <td className="smm-status-cell--nowrap">
+                                  <button
+                                    type="button"
+                                    className="smm-status-detail-button"
+                                    onClick={() => void openStatusDetail(item)}
+                                    aria-label="Detail pesanan"
+                                  >
+                                    <StatusDetailGlyph />
+                                  </button>
+                                </td>
+                              </tr>
                             );
                           })
                         ) : (
@@ -1808,6 +1908,101 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                 </div>
               )}
             </section>
+          ) : null}
+
+          {detailStatusOrder ? (
+            <div
+              className="smm-detail-modal-backdrop"
+              onClick={() => {
+                setDetailStatusOrder(null);
+                setDetailProviderStatus(null);
+              }}
+            >
+              <div className="smm-detail-modal" onClick={(event) => event.stopPropagation()}>
+                <div className="smm-detail-modal-head">
+                  <strong>Detail Pesanan</strong>
+                  <button
+                    type="button"
+                    className="smm-detail-modal-close"
+                    onClick={() => {
+                      setDetailStatusOrder(null);
+                      setDetailProviderStatus(null);
+                    }}
+                    aria-label="Tutup detail pesanan"
+                  >
+                    <ModalCloseGlyph />
+                  </button>
+                </div>
+
+                <div className="smm-detail-modal-body">
+                  <table className="smm-detail-table">
+                    <tbody>
+                      <tr>
+                        <th>Order ID</th>
+                        <td>{detailStatusOrder.providerOrderId || detailStatusOrder.orderCode || '-'}</td>
+                      </tr>
+                      <tr>
+                        <th>Layanan</th>
+                        <td>{detailStatusOrder.serviceName || '-'}</td>
+                      </tr>
+                      <tr>
+                        <th>Target</th>
+                        <td>{detailStatusOrder.targetData || '-'}</td>
+                      </tr>
+                      <tr>
+                        <th>Jumlah</th>
+                        <td>{detailStatusOrder.quantity == null ? '-' : detailStatusOrder.quantity.toLocaleString('id-ID')}</td>
+                      </tr>
+                      <tr>
+                        <th>Start</th>
+                        <td>{detailProviderStatus?.startCount == null ? '-' : detailProviderStatus.startCount.toLocaleString('id-ID')}</td>
+                      </tr>
+                      <tr>
+                        <th>Remains</th>
+                        <td>{detailProviderStatus?.remains == null ? '-' : detailProviderStatus.remains.toLocaleString('id-ID')}</td>
+                      </tr>
+                      <tr>
+                        <th>Harga</th>
+                        <td>Rp {(detailStatusOrder.totalPrice || detailStatusOrder.unitPrice || 0).toLocaleString('id-ID')}</td>
+                      </tr>
+                      <tr>
+                        <th>Status</th>
+                        <td>
+                          <div className="smm-detail-status-row">
+                            <span className={`smm-status-badge smm-status-badge--${mapStatusTone(detailProviderStatus?.status || detailStatusOrder.orderStatus)}`}>
+                              {detailProviderStatus?.status || detailStatusOrder.orderStatus || '-'}
+                            </span>
+                            <span className="smm-detail-status-info" aria-hidden="true">
+                              <StatusInfoGlyph />
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th>Tanggal &amp; Waktu</th>
+                        <td>{formatDate(detailStatusOrder.createdAt)}</td>
+                      </tr>
+                      <tr>
+                        <th>Refund</th>
+                        <td>
+                          <span className={`smm-detail-flag ${detailStatusOrder.paymentStatus === 'refunded' ? 'smm-detail-flag--success' : 'smm-detail-flag--failed'}`}>
+                            {detailStatusOrder.paymentStatus === 'refunded' ? <SuccessCheckGlyph /> : <ModalCloseGlyph />}
+                          </span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th>Via API</th>
+                        <td>
+                          <span className="smm-detail-flag smm-detail-flag--success">
+                            <SuccessCheckGlyph />
+                          </span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           ) : null}
 
           {activeTab === 'provider' ? (
