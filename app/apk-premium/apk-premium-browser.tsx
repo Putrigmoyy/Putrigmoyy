@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useDeferredValue, useEffect, useState, useTransition } from 'react';
 import type { ApkPremiumProduct, ApkPremiumVariant } from '@/lib/apk-premium';
 import { formatRupiah } from '@/lib/apk-premium';
-import { STORE_ACCOUNT_MENU_SECTIONS, TopAccountMenu } from '@/app/components/top-account-menu';
+import { TopAccountMenu } from '@/app/components/top-account-menu';
 
 type Props = {
   products: ApkPremiumProduct[];
@@ -35,6 +35,7 @@ type HistoryEntry = {
 
 type DepositMethod = 'midtrans' | 'balance';
 type OrderPaymentMethod = 'midtrans' | 'balance';
+type AccountModalView = 'deposit' | 'riwayat' | 'profil';
 
 type CoreBundlePayload = {
   account?: {
@@ -182,6 +183,10 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
     username: '',
     password: '',
   });
+  const [profileEditDraft, setProfileEditDraft] = useState({
+    username: '',
+    password: '',
+  });
   const [depositFeedback, setDepositFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
     tone: 'idle',
     text: '',
@@ -195,6 +200,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
     text: 'Pilih aplikasi premium lalu lanjutkan order langsung dari menu apprem.',
   });
   const [activeQrisOrder, setActiveQrisOrder] = useState<AppremQrisState | null>(null);
+  const [accountModalView, setAccountModalView] = useState<AccountModalView | null>(null);
   const [isSubmittingOrder, startOrderSubmit] = useTransition();
   const [isSubmittingProfile, startProfileSubmit] = useTransition();
   const [isSubmittingDeposit, startDepositSubmit] = useTransition();
@@ -213,6 +219,19 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
     };
   }, []);
 
+  useEffect(() => {
+    if (!accountModalView) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [accountModalView]);
+
   const applyCoreBundle = (bundle: CoreBundlePayload) => {
     const account = bundle.account || {};
     const username = String(account.username || account.contact || '');
@@ -224,6 +243,10 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
       balance: Math.max(0, Number(account.balance || 0)),
     });
     setWalletLoginDraft({
+      username,
+      password: '',
+    });
+    setProfileEditDraft({
       username,
       password: '',
     });
@@ -318,6 +341,10 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
 
   useEffect(() => {
     const nextTab = normalizePremiumTab(requestedTab || null);
+    if (nextTab === 'deposit' || nextTab === 'riwayat' || nextTab === 'profil') {
+      setAccountModalView(nextTab);
+      return;
+    }
     if (nextTab && nextTab !== activeTab) {
       setActiveTab(nextTab);
     }
@@ -592,11 +619,76 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
     });
   };
 
+  const updateWalletProfile = () => {
+    startProfileSubmit(async () => {
+      if (!walletProfile.loggedIn || !walletProfile.username) {
+        setProfileFeedback({
+          tone: 'error',
+          text: 'Login akun dulu sebelum mengubah profil.',
+        });
+        return;
+      }
+
+      const nextUsername = profileEditDraft.username.trim().toLowerCase();
+      const nextPassword = profileEditDraft.password.trim();
+      if (!nextUsername && !nextPassword) {
+        setProfileFeedback({
+          tone: 'error',
+          text: 'Isi username baru atau password baru dulu.',
+        });
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/core/account/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            currentUsername: walletProfile.username,
+            newUsername: nextUsername,
+            newPassword: nextPassword,
+          }),
+        });
+        const result = (await response.json()) as CoreBundleResult;
+        if (!response.ok || !result.status || !result.data || !('account' in result.data)) {
+          setProfileFeedback({
+            tone: 'error',
+            text: result.data && 'msg' in result.data ? String(result.data.msg || 'Profil belum bisa diperbarui.') : 'Profil belum bisa diperbarui.',
+          });
+          return;
+        }
+
+        applyCoreBundle(result.data);
+        const savedUsername =
+          result.data.account?.username ||
+          result.data.account?.contact ||
+          nextUsername ||
+          walletProfile.username;
+        window.localStorage.setItem(APK_ACCOUNT_SESSION_KEY, String(savedUsername).trim().toLowerCase());
+        setProfileFeedback({
+          tone: 'success',
+          text: 'Profil akun berhasil diperbarui.',
+        });
+      } catch (error) {
+        setProfileFeedback({
+          tone: 'error',
+          text: error instanceof Error ? error.message : 'Profil belum bisa diperbarui.',
+        });
+      }
+    });
+  };
+
   const logoutWalletAccount = () => {
     window.localStorage.removeItem(APK_ACCOUNT_SESSION_KEY);
     setWalletProfile((current) => ({ ...current, loggedIn: false, username: '' }));
     setHistoryEntries([]);
     setWalletLoginDraft((current) => ({ ...current, username: '', password: '' }));
+    setProfileEditDraft({
+      username: '',
+      password: '',
+    });
     setProfileFeedback({
       tone: 'success',
       text: 'Kamu sudah logout dari akun ini.',
@@ -714,7 +806,6 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
           <TopAccountMenu
             displayName={walletProfile.loggedIn ? walletProfile.name : 'Profil'}
             balance={walletProfile.balance}
-            sections={STORE_ACCOUNT_MENU_SECTIONS}
           />
         </div>
         <div className="apk-app-content apk-app-content--tight">
@@ -1357,10 +1448,8 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
           </button>
           <button
             type="button"
-            className={activeTab === 'deposit' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
-            onClick={() => {
-              window.location.href = '/account-center?tab=deposit';
-            }}
+            className={accountModalView === 'deposit' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
+            onClick={() => setAccountModalView('deposit')}
           >
             <span className="apk-app-nav-icon">
               <NavGlyph type="deposit" />
@@ -1369,10 +1458,8 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
           </button>
           <button
             type="button"
-            className={activeTab === 'riwayat' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
-            onClick={() => {
-              window.location.href = '/account-center?tab=riwayat#deposit-history';
-            }}
+            className={accountModalView === 'riwayat' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
+            onClick={() => setAccountModalView('riwayat')}
           >
             <span className="apk-app-nav-icon">
               <NavGlyph type="riwayat" />
@@ -1381,10 +1468,8 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
           </button>
           <button
             type="button"
-            className={activeTab === 'profil' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
-            onClick={() => {
-              window.location.href = '/account-center?tab=profil#profile-account';
-            }}
+            className={accountModalView === 'profil' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
+            onClick={() => setAccountModalView('profil')}
           >
             <span className="apk-app-nav-icon">
               <NavGlyph type="profil" />
@@ -1392,6 +1477,276 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
             <span>Profil</span>
           </button>
         </nav>
+
+        {accountModalView ? (
+          <div className="smm-detail-modal-backdrop" onClick={() => setAccountModalView(null)}>
+            <div className="smm-detail-modal account-popup-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="smm-detail-modal-head">
+                <strong>
+                  {accountModalView === 'deposit'
+                    ? 'Deposit'
+                    : accountModalView === 'riwayat'
+                      ? 'Riwayat Deposit'
+                      : 'Profil'}
+                </strong>
+                <button
+                  type="button"
+                  className="smm-detail-modal-close"
+                  onClick={() => setAccountModalView(null)}
+                  aria-label="Tutup popup akun"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M7.2 7.2 16.8 16.8M16.8 7.2 7.2 16.8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="smm-detail-modal-body account-popup-modal__body">
+                {accountModalView === 'deposit' ? (
+                  <div className="account-popup-stack">
+                    <div className="account-popup-card">
+                      <span className="smm-profile-title">Status akun</span>
+                      <div className="smm-profile-lines">
+                        <p>Username : {walletProfile.username ? `@${walletProfile.username}` : '-'}</p>
+                        <p>Saldo : Rp {formatRupiah(walletProfile.balance)}</p>
+                      </div>
+                    </div>
+
+                    <div className="account-popup-card">
+                      <div className="apk-app-form-grid smm-profile-form-grid">
+                        <label className="apk-app-form-field">
+                          <span>Jumlah deposit</span>
+                          <input
+                            value={depositAmount}
+                            onChange={(event) => setDepositAmount(event.target.value.replace(/[^\d]/g, ''))}
+                            placeholder="Contoh : 50000"
+                            inputMode="numeric"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="apk-app-quick-grid">
+                        {quickDepositAmounts.map((amount) => (
+                          <button
+                            key={amount}
+                            type="button"
+                            className={normalizedDepositAmount === amount ? 'apk-app-quick-chip apk-app-quick-chip--active' : 'apk-app-quick-chip'}
+                            onClick={() => setDepositAmount(String(amount))}
+                          >
+                            Rp {formatRupiah(amount)}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="apk-app-method-grid">
+                        <button
+                          type="button"
+                          className={depositMethod === 'midtrans' ? 'apk-app-method-card apk-app-method-card--active' : 'apk-app-method-card'}
+                          onClick={() => setDepositMethod('midtrans')}
+                        >
+                          <strong>QRIS Otomatis</strong>
+                          <p>Isi saldo manual lewat Midtrans.</p>
+                        </button>
+                        <button
+                          type="button"
+                          className={
+                            depositMethod === 'balance'
+                              ? 'apk-app-method-card apk-app-method-card--active'
+                              : canUseBalance
+                                ? 'apk-app-method-card'
+                                : 'apk-app-method-card apk-app-method-card--disabled'
+                          }
+                          onClick={() => {
+                            if (canUseBalance) {
+                              setDepositMethod('balance');
+                            }
+                          }}
+                          disabled={!canUseBalance}
+                        >
+                          <strong>Pakai Saldo</strong>
+                          <p>{canUseBalance ? 'Saldo cukup untuk dipakai langsung.' : 'Saldo belum cukup untuk nominal ini.'}</p>
+                        </button>
+                      </div>
+
+                      {depositFeedback.text ? (
+                        <div className={`apk-app-feedback apk-app-feedback--${depositFeedback.tone}`}>
+                          {depositFeedback.text}
+                        </div>
+                      ) : null}
+
+                      <div className="apk-app-action-row apk-app-action-row--compact">
+                        <button
+                          type="button"
+                          className="apk-app-primary-button"
+                          onClick={submitDepositFlow}
+                          disabled={depositLocked || isSubmittingDeposit}
+                        >
+                          {isSubmittingDeposit ? 'Memproses...' : 'Deposit'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {accountModalView === 'riwayat' ? (
+                  <div className="account-popup-stack">
+                    {depositHistoryEntries.length ? (
+                      depositHistoryEntries.slice(0, 8).map((entry) => {
+                        const expanded = expandedHistoryId === entry.id;
+                        return (
+                          <article key={entry.id} className="account-popup-card account-popup-card--history">
+                            <div className="apk-app-history-head">
+                              <strong>{entry.title}</strong>
+                              <span className={`apk-app-history-status apk-app-history-status--${entry.status}`}>{entry.statusLabel}</span>
+                            </div>
+                            <div className="apk-app-history-meta">
+                              <span>Waktu : {entry.createdLabel}</span>
+                              <span>Nominal : {entry.amountLabel}</span>
+                              <span>Metode : {entry.methodLabel}</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="apk-app-ghost-button"
+                              onClick={() => setExpandedHistoryId(expanded ? null : entry.id)}
+                            >
+                              {expanded ? 'Tutup Detail' : 'Lihat Detail'}
+                            </button>
+                            {expanded ? (
+                              <div className="apk-app-history-detail">
+                                <p>{entry.detail}</p>
+                                <p>Referensi : {entry.reference}</p>
+                              </div>
+                            ) : null}
+                          </article>
+                        );
+                      })
+                    ) : (
+                      <div className="apk-app-empty">Belum ada riwayat deposit.</div>
+                    )}
+                  </div>
+                ) : null}
+
+                {accountModalView === 'profil' ? (
+                  <div className="account-popup-stack">
+                    <div className="account-popup-card">
+                      <span className="smm-profile-title">Status akun</span>
+                      <div className="smm-profile-lines">
+                        <p>Nama akun : {walletProfile.name || '-'}</p>
+                        <p>Username : {walletProfile.username ? `@${walletProfile.username}` : '-'}</p>
+                        <p>Saldo : Rp {formatRupiah(walletProfile.balance)}</p>
+                        <p>Status : {walletProfile.loggedIn ? 'Login' : walletProfile.registered ? 'Belum login' : 'Belum terdaftar'}</p>
+                      </div>
+                    </div>
+
+                    {walletProfile.loggedIn ? (
+                      <div className="account-popup-card">
+                        <div className="apk-app-form-grid smm-profile-form-grid">
+                          <label className="apk-app-form-field">
+                            <span>Username baru</span>
+                            <input
+                              value={profileEditDraft.username}
+                              onChange={(event) => setProfileEditDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
+                              placeholder="contoh: putrigmoyy"
+                            />
+                          </label>
+                          <label className="apk-app-form-field">
+                            <span>Password baru</span>
+                            <input
+                              type="password"
+                              value={profileEditDraft.password}
+                              onChange={(event) => setProfileEditDraft((current) => ({ ...current, password: event.target.value }))}
+                              placeholder="Minimal 6 karakter"
+                            />
+                          </label>
+                        </div>
+                        <div className="apk-app-action-row apk-app-action-row--compact">
+                          <button type="button" className="apk-app-primary-button" onClick={updateWalletProfile} disabled={isSubmittingProfile}>
+                            {isSubmittingProfile ? 'Memproses...' : 'Simpan Profil'}
+                          </button>
+                          <button type="button" className="apk-app-ghost-button" onClick={logoutWalletAccount}>
+                            Logout
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {!walletProfile.registered ? (
+                      <div className="account-popup-card">
+                        <div className="apk-app-form-grid smm-profile-form-grid">
+                          <label className="apk-app-form-field">
+                            <span>Nama akun</span>
+                            <input
+                              value={walletRegisterDraft.name}
+                              onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, name: event.target.value }))}
+                              placeholder="Nama lengkap"
+                            />
+                          </label>
+                          <label className="apk-app-form-field">
+                            <span>Username akun</span>
+                            <input
+                              value={walletRegisterDraft.username}
+                              onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
+                              placeholder="contoh: putrigmoyy"
+                            />
+                          </label>
+                          <label className="apk-app-form-field">
+                            <span>Password akun</span>
+                            <input
+                              type="password"
+                              value={walletRegisterDraft.password}
+                              onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, password: event.target.value }))}
+                              placeholder="Minimal 6 karakter"
+                            />
+                          </label>
+                        </div>
+                        <div className="apk-app-action-row apk-app-action-row--compact">
+                          <button type="button" className="apk-app-primary-button" onClick={registerWalletAccount} disabled={isSubmittingProfile}>
+                            {isSubmittingProfile ? 'Memproses...' : 'Daftar akun'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {walletProfile.registered && !walletProfile.loggedIn ? (
+                      <div className="account-popup-card">
+                        <div className="apk-app-form-grid smm-profile-form-grid">
+                          <label className="apk-app-form-field">
+                            <span>Username akun</span>
+                            <input
+                              value={walletLoginDraft.username}
+                              onChange={(event) => setWalletLoginDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
+                              placeholder="Masukkan username"
+                            />
+                          </label>
+                          <label className="apk-app-form-field">
+                            <span>Password akun</span>
+                            <input
+                              type="password"
+                              value={walletLoginDraft.password}
+                              onChange={(event) => setWalletLoginDraft((current) => ({ ...current, password: event.target.value }))}
+                              placeholder="Masukkan password"
+                            />
+                          </label>
+                        </div>
+                        <div className="apk-app-action-row apk-app-action-row--compact">
+                          <button type="button" className="apk-app-primary-button" onClick={loginWalletAccount} disabled={isSubmittingProfile}>
+                            {isSubmittingProfile ? 'Memproses...' : 'Login'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {profileFeedback.text ? (
+                      <div className={`apk-app-feedback apk-app-feedback--${profileFeedback.tone}`}>
+                        {profileFeedback.text}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

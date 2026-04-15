@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { formatRupiah } from '@/lib/apk-premium';
 import { ActionLoadingOverlay } from '@/app/components/action-loading-overlay';
-import { STORE_ACCOUNT_MENU_SECTIONS, TopAccountMenu } from '@/app/components/top-account-menu';
+import { TopAccountMenu } from '@/app/components/top-account-menu';
 
 type Props = {
   requestedTab?: string | null;
@@ -661,7 +661,6 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
           <TopAccountMenu
             displayName={accountProfile.loggedIn ? accountProfile.name : 'Profil'}
             balance={accountProfile.balance}
-            sections={STORE_ACCOUNT_MENU_SECTIONS}
           />
         </div>
 

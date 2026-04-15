@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import {
   siApplepodcasts,
@@ -27,8 +26,9 @@ import {
   siYoutube,
 } from 'simple-icons';
 import type { NormalizedPusatPanelProfile, NormalizedPusatPanelService } from '@/lib/pusatpanel';
+import { formatRupiah } from '@/lib/apk-premium';
 import { ActionLoadingOverlay } from '@/app/components/action-loading-overlay';
-import { STORE_ACCOUNT_MENU_SECTIONS, TopAccountMenu } from '@/app/components/top-account-menu';
+import { TopAccountMenu } from '@/app/components/top-account-menu';
 
 type Props = {
   profile: NormalizedPusatPanelProfile | null;
@@ -42,6 +42,23 @@ type Props = {
 };
 
 type SocialTab = 'sosmed' | 'riwayat' | 'status' | 'provider';
+type DepositMethod = 'midtrans' | 'balance';
+type AccountModalView = 'profil' | 'deposit' | 'riwayat';
+
+type WalletHistoryEntry = {
+  id: string;
+  kind: 'order' | 'deposit';
+  title: string;
+  subjectName: string;
+  amountLabel: string;
+  statusLabel: string;
+  status: 'pending' | 'success' | 'failed';
+  createdAt: string;
+  createdLabel: string;
+  detail: string;
+  methodLabel: string;
+  reference: string;
+};
 
 type CheckoutOrderResult = {
   status?: boolean;
@@ -59,11 +76,22 @@ type CoreBundlePayload = {
     contact?: string;
     balance?: number;
   };
+  history?: WalletHistoryEntry[];
 };
 
 type CoreBundleResult = {
   status?: boolean;
   data?: CoreBundlePayload | {
+    msg?: string;
+  };
+};
+
+type CoreDepositResult = {
+  status?: boolean;
+  data?: {
+    bundle?: CoreBundlePayload;
+    amount?: number;
+    method?: DepositMethod;
     msg?: string;
   };
 };
@@ -471,17 +499,53 @@ function StatusInfoGlyph() {
   );
 }
 
+function AccountPopupGlyph({ type }: { type: AccountModalView }) {
+  if (type === 'deposit') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 8h16v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
+        <path d="M4 10h16M8 6h8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+
+  if (type === 'riwayat') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 7v5l3 2" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+        <path d="M20 12a8 8 0 1 1-2.34-5.66" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+        <path d="M20 5v3h-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="9" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M6.5 18a5.5 5.5 0 0 1 11 0" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 function normalizeSocialTab(value: string | null) {
   const normalized = String(value || '').trim().toLowerCase();
   if (normalized === 'sosmed') return 'sosmed' satisfies SocialTab;
   if (normalized === 'riwayat') return 'riwayat' satisfies SocialTab;
   if (normalized === 'status') return 'status' satisfies SocialTab;
-  if (normalized === 'profil' || normalized === 'provider') return 'provider' satisfies SocialTab;
+  return null;
+}
+
+function normalizeAccountModalTab(value: string | null) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'profil' || normalized === 'provider') return 'profil' satisfies AccountModalView;
+  if (normalized === 'deposit') return 'deposit' satisfies AccountModalView;
+  if (normalized === 'riwayat-deposit' || normalized === 'deposit-history') return 'riwayat' satisfies AccountModalView;
   return null;
 }
 
 export function SocialMediaBrowser({ profile, providerMeta, services, categories, requestedTab }: Props) {
   const [activeTab, setActiveTab] = useState<SocialTab>('sosmed');
+  const quickDepositAmounts = [10000, 20000, 50000, 100000];
   const [accountProfile, setAccountProfile] = useState({
     registered: false,
     loggedIn: false,
@@ -489,6 +553,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     username: '',
     balance: 0,
   });
+  const [accountModalView, setAccountModalView] = useState<AccountModalView | null>(null);
   const [accountRegisterDraft, setAccountRegisterDraft] = useState({
     name: '',
     username: '',
@@ -497,6 +562,17 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const [accountLoginDraft, setAccountLoginDraft] = useState({
     username: '',
     password: '',
+  });
+  const [profileEditDraft, setProfileEditDraft] = useState({
+    username: '',
+    password: '',
+  });
+  const [walletHistoryEntries, setWalletHistoryEntries] = useState<WalletHistoryEntry[]>([]);
+  const [depositAmount, setDepositAmount] = useState('10000');
+  const [depositMethod, setDepositMethod] = useState<DepositMethod>('midtrans');
+  const [depositFeedback, setDepositFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
+    tone: 'idle',
+    text: '',
   });
   const [profileFeedback, setProfileFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
     tone: 'idle',
@@ -546,6 +622,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const [isRefreshingAccountOrders, startAccountOrdersRefresh] = useTransition();
   const [isRefreshingCheckoutStatus, startCheckoutStatusRefresh] = useTransition();
   const [isSubmittingProfile, startProfileSubmit] = useTransition();
+  const [isSubmittingDeposit, startDepositSubmit] = useTransition();
   const sortedHistoryItems = useMemo(
     () =>
       [...historyItems].sort(
@@ -603,6 +680,11 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       username,
       password: '',
     });
+    setProfileEditDraft({
+      username,
+      password: '',
+    });
+    setWalletHistoryEntries(Array.isArray(bundle.history) ? bundle.history : []);
   };
 
   const syncAccountBundle = async (username: string) => {
@@ -634,6 +716,19 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       document.body.style.overflowX = previousOverflowX;
     };
   }, []);
+
+  useEffect(() => {
+    if (!accountModalView) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [accountModalView]);
 
   const refreshHistory = () => {
     startHistoryRefresh(async () => {
@@ -797,6 +892,12 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   }, []);
 
   useEffect(() => {
+    const nextModal = normalizeAccountModalTab(requestedTab || null);
+    if (nextModal) {
+      setAccountModalView(nextModal);
+      return;
+    }
+
     const nextTab = normalizeSocialTab(requestedTab || null);
     if (nextTab && nextTab !== activeTab) {
       setActiveTab(nextTab);
@@ -1041,6 +1142,126 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     });
   };
 
+  const updateProfile = () => {
+    startProfileSubmit(async () => {
+      if (!accountProfile.loggedIn || !accountProfile.username) {
+        setProfileFeedback({
+          tone: 'error',
+          text: 'Login akun dulu sebelum mengubah profil.',
+        });
+        return;
+      }
+
+      const nextUsername = profileEditDraft.username.trim().toLowerCase();
+      const nextPassword = profileEditDraft.password.trim();
+      if (!nextUsername && !nextPassword) {
+        setProfileFeedback({
+          tone: 'error',
+          text: 'Isi username baru atau password baru dulu.',
+        });
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/core/account/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            currentUsername: accountProfile.username,
+            newUsername: nextUsername,
+            newPassword: nextPassword,
+          }),
+        });
+        const result = (await response.json()) as CoreBundleResult;
+        if (!response.ok || !result.status || !result.data || !('account' in result.data)) {
+          setProfileFeedback({
+            tone: 'error',
+            text: result.data && 'msg' in result.data ? String(result.data.msg || 'Profil belum bisa diperbarui.') : 'Profil belum bisa diperbarui.',
+          });
+          return;
+        }
+
+        applyCoreBundle(result.data);
+        const savedUsername =
+          result.data.account?.username ||
+          result.data.account?.contact ||
+          nextUsername ||
+          accountProfile.username;
+        window.localStorage.setItem(WEBSITE_ACCOUNT_SESSION_KEY, String(savedUsername).trim().toLowerCase());
+        setProfileFeedback({
+          tone: 'success',
+          text: 'Profil akun berhasil diperbarui.',
+        });
+      } catch (error) {
+        setProfileFeedback({
+          tone: 'error',
+          text: error instanceof Error ? error.message : 'Profil belum bisa diperbarui.',
+        });
+      }
+    });
+  };
+
+  const submitDepositFlow = () => {
+    startDepositSubmit(async () => {
+      if (depositLocked) {
+        setDepositFeedback({
+          tone: 'error',
+          text: 'Deposit terkunci. Login akun dulu dari popup Profil.',
+        });
+        return;
+      }
+
+      if (normalizedDepositAmount <= 0) {
+        setDepositFeedback({
+          tone: 'error',
+          text: 'Masukkan jumlah deposit dulu.',
+        });
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/core/deposit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            accountContact: accountProfile.username,
+            amount: normalizedDepositAmount,
+            method: depositMethod,
+          }),
+        });
+        const result = (await response.json()) as CoreDepositResult;
+        if (!response.ok || !result.status || !result.data?.bundle) {
+          setDepositFeedback({
+            tone: 'error',
+            text:
+              result.data && 'msg' in result.data
+                ? String(result.data.msg || 'Deposit belum berhasil diproses.')
+                : 'Deposit belum berhasil diproses.',
+          });
+          return;
+        }
+
+        applyCoreBundle(result.data.bundle);
+        setDepositFeedback({
+          tone: 'success',
+          text:
+            depositMethod === 'balance'
+              ? `Saldo akun berhasil dipakai sebesar Rp ${formatRupiah(normalizedDepositAmount)}.`
+              : `Permintaan deposit QRIS Midtrans sebesar Rp ${formatRupiah(normalizedDepositAmount)} sudah dicatat.`,
+        });
+      } catch (error) {
+        setDepositFeedback({
+          tone: 'error',
+          text: error instanceof Error ? error.message : 'Deposit belum berhasil diproses.',
+        });
+      }
+    });
+  };
+
   const logoutAccount = () => {
     window.localStorage.removeItem(WEBSITE_ACCOUNT_SESSION_KEY);
     setAccountProfile((current) => ({
@@ -1050,7 +1271,12 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       balance: 0,
     }));
     setAccountOrderItems([]);
+    setWalletHistoryEntries([]);
     setAccountLoginDraft({
+      username: '',
+      password: '',
+    });
+    setProfileEditDraft({
       username: '',
       password: '',
     });
@@ -1225,13 +1451,25 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     () => sortedAccountOrderItems.filter((item) => mapStatusTone(item.orderStatus) === 'pending').length,
     [sortedAccountOrderItems],
   );
+  const normalizedDepositAmount = Math.max(0, Number(depositAmount.replace(/[^\d]/g, '') || 0));
+  const depositLocked = !accountProfile.registered || !accountProfile.loggedIn;
+  const canUseBalance = !depositLocked && normalizedDepositAmount > 0 && accountProfile.balance >= normalizedDepositAmount;
+  const depositHistoryEntries = walletHistoryEntries.filter((entry) => entry.kind === 'deposit');
   const showPendingQris =
     activeCheckoutOrder?.paymentMethod === 'midtrans' && activeCheckoutOrder.paymentStatus === 'awaiting-payment';
   const showPaidCheckoutResult =
     activeCheckoutOrder?.paymentMethod === 'midtrans' && activeCheckoutOrder.paymentStatus === 'paid';
   const activeCheckoutProviderId = String(activeCheckoutOrder?.providerOrderId || '').trim();
   const isActionLoading =
-    isOrdering || isRefreshingHistory || isRefreshingAccountOrders || isRefreshingCheckoutStatus || isSubmittingProfile;
+    isOrdering || isRefreshingHistory || isRefreshingAccountOrders || isRefreshingCheckoutStatus || isSubmittingProfile || isSubmittingDeposit;
+
+  useEffect(() => {
+    if (depositLocked || !canUseBalance) {
+      if (depositMethod === 'balance') {
+        setDepositMethod('midtrans');
+      }
+    }
+  }, [canUseBalance, depositLocked, depositMethod]);
 
   const submitOrder = () => {
     if (!selectedService) {
@@ -1341,7 +1579,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
           <TopAccountMenu
             displayName={accountProfile.loggedIn ? accountProfile.name : 'Profil'}
             balance={accountProfile.balance}
-            sections={STORE_ACCOUNT_MENU_SECTIONS}
           />
         </div>
         <div className="apk-app-content apk-app-content--tight">
@@ -2079,58 +2316,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             </div>
           ) : null}
 
-          {activeTab === 'provider' ? (
-            <section className="apk-app-panel apk-app-panel--plain">
-              <div className="apk-app-panel-head">
-                <div>
-                  <span className="apk-app-section-label">Profil</span>
-                </div>
-              </div>
-
-              <article className="apk-app-form-card smm-profile-sheet">
-                <div id="profile-account" className="smm-profile-block">
-                  <span className="smm-profile-title">Status akun</span>
-                  <div className="smm-profile-lines">
-                    <p>Nama akun : {accountProfile.name || '-'}</p>
-                    <p>Username : {accountProfile.username ? `@${accountProfile.username}` : '-'}</p>
-                    <p>Saldo : Rp {accountProfile.balance.toLocaleString('id-ID')}</p>
-                    <p>Status : {accountProfile.loggedIn ? 'Login' : accountProfile.registered ? 'Belum login' : 'Belum terdaftar'}</p>
-                  </div>
-                </div>
-
-                <div className="smm-profile-block">
-                  <span className="smm-profile-title">Pusat akun</span>
-                  <div className="smm-profile-links">
-                    <Link href="/account-center?tab=profil#profile-edit">Profil</Link>
-                    <Link href="/account-center?tab=deposit">Deposit</Link>
-                    <Link href="/account-center?tab=riwayat#deposit-history">Riwayat Deposit</Link>
-                  </div>
-                </div>
-
-                {!accountProfile.loggedIn ? (
-                  <div className="apk-app-feedback apk-app-feedback--idle">
-                    Buka pusat akun untuk daftar, login, atau ubah username dan password akun website.
-                  </div>
-                ) : null}
-
-                <div className="smm-profile-block">
-                  <span className="smm-profile-title">Panduan mulai transaksi</span>
-                  <div className="smm-profile-lines">
-                    <p id="guide-deposit">Cara deposit : buka menu deposit, isi nominal, lalu selesaikan pembayaran sampai status berhasil.</p>
-                    <p id="guide-status">Informasi status order : status order akan otomatis diperbarui. Jika QRIS expired maka kamu perlu membuat order baru.</p>
-                    <p id="guide-order">Panduan cara pesanan : pilih platform, kategori, layanan, isi data pesanan, lalu lanjutkan pembayaran.</p>
-                    <p id="guide-contact">Kontak : gunakan kontak store atau admin aktif jika ada kendala transaksi.</p>
-                  </div>
-                </div>
-
-                {profileFeedback.text ? (
-                  <div className={`apk-app-feedback apk-app-feedback--${profileFeedback.tone}`}>
-                    {profileFeedback.text}
-                  </div>
-                ) : null}
-              </article>
-            </section>
-          ) : null}
         </div>
 
         <nav className="apk-app-bottom-nav">
@@ -2139,15 +2324,29 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             ['riwayat', 'Monitoring'],
             ['status', 'Status'],
             ['provider', 'Profil'],
-          ] as Array<[SocialTab, string]>).map(([tab, label]) => (
+          ] as Array<[SocialTab | 'provider', string]>).map(([tab, label]) => (
             <button
               key={tab}
               type="button"
-              className={activeTab === tab ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
-              onClick={() => setActiveTab(tab)}
+              className={
+                tab === 'provider'
+                  ? accountModalView
+                    ? 'apk-app-nav-item apk-app-nav-item--active'
+                    : 'apk-app-nav-item'
+                  : activeTab === tab
+                    ? 'apk-app-nav-item apk-app-nav-item--active'
+                    : 'apk-app-nav-item'
+              }
+              onClick={() => {
+                if (tab === 'provider') {
+                  setAccountModalView('profil');
+                  return;
+                }
+                setActiveTab(tab);
+              }}
             >
               <span className="apk-app-nav-icon">
-                <SocialNavGlyph type={tab} />
+                {tab === 'provider' ? <AccountPopupGlyph type="profil" /> : <SocialNavGlyph type={tab} />}
               </span>
               <span className="apk-app-nav-label">
                 {label}
@@ -2158,6 +2357,292 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             </button>
           ))}
         </nav>
+
+        {accountModalView ? (
+          <div className="smm-detail-modal-backdrop" onClick={() => setAccountModalView(null)}>
+            <div className="smm-detail-modal account-popup-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="smm-detail-modal-head">
+                <strong>
+                  {accountModalView === 'deposit'
+                    ? 'Deposit'
+                    : accountModalView === 'riwayat'
+                      ? 'Riwayat Deposit'
+                      : 'Profil'}
+                </strong>
+                <button
+                  type="button"
+                  className="smm-detail-modal-close"
+                  onClick={() => setAccountModalView(null)}
+                  aria-label="Tutup popup akun"
+                >
+                  <ModalCloseGlyph />
+                </button>
+              </div>
+
+              <div className="smm-detail-modal-body account-popup-modal__body">
+                <div className="account-popup-tabs">
+                  {([
+                    ['profil', 'Profil'],
+                    ['deposit', 'Deposit'],
+                    ['riwayat', 'Riwayat'],
+                  ] as Array<[AccountModalView, string]>).map(([view, label]) => (
+                    <button
+                      key={view}
+                      type="button"
+                      className={accountModalView === view ? 'account-popup-tab account-popup-tab--active' : 'account-popup-tab'}
+                      onClick={() => setAccountModalView(view)}
+                    >
+                      <span className="account-popup-tab__icon">
+                        <AccountPopupGlyph type={view} />
+                      </span>
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {accountModalView === 'profil' ? (
+                  <div className="account-popup-stack">
+                    <div className="account-popup-card">
+                      <span className="smm-profile-title">Status akun</span>
+                      <div className="smm-profile-lines">
+                        <p>Nama akun : {accountProfile.name || '-'}</p>
+                        <p>Username : {accountProfile.username ? `@${accountProfile.username}` : '-'}</p>
+                        <p>Saldo : Rp {formatRupiah(accountProfile.balance)}</p>
+                        <p>Status : {accountProfile.loggedIn ? 'Login' : accountProfile.registered ? 'Belum login' : 'Belum terdaftar'}</p>
+                      </div>
+                    </div>
+
+                    {accountProfile.loggedIn ? (
+                      <div className="account-popup-card">
+                        <span className="smm-profile-title">Profil</span>
+                        <div className="apk-app-form-grid smm-profile-form-grid">
+                          <label className="apk-app-form-field">
+                            <span>Username baru</span>
+                            <input
+                              value={profileEditDraft.username}
+                              onChange={(event) => setProfileEditDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
+                              placeholder="contoh: putrigmoyy"
+                            />
+                          </label>
+                          <label className="apk-app-form-field">
+                            <span>Password baru</span>
+                            <input
+                              type="password"
+                              value={profileEditDraft.password}
+                              onChange={(event) => setProfileEditDraft((current) => ({ ...current, password: event.target.value }))}
+                              placeholder="Minimal 6 karakter"
+                            />
+                          </label>
+                        </div>
+                        <div className="apk-app-action-row apk-app-action-row--compact">
+                          <button type="button" className="apk-app-primary-button" onClick={updateProfile} disabled={isSubmittingProfile}>
+                            {isSubmittingProfile ? 'Memproses...' : 'Simpan Profil'}
+                          </button>
+                          <button type="button" className="apk-app-ghost-button" onClick={() => setAccountModalView('deposit')}>
+                            Deposit
+                          </button>
+                          <button type="button" className="apk-app-ghost-button" onClick={() => setAccountModalView('riwayat')}>
+                            Riwayat Deposit
+                          </button>
+                          <button type="button" className="apk-app-ghost-button" onClick={logoutAccount}>
+                            Logout
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {!accountProfile.registered ? (
+                      <div className="account-popup-card">
+                        <span className="smm-profile-title">Profil</span>
+                        <div className="apk-app-form-grid smm-profile-form-grid">
+                          <label className="apk-app-form-field">
+                            <span>Nama akun</span>
+                            <input
+                              value={accountRegisterDraft.name}
+                              onChange={(event) => setAccountRegisterDraft((current) => ({ ...current, name: event.target.value }))}
+                              placeholder="Nama lengkap"
+                            />
+                          </label>
+                          <label className="apk-app-form-field">
+                            <span>Username akun</span>
+                            <input
+                              value={accountRegisterDraft.username}
+                              onChange={(event) => setAccountRegisterDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
+                              placeholder="contoh: putrigmoyy"
+                            />
+                          </label>
+                          <label className="apk-app-form-field">
+                            <span>Password akun</span>
+                            <input
+                              type="password"
+                              value={accountRegisterDraft.password}
+                              onChange={(event) => setAccountRegisterDraft((current) => ({ ...current, password: event.target.value }))}
+                              placeholder="Minimal 6 karakter"
+                            />
+                          </label>
+                        </div>
+                        <div className="apk-app-action-row apk-app-action-row--compact">
+                          <button type="button" className="apk-app-primary-button" onClick={registerAccount} disabled={isSubmittingProfile}>
+                            {isSubmittingProfile ? 'Memproses...' : 'Daftar akun'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {accountProfile.registered && !accountProfile.loggedIn ? (
+                      <div className="account-popup-card">
+                        <span className="smm-profile-title">Profil</span>
+                        <div className="apk-app-form-grid smm-profile-form-grid">
+                          <label className="apk-app-form-field">
+                            <span>Username akun</span>
+                            <input
+                              value={accountLoginDraft.username}
+                              onChange={(event) => setAccountLoginDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
+                              placeholder="Masukkan username"
+                            />
+                          </label>
+                          <label className="apk-app-form-field">
+                            <span>Password akun</span>
+                            <input
+                              type="password"
+                              value={accountLoginDraft.password}
+                              onChange={(event) => setAccountLoginDraft((current) => ({ ...current, password: event.target.value }))}
+                              placeholder="Masukkan password"
+                            />
+                          </label>
+                        </div>
+                        <div className="apk-app-action-row apk-app-action-row--compact">
+                          <button type="button" className="apk-app-primary-button" onClick={loginAccount} disabled={isSubmittingProfile}>
+                            {isSubmittingProfile ? 'Memproses...' : 'Login'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {profileFeedback.text ? (
+                      <div className={`apk-app-feedback apk-app-feedback--${profileFeedback.tone}`}>
+                        {profileFeedback.text}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {accountModalView === 'deposit' ? (
+                  <div className="account-popup-stack">
+                    <div className="account-popup-card">
+                      <span className="smm-profile-title">Status akun</span>
+                      <div className="smm-profile-lines">
+                        <p>Username : {accountProfile.username ? `@${accountProfile.username}` : '-'}</p>
+                        <p>Saldo : Rp {formatRupiah(accountProfile.balance)}</p>
+                      </div>
+                    </div>
+
+                    <div className="account-popup-card">
+                      <span className="smm-profile-title">Deposit</span>
+                      <div className="apk-app-form-grid smm-profile-form-grid">
+                        <label className="apk-app-form-field">
+                          <span>Jumlah deposit</span>
+                          <input
+                            value={depositAmount}
+                            onChange={(event) => setDepositAmount(event.target.value.replace(/[^\d]/g, ''))}
+                            placeholder="Contoh : 50000"
+                            inputMode="numeric"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="apk-app-quick-grid">
+                        {quickDepositAmounts.map((amount) => (
+                          <button
+                            key={amount}
+                            type="button"
+                            className={normalizedDepositAmount === amount ? 'apk-app-quick-chip apk-app-quick-chip--active' : 'apk-app-quick-chip'}
+                            onClick={() => setDepositAmount(String(amount))}
+                          >
+                            Rp {formatRupiah(amount)}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="apk-app-method-grid">
+                        <button
+                          type="button"
+                          className={depositMethod === 'midtrans' ? 'apk-app-method-card apk-app-method-card--active' : 'apk-app-method-card'}
+                          onClick={() => setDepositMethod('midtrans')}
+                        >
+                          <strong>QRIS Otomatis</strong>
+                          <p>Isi saldo manual lewat Midtrans.</p>
+                        </button>
+                        <button
+                          type="button"
+                          className={
+                            depositMethod === 'balance'
+                              ? 'apk-app-method-card apk-app-method-card--active'
+                              : canUseBalance
+                                ? 'apk-app-method-card'
+                                : 'apk-app-method-card apk-app-method-card--disabled'
+                          }
+                          onClick={() => {
+                            if (canUseBalance) {
+                              setDepositMethod('balance');
+                            }
+                          }}
+                          disabled={!canUseBalance}
+                        >
+                          <strong>Pakai Saldo</strong>
+                          <p>{canUseBalance ? 'Saldo cukup untuk dipakai langsung.' : 'Saldo belum cukup untuk nominal ini.'}</p>
+                        </button>
+                      </div>
+
+                      {depositFeedback.text ? (
+                        <div className={`apk-app-feedback apk-app-feedback--${depositFeedback.tone}`}>
+                          {depositFeedback.text}
+                        </div>
+                      ) : null}
+
+                      <div className="apk-app-action-row apk-app-action-row--compact">
+                        <button
+                          type="button"
+                          className="apk-app-primary-button"
+                          onClick={submitDepositFlow}
+                          disabled={depositLocked || isSubmittingDeposit}
+                        >
+                          {isSubmittingDeposit ? 'Memproses...' : 'Deposit'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {accountModalView === 'riwayat' ? (
+                  <div className="account-popup-stack">
+                    {depositHistoryEntries.length ? (
+                      depositHistoryEntries.slice(0, 8).map((entry) => (
+                        <article key={entry.id} className="account-popup-card account-popup-card--history">
+                          <div className="apk-app-history-head">
+                            <strong>{entry.title}</strong>
+                            <span className={`apk-app-history-status apk-app-history-status--${entry.status}`}>{entry.statusLabel}</span>
+                          </div>
+                          <div className="apk-app-history-meta">
+                            <span>Waktu : {entry.createdLabel}</span>
+                            <span>Nominal : {entry.amountLabel}</span>
+                            <span>Metode : {entry.methodLabel}</span>
+                          </div>
+                          <div className="apk-app-history-detail">
+                            <p>{entry.detail}</p>
+                            <p>Referensi : {entry.reference}</p>
+                          </div>
+                        </article>
+                      ))
+                    ) : (
+                      <div className="apk-app-empty">Belum ada riwayat deposit.</div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

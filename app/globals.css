@@ -1775,6 +1775,82 @@ a {
   margin-top: 0;
 }
 
+.account-popup-modal {
+  border-radius: 28px;
+}
+
+.account-popup-modal__body {
+  display: grid;
+  gap: 14px;
+}
+
+.account-popup-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.account-popup-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 16px;
+  background: #ffffff;
+  color: #111111;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.account-popup-tab:active {
+  transform: scale(0.985);
+}
+
+.account-popup-tab--active {
+  border-color: rgba(210, 9, 209, 0.22);
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.08), rgba(210, 9, 209, 0.08));
+  box-shadow: 0 10px 20px rgba(23, 153, 242, 0.08);
+}
+
+.account-popup-tab__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.account-popup-tab__icon svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.account-popup-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.account-popup-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.04), rgba(210, 9, 209, 0.04));
+}
+
+.account-popup-card--history {
+  background: #ffffff;
+}
+
 .account-center-block--plain {
   gap: 14px;
 }
