@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { formatRupiah } from '@/lib/apk-premium';
-import type { AdminApkVariantRow, AdminCoreWalletUser, AdminPortalSnapshot } from '@/lib/admin-portal-types';
+import type { AdminApkProductRow, AdminApkVariantRow, AdminPortalSnapshot } from '@/lib/admin-portal-types';
 import { ActionLoadingOverlay } from '@/app/components/action-loading-overlay';
 import { FloatingNotice } from '@/app/components/floating-notice';
 
@@ -66,6 +66,24 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     stockDelta: '0',
     badge: initialSnapshot.apkVariants[0]?.badge || '',
   });
+  const [newProductForm, setNewProductForm] = useState({
+    title: '',
+    subtitle: '',
+    category: 'App Premium',
+    imageUrl: '',
+  });
+  const [newVariantForm, setNewVariantForm] = useState({
+    productId: initialSnapshot.apkProducts[0]?.productId || '',
+    variantTitle: '',
+    duration: '',
+    price: '',
+    badge: '',
+  });
+  const [accountStockForm, setAccountStockForm] = useState({
+    variantId: initialSnapshot.apkVariants[0]?.variantId || '',
+    accountBatch: '',
+    adminNote: '',
+  });
 
   useEffect(() => {
     if (!notice?.text) {
@@ -119,6 +137,14 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     () => snapshot.apkVariants.find((variant) => variant.variantId === selectedVariantId) || filteredVariants[0] || null,
     [filteredVariants, selectedVariantId, snapshot.apkVariants],
   );
+  const selectedProduct = useMemo<AdminApkProductRow | null>(
+    () => snapshot.apkProducts.find((product) => product.productId === newVariantForm.productId) || snapshot.apkProducts[0] || null,
+    [newVariantForm.productId, snapshot.apkProducts],
+  );
+  const selectedAccountVariant = useMemo<AdminApkVariantRow | null>(
+    () => snapshot.apkVariants.find((variant) => variant.variantId === accountStockForm.variantId) || snapshot.apkVariants[0] || null,
+    [accountStockForm.variantId, snapshot.apkVariants],
+  );
 
   useEffect(() => {
     if (!selectedVariant) {
@@ -133,6 +159,30 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
       badge: selectedVariant.badge,
     });
   }, [selectedVariant]);
+
+  useEffect(() => {
+    if (!snapshot.apkProducts.length) {
+      return;
+    }
+    setNewVariantForm((current) => ({
+      ...current,
+      productId: snapshot.apkProducts.some((product) => product.productId === current.productId)
+        ? current.productId
+        : snapshot.apkProducts[0]?.productId || '',
+    }));
+  }, [snapshot.apkProducts]);
+
+  useEffect(() => {
+    if (!snapshot.apkVariants.length) {
+      return;
+    }
+    setAccountStockForm((current) => ({
+      ...current,
+      variantId: snapshot.apkVariants.some((variant) => variant.variantId === current.variantId)
+        ? current.variantId
+        : snapshot.apkVariants[0]?.variantId || '',
+    }));
+  }, [snapshot.apkVariants]);
 
   async function fetchSnapshot() {
     const response = await fetch('/api/admin/portal', {
@@ -204,6 +254,10 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
             <strong>{snapshot.summary.totalUsers.toLocaleString('id-ID')}</strong>
           </article>
           <article className="admin-portal-summary-card">
+            <span>Total produk premium</span>
+            <strong>{snapshot.summary.totalProducts.toLocaleString('id-ID')}</strong>
+          </article>
+          <article className="admin-portal-summary-card">
             <span>Total varian App Premium</span>
             <strong>{snapshot.summary.totalVariants.toLocaleString('id-ID')}</strong>
           </article>
@@ -217,7 +271,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
           {([
             ['smm', 'Harga Sosmed'],
             ['users', 'Kelola User'],
-            ['apk', 'Restock Apprem'],
+            ['apk', 'Kelola Apprem'],
           ] as Array<[AdminTab, string]>).map(([tab, label]) => (
             <button
               key={tab}
@@ -460,9 +514,302 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
             <section className="apk-app-panel">
               <div className="apk-app-panel-head">
                 <div>
-                  <span className="apk-app-section-label">Restock App Premium</span>
-                  <h3>Tambah stok, ubah harga, dan perbarui detail varian langsung dari portal admin.</h3>
+                  <span className="apk-app-section-label">Kelola App Premium</span>
+                  <h3>Tambah produk, tambah varian, isi data akun, dan atur stok premium dari satu portal.</h3>
                 </div>
+              </div>
+
+              <div className="admin-portal-grid">
+                <article className="account-popup-card">
+                  <span className="smm-profile-title">Tambah produk</span>
+                  <div className="apk-app-form-grid smm-profile-form-grid">
+                    <label className="apk-app-form-field">
+                      <span>Nama produk</span>
+                      <input
+                        value={newProductForm.title}
+                        onChange={(event) => setNewProductForm((current) => ({ ...current, title: event.target.value }))}
+                        placeholder="Contoh: Canva Pro"
+                      />
+                    </label>
+                    <label className="apk-app-form-field">
+                      <span>Subtitle</span>
+                      <input
+                        value={newProductForm.subtitle}
+                        onChange={(event) => setNewProductForm((current) => ({ ...current, subtitle: event.target.value }))}
+                        placeholder="Deskripsi singkat produk"
+                      />
+                    </label>
+                    <label className="apk-app-form-field">
+                      <span>Kategori</span>
+                      <input
+                        value={newProductForm.category}
+                        onChange={(event) => setNewProductForm((current) => ({ ...current, category: event.target.value }))}
+                        placeholder="Streaming / Editing / AI"
+                      />
+                    </label>
+                    <label className="apk-app-form-field">
+                      <span>Logo resmi / URL gambar</span>
+                      <input
+                        value={newProductForm.imageUrl}
+                        onChange={(event) => setNewProductForm((current) => ({ ...current, imageUrl: event.target.value }))}
+                        placeholder="https://... atau /premium-icons/..."
+                      />
+                    </label>
+                  </div>
+                  <div className="apk-app-action-row apk-app-action-row--compact">
+                    <button
+                      type="button"
+                      className="apk-app-primary-button"
+                      onClick={() =>
+                        runAction(async () => {
+                          const response = await fetch('/api/admin/portal', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'x-admin-secret': secret,
+                            },
+                            body: JSON.stringify({
+                              action: 'create-apk-product',
+                              title: newProductForm.title,
+                              subtitle: newProductForm.subtitle,
+                              category: newProductForm.category,
+                              imageUrl: newProductForm.imageUrl,
+                            }),
+                          });
+                          const result = (await response.json()) as {
+                            status?: boolean;
+                            data?: {
+                              msg?: string;
+                              product?: AdminApkProductRow | null;
+                              snapshot?: AdminPortalSnapshot;
+                            };
+                          };
+                          if (!response.ok || !result.status || !result.data?.snapshot) {
+                            throw new Error(result.data?.msg || 'Produk baru belum bisa ditambahkan.');
+                          }
+                          const nextSnapshot = result.data.snapshot;
+                          const createdProductId = result.data.product?.productId || '';
+                          setSnapshot(nextSnapshot);
+                          if (createdProductId) {
+                            setNewVariantForm((current) => ({ ...current, productId: createdProductId || current.productId }));
+                          }
+                          setNewProductForm({
+                            title: '',
+                            subtitle: '',
+                            category: 'App Premium',
+                            imageUrl: '',
+                          });
+                          setNotice({
+                            tone: 'success',
+                            text: result.data.msg || 'Produk App Premium berhasil ditambahkan.',
+                          });
+                        })
+                      }
+                    >
+                      Simpan Produk
+                    </button>
+                  </div>
+                </article>
+
+                <article className="account-popup-card">
+                  <span className="smm-profile-title">Tambah varian</span>
+                  <div className="apk-app-form-grid smm-profile-form-grid">
+                    <label className="apk-app-form-field">
+                      <span>Pilih produk</span>
+                      <select
+                        value={newVariantForm.productId}
+                        onChange={(event) => setNewVariantForm((current) => ({ ...current, productId: event.target.value }))}
+                        className="smm-select"
+                      >
+                        {snapshot.apkProducts.map((product) => (
+                          <option key={product.productId} value={product.productId}>
+                            {product.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="apk-app-form-field">
+                      <span>Nama varian</span>
+                      <input
+                        value={newVariantForm.variantTitle}
+                        onChange={(event) => setNewVariantForm((current) => ({ ...current, variantTitle: event.target.value }))}
+                        placeholder="Contoh: Member 1 Bulan"
+                      />
+                    </label>
+                    <label className="apk-app-form-field">
+                      <span>Durasi</span>
+                      <input
+                        value={newVariantForm.duration}
+                        onChange={(event) => setNewVariantForm((current) => ({ ...current, duration: event.target.value }))}
+                        placeholder="1 Bulan / 1 Tahun"
+                      />
+                    </label>
+                    <label className="apk-app-form-field">
+                      <span>Harga</span>
+                      <input
+                        value={newVariantForm.price}
+                        onChange={(event) => setNewVariantForm((current) => ({ ...current, price: event.target.value.replace(/[^\d]/g, '') }))}
+                        inputMode="numeric"
+                        placeholder="Harga jual"
+                      />
+                    </label>
+                    <label className="apk-app-form-field">
+                      <span>Badge</span>
+                      <input
+                        value={newVariantForm.badge}
+                        onChange={(event) => setNewVariantForm((current) => ({ ...current, badge: event.target.value }))}
+                        placeholder="BEST / HOT / LIMITED"
+                      />
+                    </label>
+                  </div>
+                  <div className="smm-profile-lines">
+                    <p>Produk aktif : {selectedProduct?.title || '-'}</p>
+                    <p>Jumlah varian saat ini : {snapshot.apkVariants.filter((variant) => variant.productId === newVariantForm.productId).length.toLocaleString('id-ID')}</p>
+                  </div>
+                  <div className="apk-app-action-row apk-app-action-row--compact">
+                    <button
+                      type="button"
+                      className="apk-app-primary-button"
+                      onClick={() =>
+                        runAction(async () => {
+                          const response = await fetch('/api/admin/portal', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'x-admin-secret': secret,
+                            },
+                            body: JSON.stringify({
+                              action: 'create-apk-variant',
+                              productId: newVariantForm.productId,
+                              variantTitle: newVariantForm.variantTitle,
+                              duration: newVariantForm.duration,
+                              price: Number(newVariantForm.price || 0),
+                              badge: newVariantForm.badge,
+                            }),
+                          });
+                          const result = (await response.json()) as {
+                            status?: boolean;
+                            data?: {
+                              msg?: string;
+                              variant?: AdminApkVariantRow | null;
+                              snapshot?: AdminPortalSnapshot;
+                            };
+                          };
+                          if (!response.ok || !result.status || !result.data?.snapshot) {
+                            throw new Error(result.data?.msg || 'Varian baru belum bisa ditambahkan.');
+                          }
+                          const nextSnapshot = result.data.snapshot;
+                          const createdVariantId = result.data.variant?.variantId || '';
+                          setSnapshot(nextSnapshot);
+                          if (createdVariantId) {
+                            setSelectedVariantId(createdVariantId);
+                            setAccountStockForm((current) => ({ ...current, variantId: createdVariantId || current.variantId }));
+                          }
+                          setNewVariantForm((current) => ({
+                            ...current,
+                            variantTitle: '',
+                            duration: '',
+                            price: '',
+                            badge: '',
+                          }));
+                          setNotice({
+                            tone: 'success',
+                            text: result.data.msg || 'Varian App Premium berhasil ditambahkan.',
+                          });
+                        })
+                      }
+                    >
+                      Simpan Varian
+                    </button>
+                  </div>
+                </article>
+
+                <article className="account-popup-card">
+                  <span className="smm-profile-title">Tambah data akun</span>
+                  <div className="apk-app-form-grid smm-profile-form-grid">
+                    <label className="apk-app-form-field">
+                      <span>Pilih varian</span>
+                      <select
+                        value={accountStockForm.variantId}
+                        onChange={(event) => setAccountStockForm((current) => ({ ...current, variantId: event.target.value }))}
+                        className="smm-select"
+                      >
+                        {snapshot.apkVariants.map((variant) => (
+                          <option key={variant.variantId} value={variant.variantId}>
+                            {variant.productTitle} - {variant.variantTitle}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="apk-app-form-field">
+                      <span>Catatan admin stok</span>
+                      <input
+                        value={accountStockForm.adminNote}
+                        onChange={(event) => setAccountStockForm((current) => ({ ...current, adminNote: event.target.value }))}
+                        placeholder="Catatan khusus stok akun ini"
+                      />
+                    </label>
+                    <label className="apk-app-form-field apk-app-form-field--full">
+                      <span>Data akun</span>
+                      <textarea
+                        value={accountStockForm.accountBatch}
+                        onChange={(event) => setAccountStockForm((current) => ({ ...current, accountBatch: event.target.value }))}
+                        rows={6}
+                        placeholder="Satu akun per baris"
+                      />
+                    </label>
+                  </div>
+                  <div className="smm-profile-lines">
+                    <p>Varian aktif : {selectedAccountVariant?.variantTitle || '-'}</p>
+                    <p>Akun siap kirim : {selectedAccountVariant?.availableAccountCount.toLocaleString('id-ID') || '0'}</p>
+                    <p>Stok website : {selectedAccountVariant?.stock.toLocaleString('id-ID') || '0'}</p>
+                  </div>
+                  <div className="apk-app-action-row apk-app-action-row--compact">
+                    <button
+                      type="button"
+                      className="apk-app-primary-button"
+                      onClick={() =>
+                        runAction(async () => {
+                          const response = await fetch('/api/admin/portal', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'x-admin-secret': secret,
+                            },
+                            body: JSON.stringify({
+                              action: 'add-apk-account-data',
+                              variantId: accountStockForm.variantId,
+                              adminNote: accountStockForm.adminNote,
+                              accountBatch: accountStockForm.accountBatch,
+                            }),
+                          });
+                          const result = (await response.json()) as {
+                            status?: boolean;
+                            data?: {
+                              msg?: string;
+                              snapshot?: AdminPortalSnapshot;
+                            };
+                          };
+                          if (!response.ok || !result.status || !result.data?.snapshot) {
+                            throw new Error(result.data?.msg || 'Data akun belum bisa ditambahkan.');
+                          }
+                          setSnapshot(result.data.snapshot);
+                          setAccountStockForm((current) => ({
+                            ...current,
+                            accountBatch: '',
+                            adminNote: '',
+                          }));
+                          setNotice({
+                            tone: 'success',
+                            text: result.data.msg || 'Data akun berhasil ditambahkan ke stok premium.',
+                          });
+                        })
+                      }
+                    >
+                      Simpan Data Akun
+                    </button>
+                  </div>
+                </article>
               </div>
 
               <div className="admin-portal-split">
@@ -504,6 +851,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                         <p>Produk : {selectedVariant.productTitle}</p>
                         <p>Kategori : {selectedVariant.category}</p>
                         <p>Stok sekarang : {selectedVariant.stock.toLocaleString('id-ID')}</p>
+                        <p>Akun siap kirim : {selectedVariant.availableAccountCount.toLocaleString('id-ID')}</p>
                         <p>Update terakhir : {formatDateLabel(selectedVariant.productUpdatedAt)}</p>
                       </div>
 

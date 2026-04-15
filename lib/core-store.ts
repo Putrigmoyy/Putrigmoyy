@@ -647,8 +647,8 @@ export async function submitCoreDeposit(input: {
     amount,
     statusLabel: 'Menunggu pembayaran',
     status: 'pending',
-    detail: `Metode: QRIS Midtrans\nUsername: ${accountContact}\nNominal: Rp ${formatRupiah(amount)}`,
-    methodLabel: 'QRIS Midtrans',
+    detail: `Metode: QRIS\nUsername: ${accountContact}\nNominal: Rp ${formatRupiah(amount)}`,
+    methodLabel: 'QRIS',
     reference,
   });
 
@@ -1012,7 +1012,7 @@ export async function getCoreDepositStatus(reference: string) {
         reference: normalizedReference,
         statusLabel: 'Berhasil',
         status: 'success',
-        detailAppend: 'Pembayaran QRIS Midtrans berhasil dikonfirmasi dan saldo akun bertambah.',
+        detailAppend: 'Pembayaran QRIS berhasil dikonfirmasi dan saldo akun bertambah.',
       });
     } else if (normalizedStatus === 'expire' || normalizedStatus === 'cancel' || normalizedStatus === 'deny' || normalizedStatus === 'failed') {
       await updateCoreDepositHistoryStatusByReference({

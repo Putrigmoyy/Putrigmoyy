@@ -23,16 +23,43 @@ export type AdminApkVariantRow = {
   duration: string;
   price: number;
   stock: number;
+  availableAccountCount: number;
   badge: string;
   productUpdatedAt: string;
+};
+
+export type AdminApkProductRow = {
+  productId: string;
+  title: string;
+  subtitle: string;
+  category: string;
+  delivery: string;
+  note: string;
+  guarantee: string;
+  imageUrl: string;
+  stock: number;
+  sold: number;
+  accent: 'cyan' | 'amber' | 'emerald' | 'violet';
+};
+
+export type AdminApkAccountRow = {
+  id: number;
+  variantId: string;
+  accountData: string;
+  adminNote: string;
+  deliveryStatus: 'available' | 'delivered';
+  assignedOrderCode: string;
+  createdAt: string;
 };
 
 export type AdminPortalSnapshot = {
   smmPricing: AdminSmmPricingSettings;
   users: AdminCoreWalletUser[];
+  apkProducts: AdminApkProductRow[];
   apkVariants: AdminApkVariantRow[];
   summary: {
     totalUsers: number;
+    totalProducts: number;
     totalVariants: number;
     totalPremiumStock: number;
   };

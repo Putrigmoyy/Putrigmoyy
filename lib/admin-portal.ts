@@ -1,8 +1,15 @@
 import 'server-only';
 
 import { timingSafeEqual } from 'node:crypto';
-import type { AdminApkVariantRow, AdminCoreWalletUser, AdminPortalSnapshot } from '@/lib/admin-portal-types';
-import { adminUpdateApkVariant, listAdminApkVariants } from '@/lib/apk-premium-admin';
+import type { AdminPortalSnapshot } from '@/lib/admin-portal-types';
+import {
+  addAdminApkVariantAccounts,
+  adminUpdateApkVariant,
+  createAdminApkProduct,
+  createAdminApkVariant,
+  listAdminApkProducts,
+  listAdminApkVariants,
+} from '@/lib/apk-premium-admin';
 import { adminUpdateCoreWalletUser, listAdminCoreWalletUsers } from '@/lib/core-store';
 import { getSmmPricingSettings, updateSmmPricingSettings } from '@/lib/smm-pricing';
 
@@ -27,18 +34,21 @@ export function verifyAdminPortalSecret(candidate: string) {
 }
 
 export async function getAdminPortalSnapshot(): Promise<AdminPortalSnapshot> {
-  const [smmPricing, users, apkVariants] = await Promise.all([
+  const [smmPricing, users, apkProducts, apkVariants] = await Promise.all([
     getSmmPricingSettings(),
     listAdminCoreWalletUsers(),
+    listAdminApkProducts(),
     listAdminApkVariants(),
   ]);
 
   return {
     smmPricing,
     users,
+    apkProducts,
     apkVariants,
     summary: {
       totalUsers: users.length,
+      totalProducts: apkProducts.length,
       totalVariants: apkVariants.length,
       totalPremiumStock: apkVariants.reduce((sum, variant) => sum + variant.stock, 0),
     },
@@ -68,4 +78,34 @@ export async function saveAdminApkVariant(input: {
   badge?: string;
 }) {
   return adminUpdateApkVariant(input);
+}
+
+export async function saveAdminApkProduct(input: {
+  title: string;
+  subtitle?: string;
+  category?: string;
+  delivery?: string;
+  note?: string;
+  guarantee?: string;
+  imageUrl?: string;
+}) {
+  return createAdminApkProduct(input);
+}
+
+export async function saveAdminApkCreateVariant(input: {
+  productId: string;
+  variantTitle: string;
+  duration?: string;
+  price?: number;
+  badge?: string;
+}) {
+  return createAdminApkVariant(input);
+}
+
+export async function saveAdminApkAccounts(input: {
+  variantId: string;
+  entries: string[];
+  adminNote?: string;
+}) {
+  return addAdminApkVariantAccounts(input);
 }

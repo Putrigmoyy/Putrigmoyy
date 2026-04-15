@@ -201,7 +201,7 @@ async function syncCoreHistoryForSmmOrder(order: SmmOrderRow) {
         reference: order.order_code,
         statusLabel: 'Pembayaran berhasil',
         status: 'pending',
-        methodLabel: 'QRIS Midtrans',
+        methodLabel: 'QRIS',
         detailAppend: 'Pembayaran berhasil, tetapi order provider perlu dicek manual.',
       });
       return;
@@ -212,7 +212,7 @@ async function syncCoreHistoryForSmmOrder(order: SmmOrderRow) {
         reference: order.order_code,
         statusLabel: 'Berhasil',
         status: 'success',
-        methodLabel: 'QRIS Midtrans',
+        methodLabel: 'QRIS',
         detailAppend: 'Pembayaran QRIS berhasil dan order diteruskan ke provider.',
       });
       return;
@@ -223,7 +223,7 @@ async function syncCoreHistoryForSmmOrder(order: SmmOrderRow) {
         reference: order.order_code,
         statusLabel: paymentStatus === 'expire' ? 'Expired' : 'Gagal',
         status: 'failed',
-        methodLabel: 'QRIS Midtrans',
+        methodLabel: 'QRIS',
         detailAppend:
           paymentStatus === 'expire'
             ? 'Pembayaran QRIS expired sebelum diselesaikan.'
@@ -629,7 +629,7 @@ export async function submitSmmCheckoutOrder(input: CheckoutInput): Promise<SmmC
       title: serviceName,
       amount: totalPrice,
       detail,
-      methodLabel: 'QRIS Midtrans',
+      methodLabel: 'QRIS',
       reference: orderCode,
     });
   }
@@ -695,7 +695,7 @@ export async function getSmmCheckoutOrderStatus(orderCode: string): Promise<SmmC
             reference: normalizedOrderCode,
             statusLabel: 'Berhasil',
             status: 'success',
-            methodLabel: 'QRIS Midtrans',
+            methodLabel: 'QRIS',
             detailAppend: 'Pembayaran QRIS berhasil dan order diteruskan ke provider.',
           });
         }
@@ -713,7 +713,7 @@ export async function getSmmCheckoutOrderStatus(orderCode: string): Promise<SmmC
             reference: normalizedOrderCode,
             statusLabel: 'Pembayaran berhasil',
             status: 'pending',
-            methodLabel: 'QRIS Midtrans',
+            methodLabel: 'QRIS',
             detailAppend: `Pembayaran berhasil, tetapi order provider perlu dicek manual: ${error instanceof Error ? error.message : 'Provider error.'}`,
           });
         }
@@ -732,7 +732,7 @@ export async function getSmmCheckoutOrderStatus(orderCode: string): Promise<SmmC
           reference: normalizedOrderCode,
           statusLabel: normalizedPaymentStatus === 'expire' ? 'Expired' : 'Gagal',
           status: 'failed',
-          methodLabel: 'QRIS Midtrans',
+          methodLabel: 'QRIS',
           detailAppend: normalizedPaymentStatus === 'expire'
             ? 'Pembayaran QRIS expired sebelum diselesaikan.'
             : 'Pembayaran QRIS tidak berhasil dikonfirmasi.',

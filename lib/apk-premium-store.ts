@@ -69,6 +69,8 @@ type RemoteOwnerCatalogProduct = {
   title?: string;
   name?: string;
   subtitle?: string;
+  imageUrl?: string;
+  image_url?: string;
   category?: string;
   stock?: number;
   sold?: number;
@@ -96,6 +98,7 @@ function mapRemoteCatalogProduct(raw: RemoteOwnerCatalogProduct, index: number):
     id: String(raw.id || `product-${index + 1}`),
     title: String(raw.title || raw.name || `Produk ${index + 1}`),
     subtitle: String(raw.subtitle || '').trim() || 'Aplikasi premium siap order cepat.',
+    imageUrl: String(raw.imageUrl || raw.image_url || '').trim() || undefined,
     category: String(raw.category || '').trim() || 'App Premium',
     stock: Number(raw.stock || 0),
     sold: Number(raw.sold || 0),
@@ -165,6 +168,7 @@ type ApkProductRow = {
   id: string;
   title: string;
   subtitle: string;
+  image_url: string | null;
   category: string;
   stock: number;
   sold: number;
@@ -192,6 +196,7 @@ async function getApkPremiumCatalogFromNeon(): Promise<ApkPremiumCatalogPayload>
       id,
       title,
       subtitle,
+      image_url,
       category,
       stock,
       sold,
@@ -238,6 +243,7 @@ async function getApkPremiumCatalogFromNeon(): Promise<ApkPremiumCatalogPayload>
     id: row.id,
     title: row.title,
     subtitle: row.subtitle,
+    imageUrl: String(row.image_url || '').trim() || undefined,
     category: row.category,
     stock: Number(row.stock || 0),
     sold: Number(row.sold || 0),

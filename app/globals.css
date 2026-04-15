@@ -1022,6 +1022,9 @@ a {
 }
 
 .apk-app-product-art {
+  display: block;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
 }
 
@@ -1257,6 +1260,10 @@ a {
 .apk-app-form-field {
   display: grid;
   gap: 8px;
+}
+
+.apk-app-form-field--full {
+  grid-column: 1 / -1;
 }
 
 .apk-app-live-total-card {

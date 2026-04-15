@@ -11,6 +11,7 @@ export type ApkPremiumProduct = {
   id: string;
   title: string;
   subtitle: string;
+  imageUrl?: string;
   category: string;
   stock: number;
   sold: number;

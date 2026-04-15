@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminPortalSnapshot, saveAdminApkVariant, saveAdminSmmPricing, saveAdminUser, verifyAdminPortalSecret } from '@/lib/admin-portal';
+import {
+  getAdminPortalSnapshot,
+  saveAdminApkAccounts,
+  saveAdminApkCreateVariant,
+  saveAdminApkProduct,
+  saveAdminApkVariant,
+  saveAdminSmmPricing,
+  saveAdminUser,
+  verifyAdminPortalSecret,
+} from '@/lib/admin-portal';
 
 function resolveRequestSecret(request: NextRequest) {
   const headerSecret = request.headers.get('x-admin-secret');
@@ -101,6 +110,67 @@ export async function POST(request: NextRequest) {
         data: {
           msg: 'Variant App Premium berhasil diperbarui.',
           variant,
+          snapshot,
+        },
+      });
+    }
+
+    if (action === 'create-apk-product') {
+      const product = await saveAdminApkProduct({
+        title: String(body.title || '').trim(),
+        subtitle: String(body.subtitle || '').trim(),
+        category: String(body.category || '').trim(),
+        delivery: String(body.delivery || '').trim(),
+        note: String(body.note || '').trim(),
+        guarantee: String(body.guarantee || '').trim(),
+        imageUrl: String(body.imageUrl || '').trim(),
+      });
+      const snapshot = await getAdminPortalSnapshot();
+      return NextResponse.json({
+        status: true,
+        data: {
+          msg: 'Produk App Premium berhasil ditambahkan.',
+          product,
+          snapshot,
+        },
+      });
+    }
+
+    if (action === 'create-apk-variant') {
+      const variant = await saveAdminApkCreateVariant({
+        productId: String(body.productId || '').trim(),
+        variantTitle: String(body.variantTitle || '').trim(),
+        duration: String(body.duration || '').trim(),
+        price: Number(body.price || 0),
+        badge: String(body.badge || '').trim(),
+      });
+      const snapshot = await getAdminPortalSnapshot();
+      return NextResponse.json({
+        status: true,
+        data: {
+          msg: 'Varian App Premium berhasil ditambahkan.',
+          variant,
+          snapshot,
+        },
+      });
+    }
+
+    if (action === 'add-apk-account-data') {
+      const rawEntries = String(body.accountBatch || '')
+        .split(/\r?\n/)
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      const accountStock = await saveAdminApkAccounts({
+        variantId: String(body.variantId || '').trim(),
+        entries: rawEntries,
+        adminNote: String(body.adminNote || '').trim(),
+      });
+      const snapshot = await getAdminPortalSnapshot();
+      return NextResponse.json({
+        status: true,
+        data: {
+          msg: 'Data akun berhasil ditambahkan ke stok App Premium.',
+          accountStock,
           snapshot,
         },
       });

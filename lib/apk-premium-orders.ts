@@ -2,6 +2,8 @@ import { getAppDataSourceConfig } from '@/lib/data-sources';
 import { getNeonClient } from '@/lib/neon-clients';
 import { formatRupiah } from '@/lib/apk-premium';
 import { getApkPremiumProductById } from '@/lib/apk-premium-store';
+import { assignApkAccountsToOrder, ensureApkAdminTables, getDeliveredApkAccounts } from '@/lib/apk-premium-admin';
+import type { AdminApkAccountRow } from '@/lib/admin-portal-types';
 import { recordCoreOrderHistory, refundCoreWalletBalanceOrder, spendCoreWalletBalanceForOrder, updateCoreOrderHistoryStatusByReference } from '@/lib/core-store';
 import { createMidtransQrisCharge, getMidtransPublicConfig, getMidtransTransactionStatus, isMidtransConfigured } from '@/lib/midtrans';
 
@@ -41,6 +43,7 @@ export type ApkSubmittedOrder = ApkCheckoutBase & {
   syncReady: boolean;
   nextStep: string;
   paymentMethod: 'midtrans' | 'balance';
+  deliveredAccounts: AdminApkAccountRow[];
   qris?: {
     transactionId: string;
     qrUrl: string;
@@ -52,11 +55,15 @@ export type ApkSubmittedOrder = ApkCheckoutBase & {
 
 type ApkOrderStatusSnapshot = {
   orderCode: string;
+  productTitle: string;
+  variantTitle: string;
+  quantity: number;
   orderStatus: string;
   paymentStatus: string;
   paymentMethod: 'midtrans' | 'balance';
   totalPrice: number;
   totalPriceLabel: string;
+  deliveredAccounts: AdminApkAccountRow[];
   qris: {
     transactionId: string;
     qrUrl: string;
@@ -150,6 +157,7 @@ export async function buildApkPremiumCheckoutPreview(input: CheckoutInput): Prom
 }
 
 async function submitOrderToNeon(input: CheckoutInput): Promise<ApkSubmittedOrder> {
+  await ensureApkAdminTables();
   const sql = getNeonClient('apk');
   const result = await buildCheckoutCore(input);
   const usingBalance = result.paymentMethod === 'balance';
@@ -354,10 +362,18 @@ async function submitOrderToNeon(input: CheckoutInput): Promise<ApkSubmittedOrde
         title: `${result.product.title} - ${result.variant.title}`,
         amount: result.totalPrice,
         detail: detailText,
-        methodLabel: 'Order aplikasi premium',
+        methodLabel: 'QRIS',
         reference: result.orderCode,
       });
     }
+
+    const deliveredAccounts = usingBalance
+      ? await assignApkAccountsToOrder({
+          orderCode: result.orderCode,
+          variantId: result.variant.id,
+          quantity: result.quantity,
+        })
+      : [];
 
     return {
       orderCode: result.orderCode,
@@ -376,6 +392,7 @@ async function submitOrderToNeon(input: CheckoutInput): Promise<ApkSubmittedOrde
       queueCreated: true,
       syncReady: true,
       paymentMethod: result.paymentMethod,
+      deliveredAccounts,
       qris: usingBalance || !midtransCharge
         ? null
         : {
@@ -386,7 +403,9 @@ async function submitOrderToNeon(input: CheckoutInput): Promise<ApkSubmittedOrde
             expiryTime: midtransCharge.expiryTime,
           },
       nextStep: usingBalance
-        ? 'Pembayaran saldo berhasil. Owner akan menerima notifikasi fulfillment order ini.'
+        ? deliveredAccounts.length > 0
+          ? 'Pembayaran berhasil dan data akun premium sudah siap.'
+          : 'Pembayaran berhasil, tetapi data akun premium masih menunggu sinkron stok.'
         : 'QRIS siap ditampilkan langsung di website.',
     };
   } catch (error) {
@@ -443,7 +462,8 @@ export async function submitApkPremiumOrder(input: CheckoutInput): Promise<ApkSu
     orderStatus: 'pending',
     queueCreated: false,
     syncReady: false,
-    paymentMethod: input.paymentMethod === 'balance' ? 'balance' : 'midtrans',
+    paymentMethod: 'midtrans',
+    deliveredAccounts: [],
     qris: null,
     nextStep: 'Hubungkan DATABASE_URL_APK dan ubah APK_PREMIUM_DATA_SOURCE=neon agar order website tersimpan penuh.',
   };
@@ -451,6 +471,10 @@ export async function submitApkPremiumOrder(input: CheckoutInput): Promise<ApkSu
 
 type OrderRow = {
   order_code: string;
+  product_title: string;
+  variant_title: string;
+  variant_id: string;
+  quantity: number;
   order_status: string;
   payment_status: string;
   total_price: number;
@@ -500,6 +524,7 @@ export async function getApkPremiumOrderStatus(orderCode: string): Promise<ApkOr
     throw new Error('DATABASE_URL_APK belum aktif.');
   }
 
+  await ensureApkAdminTables();
   const normalizedOrderCode = String(orderCode || '').trim();
   if (!normalizedOrderCode) {
     throw new Error('Order code wajib diisi.');
@@ -527,7 +552,7 @@ export async function getApkPremiumOrderStatus(orderCode: string): Promise<ApkOr
   `;
 
   const orderRows = (await sql`
-    select order_code, order_status, payment_status, total_price
+    select order_code, product_title, variant_title, variant_id, quantity, order_status, payment_status, total_price
     from apk_orders
     where order_code = ${normalizedOrderCode}
     limit 1
@@ -601,8 +626,8 @@ export async function getApkPremiumOrderStatus(orderCode: string): Promise<ApkOr
         reference: normalizedOrderCode,
         statusLabel: 'Berhasil',
         status: 'success',
-        methodLabel: 'QRIS Midtrans',
-        detailAppend: 'Pembayaran QRIS Midtrans berhasil dikonfirmasi.',
+        methodLabel: 'QRIS',
+        detailAppend: 'Pembayaran QRIS berhasil dikonfirmasi.',
       });
       order.order_status = 'paid';
       order.payment_status = 'paid';
@@ -620,11 +645,11 @@ export async function getApkPremiumOrderStatus(orderCode: string): Promise<ApkOr
         reference: normalizedOrderCode,
         statusLabel: normalizedStatus === 'expire' ? 'Expired' : 'Gagal',
         status: 'failed',
-        methodLabel: 'QRIS Midtrans',
+        methodLabel: 'QRIS',
         detailAppend:
           normalizedStatus === 'expire'
-            ? 'Pembayaran QRIS Midtrans expired dan stok dikembalikan.'
-            : 'Pembayaran QRIS Midtrans tidak berhasil dan stok dikembalikan.',
+            ? 'Pembayaran QRIS expired dan stok dikembalikan.'
+            : 'Pembayaran QRIS tidak berhasil dan stok dikembalikan.',
       });
       order.order_status = normalizedStatus === 'expire' ? 'expired' : 'failed';
       order.payment_status = normalizedStatus;
@@ -644,14 +669,36 @@ export async function getApkPremiumOrderStatus(orderCode: string): Promise<ApkOr
     limit 1
   `) as PaymentRow[];
   const refreshedPayment = refreshedPaymentRows[0] || payment;
+  const deliveredAccounts =
+    order.payment_status === 'paid'
+      ? await assignApkAccountsToOrder({
+          orderCode: normalizedOrderCode,
+          variantId: String(order.variant_id || '').trim(),
+          quantity: Math.max(0, Number(order.quantity || 0)),
+        })
+      : await getDeliveredApkAccounts(normalizedOrderCode);
+
+  if (order.payment_status === 'paid' && deliveredAccounts.length > 0) {
+    await updateCoreOrderHistoryStatusByReference({
+      reference: normalizedOrderCode,
+      statusLabel: 'Berhasil',
+      status: 'success',
+      methodLabel: 'QRIS',
+      detailAppend: `Data akun premium siap dikirim: ${deliveredAccounts.length} akun.`,
+    });
+  }
 
   return {
     orderCode: normalizedOrderCode,
+    productTitle: String(order.product_title || '').trim(),
+    variantTitle: String(order.variant_title || '').trim(),
+    quantity: Math.max(0, Number(order.quantity || 0)),
     orderStatus: order.order_status,
     paymentStatus: order.payment_status,
     paymentMethod: 'midtrans',
     totalPrice: Math.max(0, Number(order.total_price || 0)),
     totalPriceLabel: formatRupiah(Math.max(0, Number(order.total_price || 0))),
+    deliveredAccounts,
     qris: refreshedPayment
       ? {
           transactionId: String(refreshedPayment.transaction_id || '').trim(),
@@ -663,7 +710,9 @@ export async function getApkPremiumOrderStatus(orderCode: string): Promise<ApkOr
       : null,
     nextStep:
       order.payment_status === 'paid'
-        ? 'Pembayaran berhasil dan order siap diteruskan ke owner.'
+        ? deliveredAccounts.length > 0
+          ? 'Pembayaran berhasil dan data akun premium sudah siap.'
+          : 'Pembayaran berhasil, tetapi data akun premium masih menunggu sinkron stok.'
         : order.payment_status === 'expire' || order.payment_status === 'cancel' || order.payment_status === 'deny'
           ? 'Pembayaran tidak aktif lagi. Silakan buat order baru.'
           : 'QRIS masih aktif. Silakan selesaikan pembayaran.',
