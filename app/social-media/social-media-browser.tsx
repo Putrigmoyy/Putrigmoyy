@@ -815,7 +815,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                     <div className="smm-select-stack">
                       <button
                         type="button"
-                        className={servicePickerOpen ? 'smm-picker-trigger smm-picker-trigger--open' : 'smm-picker-trigger'}
+                        className={servicePickerOpen ? 'smm-picker-trigger smm-picker-trigger--multiline smm-picker-trigger--open' : 'smm-picker-trigger smm-picker-trigger--multiline'}
                         onClick={() => {
                           if (!selectedCategory) return;
                           setServicePickerOpen((current) => !current);
@@ -881,6 +881,18 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                       <div className="smm-service-note-card">
                         <span>Deskripsi Layanan</span>
                         <p>{selectedService.note || 'Deskripsi layanan belum tersedia dari provider.'}</p>
+                      </div>
+
+                      <div className="smm-service-stats-card">
+                        <p>
+                          <strong>Min. Order:</strong> {selectedService.min.toLocaleString('id-ID')}
+                        </p>
+                        <p>
+                          <strong>Max. Order:</strong> {selectedService.max.toLocaleString('id-ID')}
+                        </p>
+                        <p>
+                          <strong>Harga/1000:</strong> Rp {selectedService.priceLabel}
+                        </p>
                       </div>
 
                       <div className="apk-app-form-grid">
@@ -966,8 +978,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             <section className="apk-app-panel apk-app-panel--plain">
               <div className="apk-app-panel-head">
                 <div>
-                  <span className="apk-app-section-label">Riwayat</span>
-                  <h3>Order social media yang tersimpan</h3>
+                  <span className="apk-app-section-label">Monitoring Sosmed</span>
+                  <h3>Pantau order dari API key aktif</h3>
                 </div>
                 <button type="button" className="apk-app-ghost-button" onClick={refreshHistory} disabled={isRefreshingHistory}>
                   {isRefreshingHistory ? 'Memuat...' : 'Refresh'}
@@ -975,8 +987,12 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
               </div>
 
               <div className="apk-app-history-card">
+                <article className="apk-app-info-card">
+                  <strong>Monitoring terhubung ke akun provider aktif</strong>
+                  <p className="smm-provider-copy">Data monitoring di bawah ini berasal dari order yang dikirim menggunakan API key aktif milik {profile?.username || 'provider'}.</p>
+                </article>
                 {historyItems.length === 0 ? (
-                  <div className="apk-app-empty">Belum ada riwayat order social media yang tersimpan.</div>
+                  <div className="apk-app-empty">Belum ada data monitoring order social media yang tersimpan.</div>
                 ) : (
                   historyItems.map((item) => (
                     <article key={item.id} className="apk-app-info-card">
@@ -1214,15 +1230,15 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             <section className="apk-app-panel apk-app-panel--plain">
               <div className="apk-app-panel-head">
                 <div>
-                  <span className="apk-app-section-label">Provider</span>
-                  <h3>Koneksi langsung ke PusatPanelSMM</h3>
+                  <span className="apk-app-section-label">Profil</span>
+                  <h3>Profil akun provider aktif</h3>
                 </div>
               </div>
 
               <div className="apk-app-history-card">
                 <article className="apk-app-info-card">
                   <strong>{profile?.fullName || 'Profil provider belum terbaca'}</strong>
-                  <p className="smm-provider-copy">Semua layanan di halaman ini diambil langsung dari API provider menggunakan API key dan secret key aktif di Vercel.</p>
+                  <p className="smm-provider-copy">Profil ini dibaca langsung dari API key dan secret key aktif di Vercel.</p>
                 </article>
                 <article className="apk-app-info-card smm-provider-grid">
                   <div>
@@ -1268,9 +1284,9 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
         <nav className="apk-app-bottom-nav">
           {([
             ['sosmed', 'Sosmed'],
-            ['riwayat', 'Riwayat'],
+            ['riwayat', 'Monitoring'],
             ['status', 'Status'],
-            ['provider', 'Provider'],
+            ['provider', 'Profil'],
           ] as Array<[SocialTab, string]>).map(([tab, label]) => (
             <button
               key={tab}
