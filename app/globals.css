@@ -1459,6 +1459,10 @@ a {
   box-shadow: none;
 }
 
+.smm-checkout-summary-grid {
+  margin-top: 18px;
+}
+
 .smm-status-order-note {
   margin-bottom: 14px;
   padding: 16px 18px;

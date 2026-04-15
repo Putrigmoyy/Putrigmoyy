@@ -73,8 +73,10 @@ export async function GET(request: Request) {
     const limit = Number(searchParams.get('limit') || 40);
     const contact = String(searchParams.get('contact') || '').trim();
     const sync = searchParams.get('sync') !== '0';
+    const providerOnly = !contact && searchParams.get('providerOnly') !== '0';
     let items = await getSmmOrderHistory(limit, {
       accountContact: contact,
+      providerOnly,
     });
 
     if (sync && items.length) {
@@ -82,6 +84,7 @@ export async function GET(request: Request) {
       if (updated) {
         items = await getSmmOrderHistory(limit, {
           accountContact: contact,
+          providerOnly,
         });
       }
     }

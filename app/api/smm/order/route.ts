@@ -1,68 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requestPusatPanel } from '@/lib/pusatpanel';
-import { saveSmmOrder } from '@/lib/smm-store';
+import { getSmmPaymentGatewayStatus, submitSmmCheckoutOrder } from '@/lib/smm-checkout';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as Record<string, unknown>;
-    const service = String(body.service || '').trim();
-    const accountContact = String(body.accountContact || '').trim();
-    const data = String(body.data || '').trim();
-    const quantity = String(body.quantity || '').trim();
-    const unitPrice = Number(body.unitPrice || 0);
-    const totalPrice = Number(body.totalPrice || 0);
-    const username = String(body.username || '').trim();
-    const serviceName = String(body.serviceName || '').trim();
-    const category = String(body.category || '').trim();
-    const komen = Array.isArray(body.komen)
+    const comments = Array.isArray(body.komen)
       ? body.komen.map((item) => String(item || '').trim()).filter(Boolean).join('\n')
       : String(body.komen || '').trim();
 
-    if (!service) {
-      return NextResponse.json({ status: false, data: { msg: 'Service wajib diisi.' } }, { status: 400 });
-    }
+    const quantityValue = String(body.quantity || '').trim();
+    const quantity = quantityValue ? Math.max(0, Number(quantityValue || 0)) : null;
 
-    const payload: Record<string, string> = {
-      action: 'order',
-      service,
-    };
-
-    if (data) payload.data = data;
-    if (quantity) payload.quantity = quantity;
-    if (username) payload.username = username;
-    if (komen) payload.komen = komen;
-
-    const response = await requestPusatPanel<{ id: string }>({
-      ...payload,
+    const result = await submitSmmCheckoutOrder({
+      accountContact: String(body.accountContact || '').trim(),
+      customerName: String(body.customerName || '').trim(),
+      service: String(body.service || '').trim(),
+      serviceName: String(body.serviceName || '').trim(),
+      category: String(body.category || '').trim(),
+      data: String(body.data || '').trim(),
+      quantity,
+      unitPrice: Number(body.unitPrice || 0),
+      totalPrice: Number(body.totalPrice || 0),
+      username: String(body.username || '').trim(),
+      comments,
     });
 
-    if (response.status && response.data && 'id' in response.data && response.data.id) {
-      await saveSmmOrder({
-        providerOrderId: String(response.data.id),
-        accountContact,
-        serviceId: service,
-        serviceName: serviceName || service,
-        category,
-        targetData: data,
-        quantity: quantity ? Number(quantity) : null,
-        unitPrice,
-        totalPrice,
-        username,
-        comments: komen,
-        orderStatus: 'pending',
-      });
-    }
-
-    return NextResponse.json(response);
+    return NextResponse.json({
+      status: true,
+      data: result,
+    });
   } catch (error) {
     return NextResponse.json(
       {
         status: false,
         data: {
-          msg: error instanceof Error ? error.message : 'Gagal membuat order provider.',
+          gateway: getSmmPaymentGatewayStatus(),
+          msg: error instanceof Error ? error.message : 'Checkout sosial media belum bisa dibuat.',
         },
       },
-      { status: 500 },
+      { status: 400 },
     );
   }
 }

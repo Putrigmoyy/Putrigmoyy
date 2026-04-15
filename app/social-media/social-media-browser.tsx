@@ -40,10 +40,9 @@ type Props = {
 
 type SocialTab = 'sosmed' | 'riwayat' | 'status' | 'provider';
 
-type ProviderOrderResult = {
+type CheckoutOrderResult = {
   status?: boolean;
-  data?: {
-    id?: string;
+  data?: SocialCheckoutState | {
     msg?: string;
   };
 };
@@ -67,6 +66,7 @@ type CoreBundleResult = {
 
 type HistoryItem = {
   id: number;
+  orderCode: string;
   providerOrderId: string;
   serviceId: string;
   serviceName: string;
@@ -78,8 +78,36 @@ type HistoryItem = {
   username: string;
   comments: string;
   orderStatus: string;
+  paymentStatus: string;
+  paymentMethod: string;
   createdAt: string;
   updatedAt: string;
+};
+
+type SocialCheckoutState = {
+  orderCode: string;
+  providerOrderId: string;
+  serviceId: string;
+  serviceName: string;
+  category: string;
+  targetData: string;
+  quantity: number | null;
+  unitPrice: number;
+  unitPriceLabel: string;
+  totalPrice: number;
+  totalPriceLabel: string;
+  paymentStatus: string;
+  orderStatus: string;
+  paymentMethod: 'midtrans' | 'balance';
+  fallbackNotice: string;
+  nextStep: string;
+  qris: {
+    transactionId: string;
+    qrUrl: string;
+    qrString: string;
+    deeplinkUrl: string;
+    expiryTime: string;
+  } | null;
 };
 
 type SocialPlatformVisual = {
@@ -312,6 +340,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     tone: 'idle',
     text: 'Pilih layanan social media langsung dari katalog live provider.',
   });
+  const [activeCheckoutOrder, setActiveCheckoutOrder] = useState<SocialCheckoutState | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [accountOrderItems, setAccountOrderItems] = useState<HistoryItem[]>([]);
   const [expandedStatusHistoryId, setExpandedStatusHistoryId] = useState<number | null>(null);
@@ -340,6 +369,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const [isOrdering, startOrdering] = useTransition();
   const [isRefreshingHistory, startHistoryRefresh] = useTransition();
   const [isRefreshingAccountOrders, startAccountOrdersRefresh] = useTransition();
+  const [isRefreshingCheckoutStatus, startCheckoutStatusRefresh] = useTransition();
   const switchTargets = [
     { label: 'Apprem', href: '/apk-premium' },
     { label: 'OTP Nokos', href: process.env.NEXT_PUBLIC_OTP_URL || '#', external: true },
@@ -479,6 +509,75 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     });
   };
 
+  const handleCheckoutStatusPayload = async (payload: SocialCheckoutState) => {
+    setActiveCheckoutOrder(payload);
+    if (payload.fallbackNotice) {
+      setOrderFeedback({ tone: 'success', text: payload.fallbackNotice });
+    }
+
+    if (payload.paymentStatus === 'paid') {
+      setOrderFeedback({
+        tone: 'success',
+        text: payload.nextStep,
+      });
+      refreshHistory();
+      if (accountProfile.contact) {
+        refreshAccountOrders(accountProfile.contact);
+        try {
+          await syncAccountBundle(accountProfile.contact);
+        } catch {
+          // keep current account banner if refresh fails
+        }
+      }
+      return;
+    }
+
+    if (payload.paymentStatus === 'expire' || payload.paymentStatus === 'cancel' || payload.paymentStatus === 'deny' || payload.paymentStatus === 'failed') {
+      setOrderFeedback({
+        tone: 'error',
+        text: payload.nextStep,
+      });
+      if (accountProfile.contact) {
+        refreshAccountOrders(accountProfile.contact);
+      }
+    }
+  };
+
+  const refreshCheckoutStatus = () => {
+    if (!activeCheckoutOrder?.orderCode) {
+      return;
+    }
+
+    startCheckoutStatusRefresh(async () => {
+      try {
+        const response = await fetch(`/api/smm/order-status?orderCode=${encodeURIComponent(activeCheckoutOrder.orderCode)}`, {
+          method: 'GET',
+          cache: 'no-store',
+        });
+        const result = (await response.json()) as {
+          status?: boolean;
+          data?: SocialCheckoutState | {
+            msg?: string;
+          };
+        };
+        if (!response.ok || !result.status || !result.data || !('orderCode' in result.data)) {
+          setOrderFeedback({
+            tone: 'error',
+            text: result.data && 'msg' in result.data && result.data.msg ? String(result.data.msg) : 'Status pembayaran belum bisa dimuat.',
+          });
+          return;
+        }
+
+        await handleCheckoutStatusPayload(result.data);
+      } catch (error) {
+        setOrderFeedback({
+          tone: 'error',
+          text: error instanceof Error ? error.message : 'Status pembayaran belum bisa diperbarui.',
+        });
+      }
+    });
+  };
+
   const applyMonitoringFilter = () => {
     setAppliedMonitoringFilter({
       limit: Math.max(1, Number(monitoringFilterDraft.limit || 25)),
@@ -553,6 +652,29 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       window.clearInterval(intervalId);
     };
   }, [activeTab]);
+
+  useEffect(() => {
+    if (!activeCheckoutOrder || activeCheckoutOrder.paymentMethod !== 'midtrans') {
+      return;
+    }
+    if (
+      activeCheckoutOrder.paymentStatus === 'paid' ||
+      activeCheckoutOrder.paymentStatus === 'expire' ||
+      activeCheckoutOrder.paymentStatus === 'cancel' ||
+      activeCheckoutOrder.paymentStatus === 'deny' ||
+      activeCheckoutOrder.paymentStatus === 'failed'
+    ) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      refreshCheckoutStatus();
+    }, 12000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [activeCheckoutOrder?.orderCode, activeCheckoutOrder?.paymentMethod, activeCheckoutOrder?.paymentStatus]);
 
   const platformGroups = useMemo<PlatformGroup[]>(() => {
     const buckets = new Map<string, PlatformGroup>();
@@ -703,6 +825,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
         appliedStatusFilter.status === 'Semua' ||
         String(item.orderStatus || '').toLowerCase() === appliedStatusFilter.status.toLowerCase();
       const haystack = [
+        item.orderCode,
         item.providerOrderId,
         item.serviceName,
         item.targetData,
@@ -757,7 +880,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     }
 
     startOrdering(async () => {
-      setOrderFeedback({ tone: 'idle', text: 'Mengirim order ke provider...' });
+      setOrderFeedback({ tone: 'idle', text: 'Menyiapkan checkout sosial media...' });
+      setActiveCheckoutOrder(null);
       try {
         const response = await fetch('/api/smm/order', {
           method: 'POST',
@@ -766,6 +890,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
           },
           body: JSON.stringify({
             accountContact: accountProfile.loggedIn ? accountProfile.contact : '',
+            customerName: accountProfile.loggedIn ? accountProfile.name : 'Pelanggan Sosmed',
             service: selectedService.id,
             serviceName: selectedService.name,
             category: selectedService.category,
@@ -777,25 +902,39 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             komen: comments,
           }),
         });
-        const result = (await response.json()) as ProviderOrderResult;
-        if (!response.ok || !result.status || !result.data?.id) {
+        const result = (await response.json()) as CheckoutOrderResult;
+        if (!response.ok || !result.status || !result.data || !('orderCode' in result.data)) {
           setOrderFeedback({
             tone: 'error',
-            text: result.data?.msg || 'Order gagal diproses oleh provider.',
+            text: result.data && 'msg' in result.data && result.data.msg ? String(result.data.msg) : 'Checkout sosial media gagal dibuat.',
           });
           return;
         }
-        setOrderFeedback({
-          tone: 'success',
-          text: `Order berhasil dibuat. ID provider: ${result.data.id}`,
-        });
-        refreshHistory();
-        refreshAccountOrders(accountProfile.contact);
-        setActiveTab('status');
+
+        if (result.data.paymentMethod === 'balance') {
+          setActiveCheckoutOrder(null);
+          setOrderFeedback({
+            tone: 'success',
+            text: result.data.nextStep,
+          });
+          refreshHistory();
+          if (accountProfile.contact) {
+            refreshAccountOrders(accountProfile.contact);
+            try {
+              await syncAccountBundle(accountProfile.contact);
+            } catch {
+              // keep current account banner if sync fails
+            }
+          }
+          setActiveTab('status');
+          return;
+        }
+
+        await handleCheckoutStatusPayload(result.data);
       } catch (error) {
         setOrderFeedback({
           tone: 'error',
-          text: error instanceof Error ? error.message : 'Order gagal dikirim.',
+          text: error instanceof Error ? error.message : 'Checkout sosial media gagal diproses.',
         });
       }
     });
@@ -1052,6 +1191,78 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                           </label>
                         ) : null}
                       </div>
+
+                      <div className="apk-app-inline-helper">
+                        {accountProfile.loggedIn
+                          ? `Saldo aktif kamu Rp ${accountProfile.balance.toLocaleString('id-ID')}. Sistem akan memakai saldo dulu jika cukup, lalu otomatis dialihkan ke QRIS jika saldo kurang.`
+                          : 'Jika ingin prioritas memakai saldo akun, login akun dulu. Kalau belum login, pembayaran akan langsung memakai QRIS.'}
+                      </div>
+
+                      {activeCheckoutOrder && activeCheckoutOrder.paymentMethod === 'midtrans' ? (
+                        <div className="apk-app-qris-shell">
+                          <div className="apk-app-qris-head">
+                            <div>
+                              <span className="apk-app-section-label">QRIS Payment</span>
+                              <strong>{activeCheckoutOrder.orderCode}</strong>
+                            </div>
+                            <div className={`apk-app-order-pill apk-app-order-pill--${activeCheckoutOrder.paymentStatus === 'paid' ? 'success' : activeCheckoutOrder.paymentStatus === 'awaiting-payment' ? 'pending' : 'failed'}`}>
+                              {activeCheckoutOrder.paymentStatus === 'awaiting-payment' ? 'Menunggu bayar' : activeCheckoutOrder.paymentStatus}
+                            </div>
+                          </div>
+                          <div className="apk-app-qris-card">
+                            {activeCheckoutOrder.qris?.qrUrl ? (
+                              <img src={activeCheckoutOrder.qris.qrUrl} alt={`QRIS ${activeCheckoutOrder.orderCode}`} className="apk-app-qris-image" />
+                            ) : (
+                              <div className="apk-app-qris-fallback">QRIS siap, tetapi gambar belum tersedia.</div>
+                            )}
+                            <div className="apk-app-qris-copy">
+                              <div className="apk-app-live-total-card apk-app-live-total-card--compact">
+                                <span>Total Bayar</span>
+                                <strong>Rp {activeCheckoutOrder.totalPriceLabel}</strong>
+                              </div>
+                              <p>{activeCheckoutOrder.nextStep}</p>
+                              {activeCheckoutOrder.qris?.expiryTime ? <small>Berlaku sampai {new Date(activeCheckoutOrder.qris.expiryTime).toLocaleString('id-ID')}</small> : null}
+                              <div className="apk-app-action-row apk-app-action-row--compact">
+                                <button type="button" className="apk-app-primary-button" onClick={refreshCheckoutStatus} disabled={isRefreshingCheckoutStatus}>
+                                  {isRefreshingCheckoutStatus ? 'Memuat...' : 'Cek Status'}
+                                </button>
+                                {activeCheckoutOrder.qris?.deeplinkUrl ? (
+                                  <a className="apk-app-ghost-button apk-app-link-button" href={activeCheckoutOrder.qris.deeplinkUrl} target="_blank" rel="noreferrer">
+                                    Buka Pembayaran
+                                  </a>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="apk-app-form-grid smm-checkout-summary-grid">
+                            <label className="apk-app-form-field">
+                              <span>Order Code</span>
+                              <input value={activeCheckoutOrder.orderCode} readOnly className="smm-readonly-input" />
+                            </label>
+                            <label className="apk-app-form-field">
+                              <span>Layanan</span>
+                              <input value={activeCheckoutOrder.serviceName} readOnly className="smm-readonly-input" />
+                            </label>
+                            <label className="apk-app-form-field">
+                              <span>Kategori</span>
+                              <input value={activeCheckoutOrder.category} readOnly className="smm-readonly-input" />
+                            </label>
+                            <label className="apk-app-form-field">
+                              <span>Target</span>
+                              <input value={activeCheckoutOrder.targetData} readOnly className="smm-readonly-input" />
+                            </label>
+                            <label className="apk-app-form-field">
+                              <span>Jumlah</span>
+                              <input value={activeCheckoutOrder.quantity == null ? '-' : String(activeCheckoutOrder.quantity)} readOnly className="smm-readonly-input" />
+                            </label>
+                            <label className="apk-app-form-field">
+                              <span>Metode</span>
+                              <input value="QRIS Midtrans" readOnly className="smm-readonly-input" />
+                            </label>
+                          </div>
+                        </div>
+                      ) : null}
 
                       {orderFeedback.tone !== 'idle' ? (
                         <div className={`apk-app-feedback apk-app-feedback--${orderFeedback.tone}`}>
@@ -1314,7 +1525,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                             return (
                               <Fragment key={item.id}>
                                 <tr>
-                                  <td>{item.providerOrderId || '-'}</td>
+                                  <td>{item.providerOrderId || item.orderCode || '-'}</td>
                                   <td>{formatDate(item.createdAt)}</td>
                                   <td>{item.serviceName || '-'}</td>
                                   <td>
@@ -1341,8 +1552,12 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                                   <tr>
                                     <td colSpan={8}>
                                       <div className="smm-status-detail-panel">
+                                        <p>Order Code : {item.orderCode || '-'}</p>
+                                        <p>Provider ID : {item.providerOrderId || '-'}</p>
                                         <p>Kategori : {item.category || '-'}</p>
                                         <p>Service ID : {item.serviceId || '-'}</p>
+                                        <p>Metode bayar : {item.paymentMethod === 'balance' ? 'Saldo akun' : item.paymentMethod === 'midtrans' ? 'QRIS Midtrans' : '-'}</p>
+                                        <p>Status bayar : {item.paymentStatus || '-'}</p>
                                         <p>Username : {item.username || '-'}</p>
                                         <p>Komentar : {item.comments || '-'}</p>
                                         <p>Update terakhir : {formatDate(item.updatedAt)}</p>
