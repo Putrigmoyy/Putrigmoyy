@@ -241,11 +241,12 @@ function SocialPlatformIcon({ icon }: { icon: string }) {
 function formatDate(value: string) {
   if (!value) return '-';
   return new Date(value).toLocaleString('id-ID', {
-    day: '2-digit',
-    month: '2-digit',
+    day: 'numeric',
+    month: 'long',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
   });
 }
 
@@ -325,18 +326,15 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   });
   const [statusResult, setStatusResult] = useState<ProviderStatusResult['data'] | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
-  const [expandedHistoryId, setExpandedHistoryId] = useState<number | null>(null);
-  const [statusFilterDraft, setStatusFilterDraft] = useState({
-    limit: '10',
+  const [monitoringFilterDraft, setMonitoringFilterDraft] = useState({
+    limit: '25',
     status: 'Semua',
-    year: String(new Date().getFullYear()),
-    search: '',
+    category: 'Semua Kategori',
   });
-  const [appliedStatusFilter, setAppliedStatusFilter] = useState({
-    limit: 10,
+  const [appliedMonitoringFilter, setAppliedMonitoringFilter] = useState({
+    limit: 25,
     status: 'Semua',
-    year: String(new Date().getFullYear()),
-    search: '',
+    category: 'Semua Kategori',
   });
   const [isOrdering, startOrdering] = useTransition();
   const [isCheckingStatus, startStatusCheck] = useTransition();
@@ -346,18 +344,25 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     { label: 'OTP Nokos', href: process.env.NEXT_PUBLIC_OTP_URL || '#', external: true },
     { label: 'Sewa Bot', href: process.env.NEXT_PUBLIC_BOT_RENTAL_URL || '#', external: true },
   ];
-  const availableYears = useMemo(() => {
-    const years = Array.from(new Set(historyItems.map((item) => new Date(item.createdAt).getFullYear()).filter(Boolean))).sort((a, b) => b - a);
-    const currentYear = new Date().getFullYear();
-    if (!years.includes(currentYear)) {
-      years.unshift(currentYear);
-    }
-    return years.map(String);
-  }, [historyItems]);
+  const sortedHistoryItems = useMemo(
+    () =>
+      [...historyItems].sort(
+        (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+      ),
+    [historyItems],
+  );
+
   const availableStatuses = useMemo(() => {
-    const values = Array.from(new Set(historyItems.map((item) => String(item.orderStatus || '').trim()).filter(Boolean)));
+    const values = Array.from(new Set(sortedHistoryItems.map((item) => String(item.orderStatus || '').trim()).filter(Boolean)));
     return ['Semua', ...values];
-  }, [historyItems]);
+  }, [sortedHistoryItems]);
+
+  const availableMonitoringCategories = useMemo(() => {
+    const values = Array.from(new Set(sortedHistoryItems.map((item) => String(item.category || '').trim()).filter(Boolean))).sort((left, right) =>
+      left.localeCompare(right, 'id'),
+    );
+    return ['Semua Kategori', ...values];
+  }, [sortedHistoryItems]);
 
   const syncAccountBundle = async (contact: string) => {
     const normalizedContact = String(contact || '').trim();
@@ -419,12 +424,11 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     });
   };
 
-  const applyStatusFilter = () => {
-    setAppliedStatusFilter({
-      limit: Math.max(1, Number(statusFilterDraft.limit || 10)),
-      status: statusFilterDraft.status,
-      year: statusFilterDraft.year,
-      search: statusFilterDraft.search.trim().toLowerCase(),
+  const applyMonitoringFilter = () => {
+    setAppliedMonitoringFilter({
+      limit: Math.max(1, Number(monitoringFilterDraft.limit || 25)),
+      status: monitoringFilterDraft.status,
+      category: monitoringFilterDraft.category,
     });
   };
 
@@ -532,21 +536,27 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   }, [platformServices, serviceQuery]);
 
   useEffect(() => {
-    const nextService = filteredServices.find((service) => service.id === selectedServiceId) || null;
-    setSelectedServiceId(nextService?.id || '');
-    if (nextService) {
-      setOrderForm((prev) => ({
-        ...prev,
-        quantity: nextService.menuType === '4' ? '' : prev.quantity && nextService.id === selectedServiceId ? prev.quantity : String(Math.max(0, nextService.min || 0)),
-      }));
+    const nextService = platformServices.find((service) => service.id === selectedServiceId) || null;
+    if (!nextService) {
+      if (selectedServiceId) {
+        setSelectedServiceId('');
+      }
+      setOrderForm(createInitialOrderForm(null));
+      return;
     }
-  }, [filteredServices, selectedServiceId]);
 
-  const selectedService =
-    filteredServices.find((service) => service.id === selectedServiceId) ||
-    platformServices.find((service) => service.id === selectedServiceId) ||
-    filteredServices[0] ||
-    null;
+    setOrderForm((prev) => ({
+      ...prev,
+      quantity:
+        nextService.menuType === '4'
+          ? ''
+          : prev.quantity && nextService.id === selectedServiceId
+            ? prev.quantity
+            : String(Math.max(0, nextService.min || 0)),
+    }));
+  }, [platformServices, selectedServiceId]);
+
+  const selectedService = platformServices.find((service) => service.id === selectedServiceId) || null;
 
   const calculatedQuantity = useMemo(() => {
     if (!selectedService) return 0;
@@ -569,20 +579,18 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     return selectedService.price * units;
   }, [calculatedQuantity, selectedService]);
 
-  const filteredStatusOrders = useMemo(() => {
-    const filtered = historyItems.filter((item) => {
-      const itemYear = String(new Date(item.createdAt).getFullYear());
-      const matchesYear = !appliedStatusFilter.year || itemYear === appliedStatusFilter.year;
+  const filteredMonitoringItems = useMemo(() => {
+    const filtered = sortedHistoryItems.filter((item) => {
       const matchesStatus =
-        appliedStatusFilter.status === 'Semua' ||
-        String(item.orderStatus || '').toLowerCase() === appliedStatusFilter.status.toLowerCase();
-      const haystack = [item.providerOrderId, item.targetData, item.serviceName, item.category].join(' ').toLowerCase();
-      const matchesSearch = !appliedStatusFilter.search || haystack.includes(appliedStatusFilter.search);
-      return matchesYear && matchesStatus && matchesSearch;
+        appliedMonitoringFilter.status === 'Semua' ||
+        String(item.orderStatus || '').toLowerCase() === appliedMonitoringFilter.status.toLowerCase();
+      const matchesCategory =
+        appliedMonitoringFilter.category === 'Semua Kategori' || item.category === appliedMonitoringFilter.category;
+      return matchesStatus && matchesCategory;
     });
 
-    return filtered.slice(0, appliedStatusFilter.limit);
-  }, [appliedStatusFilter, historyItems]);
+    return filtered.slice(0, appliedMonitoringFilter.limit);
+  }, [appliedMonitoringFilter, sortedHistoryItems]);
 
   const submitOrder = () => {
     if (!selectedService) {
@@ -704,7 +712,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   };
 
   return (
-    <div className="apk-app-shell">
+    <div className="apk-app-shell smm-app-page">
       <div className="apk-app-phone">
         <div className="apk-app-top-strip">
           <TopAccountMenu
@@ -720,7 +728,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                 <>
                   <div className="apk-app-panel-head">
                     <div>
-                      <span className="apk-app-section-label">Kebutuhan Social Media</span>
+                      <span className="apk-app-section-label">Pilih Platforms dan Layanan</span>
                       <h3>Pilih Platform & Layanan</h3>
                       <p className="smm-platform-copy">Klik salah satu logo platform untuk memuat kategori layanan dari API provider secara langsung.</p>
                     </div>
@@ -777,6 +785,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                               className={!selectedCategory ? 'smm-manual-item smm-manual-item--active' : 'smm-manual-item'}
                               onClick={() => {
                                 setSelectedCategory('');
+                                setSelectedServiceId('');
                                 setCategoryPickerOpen(false);
                               }}
                             >
@@ -976,82 +985,28 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
           {activeTab === 'riwayat' ? (
             <section className="apk-app-panel apk-app-panel--plain">
-              <div className="apk-app-panel-head">
-                <div>
-                  <span className="apk-app-section-label">Monitoring Sosmed</span>
-                  <h3>Pantau order dari API key aktif</h3>
+              <div className="smm-monitoring-header">
+                <div className="smm-monitoring-title">
+                  <span className="smm-monitoring-title-icon" aria-hidden="true">
+                    <SocialNavGlyph type="riwayat" />
+                  </span>
+                  <div>
+                    <span className="apk-app-section-label">Monitoring Layanan Sosial Media</span>
+                    <h3>Pantau order sesuai API key aktif</h3>
+                  </div>
                 </div>
-                <button type="button" className="apk-app-ghost-button" onClick={refreshHistory} disabled={isRefreshingHistory}>
-                  {isRefreshingHistory ? 'Memuat...' : 'Refresh'}
-                </button>
-              </div>
-
-              <div className="apk-app-history-card">
-                <article className="apk-app-info-card">
-                  <strong>Monitoring terhubung ke akun provider aktif</strong>
-                  <p className="smm-provider-copy">Data monitoring di bawah ini berasal dari order yang dikirim menggunakan API key aktif milik {profile?.username || 'provider'}.</p>
-                </article>
-                {historyItems.length === 0 ? (
-                  <div className="apk-app-empty">Belum ada data monitoring order social media yang tersimpan.</div>
-                ) : (
-                  historyItems.map((item) => (
-                    <article key={item.id} className="apk-app-info-card">
-                      <div className="apk-app-history-head">
-                        <div className="apk-app-history-meta">
-                          <strong>{item.serviceName}</strong>
-                          <span>{item.category}</span>
-                          <span>ID Provider : {item.providerOrderId || '-'}</span>
-                          <span>Waktu : {formatDate(item.createdAt)}</span>
-                        </div>
-                        <div className={`apk-app-history-status apk-app-history-status--${mapStatusTone(item.orderStatus)}`}>
-                          {item.orderStatus}
-                        </div>
-                      </div>
-                      <div className="apk-app-action-row apk-app-action-row--compact">
-                        <button
-                          type="button"
-                          className="apk-app-ghost-button"
-                          onClick={() => setExpandedHistoryId((current) => (current === item.id ? null : item.id))}
-                        >
-                          {expandedHistoryId === item.id ? 'Tutup Detail' : 'Lihat Detail'}
-                        </button>
-                      </div>
-                      {expandedHistoryId === item.id ? (
-                        <div className="apk-app-history-detail">
-                          <p>Target : {item.targetData || '-'}</p>
-                          <p>Quantity : {item.quantity == null ? '-' : item.quantity.toLocaleString('id-ID')}</p>
-                          <p>Username : {item.username || '-'}</p>
-                          <p>Komentar : {item.comments || '-'}</p>
-                          <p>Update Terakhir : {formatDate(item.updatedAt)}</p>
-                        </div>
-                      ) : null}
-                    </article>
-                  ))
-                )}
-              </div>
-            </section>
-          ) : null}
-
-          {activeTab === 'status' ? (
-            <section className="apk-app-panel apk-app-panel--plain">
-              <div className="apk-app-panel-head">
-                <div>
-                  <span className="apk-app-section-label">Status Order</span>
-                  <h3>Filter dan lihat detail order social media</h3>
-                </div>
-              </div>
-
-              <div className="smm-status-order-note">
-                Klik tombol detail untuk melihat rincian pesanan dan target order.
+                <p className="smm-provider-copy">
+                  Monitoring ini membaca histori order social media yang dikirim menggunakan API key aktif milik {profile?.username || 'provider'}.
+                </p>
               </div>
 
               <div className="apk-app-form-card">
-                <div className="smm-status-filter-grid">
+                <div className="smm-monitoring-filter-grid">
                   <label className="apk-app-form-field">
-                    <span>Tampilkan</span>
+                    <span>Tampilkan Beberapa</span>
                     <select
-                      value={statusFilterDraft.limit}
-                      onChange={(event) => setStatusFilterDraft((current) => ({ ...current, limit: event.target.value }))}
+                      value={monitoringFilterDraft.limit}
+                      onChange={(event) => setMonitoringFilterDraft((current) => ({ ...current, limit: event.target.value }))}
                       className="smm-select"
                     >
                       {['10', '25', '50', '100'].map((limit) => (
@@ -1064,8 +1019,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                   <label className="apk-app-form-field">
                     <span>Filter Status</span>
                     <select
-                      value={statusFilterDraft.status}
-                      onChange={(event) => setStatusFilterDraft((current) => ({ ...current, status: event.target.value }))}
+                      value={monitoringFilterDraft.status}
+                      onChange={(event) => setMonitoringFilterDraft((current) => ({ ...current, status: event.target.value }))}
                       className="smm-select"
                     >
                       {availableStatuses.map((status) => (
@@ -1076,36 +1031,30 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                     </select>
                   </label>
                   <label className="apk-app-form-field">
-                    <span>Filter Tahun</span>
+                    <span>Filter Category</span>
                     <select
-                      value={statusFilterDraft.year}
-                      onChange={(event) => setStatusFilterDraft((current) => ({ ...current, year: event.target.value }))}
+                      value={monitoringFilterDraft.category}
+                      onChange={(event) => setMonitoringFilterDraft((current) => ({ ...current, category: event.target.value }))}
                       className="smm-select"
                     >
-                      {availableYears.map((year) => (
-                        <option key={year} value={year}>
-                          {year}
+                      {availableMonitoringCategories.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
                         </option>
                       ))}
                     </select>
                   </label>
-                  <label className="apk-app-form-field">
-                    <span>Cari Order ID</span>
-                    <input
-                      value={statusFilterDraft.search}
-                      onChange={(event) => setStatusFilterDraft((current) => ({ ...current, search: event.target.value }))}
-                      placeholder="Cari Order ID/Target"
-                    />
-                  </label>
-                </div>
-
-                <div className="apk-app-action-row">
-                  <button type="button" className="apk-app-primary-button" onClick={applyStatusFilter}>
-                    Filter
-                  </button>
-                  <button type="button" className="apk-app-ghost-button" onClick={refreshHistory} disabled={isRefreshingHistory}>
-                    {isRefreshingHistory ? 'Memuat...' : 'Refresh'}
-                  </button>
+                  <div className="smm-monitoring-filter-actions">
+                    <span>Submit</span>
+                    <div className="smm-monitoring-filter-buttons">
+                      <button type="button" className="apk-app-primary-button" onClick={applyMonitoringFilter}>
+                        Filter
+                      </button>
+                      <button type="button" className="apk-app-ghost-button" onClick={refreshHistory} disabled={isRefreshingHistory}>
+                        {isRefreshingHistory ? 'Memuat...' : 'Refresh'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1113,72 +1062,50 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                 <table className="smm-status-table">
                   <thead>
                     <tr>
-                      <th>ID</th>
                       <th>Waktu</th>
+                      <th>Kategori</th>
+                      <th>Service ID</th>
                       <th>Layanan</th>
-                      <th>Target</th>
                       <th>Jumlah</th>
                       <th>Harga</th>
                       <th>Status</th>
-                      <th>Detail</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredStatusOrders.length ? (
-                      filteredStatusOrders.map((item) => {
-                        const expanded = expandedHistoryId === item.id;
-                        return (
-                          <>
-                            <tr key={item.id}>
-                              <td>{item.providerOrderId || '-'}</td>
-                              <td>{formatDate(item.createdAt)}</td>
-                              <td>{item.serviceName}</td>
-                              <td>
-                                <div className="smm-status-target">{item.targetData || '-'}</div>
-                              </td>
-                              <td>{item.quantity == null ? '-' : item.quantity.toLocaleString('id-ID')}</td>
-                              <td>Rp {(item.totalPrice || item.unitPrice || 0).toLocaleString('id-ID')}</td>
-                              <td>
-                                <span className={`smm-status-badge smm-status-badge--${mapStatusTone(item.orderStatus)}`}>{item.orderStatus}</span>
-                              </td>
-                              <td>
-                                <button
-                                  type="button"
-                                  className="smm-status-detail-button"
-                                  onClick={() => setExpandedHistoryId(expanded ? null : item.id)}
-                                >
-                                  Detail
-                                </button>
-                              </td>
-                            </tr>
-                            {expanded ? (
-                              <tr key={`${item.id}-detail`}>
-                                <td colSpan={8}>
-                                  <div className="smm-status-detail-panel">
-                                    <p>Kategori : {item.category || '-'}</p>
-                                    <p>Target : {item.targetData || '-'}</p>
-                                    <p>Jumlah : {item.quantity == null ? '-' : item.quantity.toLocaleString('id-ID')}</p>
-                                    <p>Harga per unit : Rp {(item.unitPrice || 0).toLocaleString('id-ID')}</p>
-                                    <p>Total harga : Rp {(item.totalPrice || item.unitPrice || 0).toLocaleString('id-ID')}</p>
-                                    <p>Username : {item.username || '-'}</p>
-                                    <p>Komentar : {item.comments || '-'}</p>
-                                    <p>Update terakhir : {formatDate(item.updatedAt)}</p>
-                                  </div>
-                                </td>
-                              </tr>
-                            ) : null}
-                          </>
-                        );
-                      })
+                    {filteredMonitoringItems.length ? (
+                      filteredMonitoringItems.map((item) => (
+                        <tr key={item.id}>
+                          <td>{formatDate(item.createdAt)}</td>
+                          <td>{item.category || '-'}</td>
+                          <td>{item.serviceId || '-'}</td>
+                          <td>{item.serviceName || '-'}</td>
+                          <td>{item.quantity == null ? '-' : item.quantity.toLocaleString('id-ID')}</td>
+                          <td>Rp {(item.totalPrice || item.unitPrice || 0).toLocaleString('id-ID')}</td>
+                          <td>
+                            <span className={`smm-status-badge smm-status-badge--${mapStatusTone(item.orderStatus)}`}>{item.orderStatus || '-'}</span>
+                          </td>
+                        </tr>
+                      ))
                     ) : (
                       <tr>
-                        <td colSpan={8}>
-                          <div className="apk-app-empty">Belum ada order yang cocok dengan filter ini.</div>
+                        <td colSpan={7}>
+                          <div className="apk-app-empty">Belum ada data monitoring yang cocok dengan filter ini.</div>
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
+              </div>
+            </section>
+          ) : null}
+
+          {activeTab === 'status' ? (
+            <section className="apk-app-panel apk-app-panel--plain">
+              <div className="apk-app-panel-head">
+                <div>
+                  <span className="apk-app-section-label">Status Order</span>
+                  <h3>Cek status order provider secara manual</h3>
+                </div>
               </div>
 
               <div className="apk-app-form-card">

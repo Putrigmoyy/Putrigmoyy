@@ -328,6 +328,20 @@ a {
   background: linear-gradient(135deg, #d209d1, #1799f2);
 }
 
+.smm-app-page .apk-app-section-label {
+  gap: 0;
+}
+
+.smm-app-page .apk-app-section-label::before {
+  display: none;
+}
+
+.smm-app-page .apk-app-form-card > .apk-app-section-label,
+.smm-app-page .apk-app-panel-head .apk-app-section-label,
+.smm-app-page .smm-monitoring-title .apk-app-section-label {
+  margin-bottom: 12px;
+}
+
 .apk-app-hero,
 .apk-app-panel,
 .apk-app-info-card,
@@ -1003,6 +1017,35 @@ a {
   line-height: 1.6;
 }
 
+.smm-monitoring-header {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.smm-monitoring-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.smm-monitoring-title-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.08), rgba(210, 9, 209, 0.08));
+  color: #1a5bb8;
+  box-shadow: 0 10px 24px rgba(23, 153, 242, 0.1);
+  flex-shrink: 0;
+}
+
+.smm-monitoring-title-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
 .smm-platform-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1115,6 +1158,7 @@ a {
   grid-template-columns: auto 1fr;
   align-items: center;
   justify-items: start;
+  margin-top: 4px;
   margin-bottom: 14px;
 }
 
@@ -1127,6 +1171,7 @@ a {
 .smm-select-stack {
   display: grid;
   gap: 14px;
+  margin-top: 2px;
 }
 
 .smm-picker-trigger {
@@ -1371,14 +1416,15 @@ a {
 .smm-service-stats-card {
   margin-top: 12px;
   padding: 14px 16px;
-  border-radius: 0;
-  background: #0f4d97;
-  color: #ffffff;
+  border: 1px solid rgba(23, 153, 242, 0.14);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.05), rgba(210, 9, 209, 0.05));
+  color: #111111;
 }
 
 .smm-service-stats-card p {
   margin: 0;
-  color: #ffffff;
+  color: rgba(17, 17, 17, 0.78);
   font-size: 0.88rem;
   line-height: 1.6;
 }
@@ -1388,7 +1434,7 @@ a {
 }
 
 .smm-service-stats-card strong {
-  color: #ffffff;
+  color: #111111;
   font-weight: 800;
 }
 
@@ -1417,6 +1463,28 @@ a {
 .smm-status-filter-grid {
   display: grid;
   gap: 12px;
+}
+
+.smm-monitoring-filter-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.smm-monitoring-filter-actions {
+  display: grid;
+  align-content: end;
+  gap: 10px;
+}
+
+.smm-monitoring-filter-actions > span {
+  color: #111111;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.smm-monitoring-filter-buttons {
+  display: grid;
+  gap: 10px;
 }
 
 .smm-status-table-wrap {
@@ -1457,6 +1525,7 @@ a {
   color: #111111;
   font-size: 0.9rem;
   line-height: 1.55;
+  word-break: break-word;
 }
 
 .smm-status-target {
@@ -1824,6 +1893,14 @@ a {
   }
 
   .smm-status-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .smm-monitoring-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .smm-monitoring-filter-buttons {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
