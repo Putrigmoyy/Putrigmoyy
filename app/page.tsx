@@ -8,8 +8,9 @@ export default function HomePage() {
           title: 'Aplikasi Premium',
           description: 'Masuk ke katalog akun premium dan checkout website.',
           href: '/apk-premium',
-          image: '/dashboard-apk-premium.svg',
+          image: '/dashboard-apk-premium.jpg',
           external: false,
+          imagePosition: 'center center',
         },
         {
           title: 'Kebutuhan Social Media',
@@ -31,8 +32,9 @@ export default function HomePage() {
           title: 'Sewa Bot Premium',
           description: 'Landing khusus untuk penyewaan bot premium.',
           href: process.env.NEXT_PUBLIC_BOT_RENTAL_URL || '#',
-          image: '/dashboard-bot-rental.svg',
+          image: '/dashboard-bot-rental.jpg',
           external: true,
+          imagePosition: 'center center',
         },
       ]}
     />
