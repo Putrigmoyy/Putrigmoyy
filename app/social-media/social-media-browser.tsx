@@ -48,16 +48,6 @@ type ProviderOrderResult = {
   };
 };
 
-type ProviderStatusResult = {
-  status?: boolean;
-  data?: {
-    status?: string;
-    start_count?: number;
-    remains?: number;
-    msg?: string;
-  };
-};
-
 type CoreBundlePayload = {
   account?: {
     registered?: boolean;
@@ -319,12 +309,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     tone: 'idle',
     text: 'Pilih layanan social media langsung dari katalog live provider.',
   });
-  const [statusOrderId, setStatusOrderId] = useState('');
-  const [statusFeedback, setStatusFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
-    tone: 'idle',
-    text: 'Masukkan ID order untuk cek status dari provider.',
-  });
-  const [statusResult, setStatusResult] = useState<ProviderStatusResult['data'] | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [accountOrderItems, setAccountOrderItems] = useState<HistoryItem[]>([]);
   const [expandedStatusHistoryId, setExpandedStatusHistoryId] = useState<number | null>(null);
@@ -351,7 +335,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     search: '',
   });
   const [isOrdering, startOrdering] = useTransition();
-  const [isCheckingStatus, startStatusCheck] = useTransition();
   const [isRefreshingHistory, startHistoryRefresh] = useTransition();
   const [isRefreshingAccountOrders, startAccountOrdersRefresh] = useTransition();
   const switchTargets = [
@@ -537,6 +520,21 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     setAccountOrderItems([]);
     setExpandedStatusHistoryId(null);
   }, [accountProfile.contact, accountProfile.loggedIn]);
+
+  useEffect(() => {
+    if (activeTab !== 'status' || !accountProfile.loggedIn || !accountProfile.contact) {
+      return;
+    }
+
+    refreshAccountOrders(accountProfile.contact);
+    const intervalId = window.setInterval(() => {
+      refreshAccountOrders(accountProfile.contact);
+    }, 30000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [activeTab, accountProfile.contact, accountProfile.loggedIn]);
 
   const platformGroups = useMemo<PlatformGroup[]>(() => {
     const buckets = new Map<string, PlatformGroup>();
@@ -769,7 +767,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
           });
           return;
         }
-        setStatusOrderId(result.data.id);
         setOrderFeedback({
           tone: 'success',
           text: `Order berhasil dibuat. ID provider: ${result.data.id}`,
@@ -781,49 +778,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
         setOrderFeedback({
           tone: 'error',
           text: error instanceof Error ? error.message : 'Order gagal dikirim.',
-        });
-      }
-    });
-  };
-
-  const checkOrderStatus = () => {
-    const orderId = statusOrderId.trim();
-    if (!orderId) {
-      setStatusFeedback({ tone: 'error', text: 'Isi ID order dulu.' });
-      return;
-    }
-
-    startStatusCheck(async () => {
-      setStatusFeedback({ tone: 'idle', text: 'Mengambil status order dari provider...' });
-      try {
-        const response = await fetch('/api/smm/status', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ id: orderId }),
-        });
-        const result = (await response.json()) as ProviderStatusResult;
-        if (!response.ok || !result.status || !result.data?.status) {
-          setStatusResult(null);
-          setStatusFeedback({
-            tone: 'error',
-            text: result.data?.msg || 'Status order tidak ditemukan.',
-          });
-          return;
-        }
-        setStatusResult(result.data);
-        setStatusFeedback({
-          tone: 'success',
-          text: `Status order saat ini: ${result.data.status}`,
-        });
-        refreshHistory();
-        refreshAccountOrders(accountProfile.contact);
-      } catch (error) {
-        setStatusResult(null);
-        setStatusFeedback({
-          tone: 'error',
-          text: error instanceof Error ? error.message : 'Gagal mengambil status order.',
         });
       }
     });
@@ -1222,7 +1176,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
               <div className="apk-app-panel-head">
                 <div>
                   <span className="apk-app-section-label">Status Order</span>
-                  <h3>Riwayat transaksi pengguna akun</h3>
+                  <h3>Riwayat pemesanan sosmed realtime</h3>
                 </div>
                 <span className="apk-app-count-pill">
                   {pendingAccountOrderCount.toLocaleString('id-ID')} Pending
@@ -1230,7 +1184,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
               </div>
 
               <div className="smm-status-order-note">
-                Klik tombol detail untuk melihat rincian pesanan akun yang sedang login.
+                Data ini otomatis diperbarui berkala saat halaman status sedang dibuka. Klik tombol detail untuk melihat rincian pesanan akun yang sedang login.
               </div>
 
               {accountProfile.loggedIn ? (
@@ -1397,49 +1351,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                   Login akun dulu agar menu Status Order bisa menampilkan riwayat transaksi pengguna akun.
                 </div>
               )}
-
-              <div className="apk-app-form-card">
-                <span className="apk-app-section-label">Cek Status Manual</span>
-                <div className="apk-app-form-grid">
-                  <label className="apk-app-form-field">
-                    <span>ID order provider</span>
-                    <input
-                      value={statusOrderId}
-                      onChange={(event) => setStatusOrderId(event.target.value)}
-                      placeholder="Contoh 123456"
-                    />
-                  </label>
-                </div>
-
-                {statusFeedback.tone !== 'idle' ? (
-                  <div className={`apk-app-feedback apk-app-feedback--${statusFeedback.tone}`}>
-                    {statusFeedback.text}
-                  </div>
-                ) : null}
-
-                {statusResult ? (
-                  <div className="smm-status-grid">
-                    <div className="apk-app-info-card">
-                      <span>Status</span>
-                      <strong>{statusResult.status || '-'}</strong>
-                    </div>
-                    <div className="apk-app-info-card">
-                      <span>Start Count</span>
-                      <strong>{Number(statusResult.start_count || 0).toLocaleString('id-ID')}</strong>
-                    </div>
-                    <div className="apk-app-info-card">
-                      <span>Remains</span>
-                      <strong>{Number(statusResult.remains || 0).toLocaleString('id-ID')}</strong>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="apk-app-action-row">
-                  <button type="button" className="apk-app-primary-button" onClick={checkOrderStatus} disabled={isCheckingStatus}>
-                    {isCheckingStatus ? 'Memuat...' : 'Cek Status'}
-                  </button>
-                </div>
-              </div>
             </section>
           ) : null}
 
