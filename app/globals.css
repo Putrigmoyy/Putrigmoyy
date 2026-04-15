@@ -1175,21 +1175,22 @@ a {
 
 .smm-picker-panel {
   display: grid;
-  gap: 12px;
-  padding: 12px;
+  gap: 10px;
+  padding: 10px;
   border: 1px solid rgba(23, 153, 242, 0.14);
-  border-radius: 20px;
+  border-radius: 18px;
   background: #ffffff;
   box-shadow: 0 16px 34px rgba(23, 153, 242, 0.08);
   animation: apk-app-fade-up 0.22s ease;
 }
 
 .smm-manual-list {
-  display: grid;
-  gap: 10px;
+  display: block;
   max-height: 232px;
   overflow-y: auto;
-  padding-right: 2px;
+  border: 1px solid rgba(23, 153, 242, 0.14);
+  border-radius: 16px;
+  background: #ffffff;
 }
 
 .smm-manual-list--service {
@@ -1199,41 +1200,48 @@ a {
 .smm-manual-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 0;
   width: 100%;
-  min-height: 58px;
-  padding: 12px 14px;
-  border: 1px solid rgba(23, 153, 242, 0.14);
-  border-radius: 18px;
-  background: #ffffff;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid rgba(23, 153, 242, 0.1);
+  border-radius: 0;
+  background: transparent;
   color: #111111;
   text-align: left;
   cursor: pointer;
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  box-shadow: none;
+  transition: background 0.18s ease, color 0.18s ease;
 }
 
 .smm-manual-item:active {
-  transform: scale(0.986);
+  transform: none;
 }
 
 .smm-manual-item--active {
-  border-color: rgba(210, 9, 209, 0.24);
-  background: linear-gradient(135deg, rgba(23, 153, 242, 0.07), rgba(210, 9, 209, 0.08));
-  box-shadow: 0 12px 22px rgba(23, 153, 242, 0.08);
+  background: #5d92ee;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.smm-manual-item:last-child {
+  border-bottom: 0;
 }
 
 .smm-manual-item-copy {
   display: grid;
-  gap: 4px;
+  gap: 0;
   min-width: 0;
+  width: 100%;
 }
 
 .smm-manual-item-copy strong,
 .smm-manual-item small {
   color: #111111;
-  font-size: 0.84rem;
-  font-weight: 700;
+  font-size: 0.8rem;
+  font-weight: 500;
   line-height: 1.45;
 }
 
@@ -1242,6 +1250,11 @@ a {
   font-size: 0.72rem;
   font-weight: 700;
   text-align: right;
+}
+
+.smm-manual-item--active .smm-manual-item-copy strong,
+.smm-manual-item--active small {
+  color: #ffffff;
 }
 
 .smm-select {

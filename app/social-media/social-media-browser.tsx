@@ -249,6 +249,11 @@ function formatDate(value: string) {
   });
 }
 
+function formatServicePickerLabel(service?: NormalizedPusatPanelService | null) {
+  if (!service) return 'Pilih Salah Satu';
+  return `${service.id} - ${service.name} - Rp${service.priceLabel}`;
+}
+
 function mapStatusTone(status: string) {
   const normalized = String(status || '').trim().toLowerCase();
   if (normalized.includes('success') || normalized.includes('complete') || normalized.includes('completed') || normalized.includes('processing')) {
@@ -818,7 +823,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                         }}
                         disabled={!selectedCategory}
                       >
-                        <span>{selectedService?.name || 'Pilih Salah Satu'}</span>
+                        <span>{formatServicePickerLabel(selectedService)}</span>
                         <i aria-hidden="true" />
                       </button>
                       {servicePickerOpen ? (
@@ -855,7 +860,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                                   }}
                                 >
                                   <div className="smm-manual-item-copy">
-                                    <strong>{service.name}</strong>
+                                    <strong>{formatServicePickerLabel(service)}</strong>
                                   </div>
                                 </button>
                               ))
