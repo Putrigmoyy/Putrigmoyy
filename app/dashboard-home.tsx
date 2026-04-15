@@ -10,6 +10,8 @@ type DashboardItem = {
   href: string;
   image: string;
   external: boolean;
+  imagePosition?: string;
+  overlayTone?: 'default' | 'soft-gray';
 };
 
 type Props = {
@@ -82,9 +84,16 @@ export function DashboardHome({ items }: Props) {
                   fill
                   sizes="(max-width: 640px) 50vw, 220px"
                   className="dashboard-card-image"
+                  style={item.imagePosition ? { objectPosition: item.imagePosition } : undefined}
                   priority
                 />
-                <div className="dashboard-card-overlay">
+                <div
+                  className={
+                    item.overlayTone === 'soft-gray'
+                      ? 'dashboard-card-overlay dashboard-card-overlay--soft-gray'
+                      : 'dashboard-card-overlay'
+                  }
+                >
                   <h2>{item.title}</h2>
                 </div>
               </div>

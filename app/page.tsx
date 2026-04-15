@@ -15,8 +15,10 @@ export default function HomePage() {
           title: 'Kebutuhan Social Media',
           description: 'Masuk ke katalog layanan SMM dan panel order provider.',
           href: '/social-media',
-          image: '/dashboard-social-media.svg',
+          image: '/dashboard-social-media.jpg',
           external: false,
+          imagePosition: 'center center',
+          overlayTone: 'soft-gray',
         },
         {
           title: 'OTP Nokos All Country',
