@@ -9,6 +9,7 @@ function isSmmConfigured() {
 
 export async function saveSmmOrder(input: {
   providerOrderId: string;
+  accountContact?: string;
   serviceId: string;
   serviceName: string;
   category: string;
@@ -25,11 +26,13 @@ export async function saveSmmOrder(input: {
   }
 
   const sql = getNeonClient('smm');
+  await sql`alter table smm_orders add column if not exists account_contact text not null default ''`;
   await sql`alter table smm_orders add column if not exists unit_price integer not null default 0`;
   await sql`alter table smm_orders add column if not exists total_price integer not null default 0`;
   await sql`
     insert into smm_orders (
       provider_order_id,
+      account_contact,
       service_id,
       service_name,
       category,
@@ -42,6 +45,7 @@ export async function saveSmmOrder(input: {
       order_status
     ) values (
       ${input.providerOrderId},
+      ${String(input.accountContact || '').trim()},
       ${input.serviceId},
       ${input.serviceName},
       ${input.category || 'Tanpa Kategori'},
@@ -136,34 +140,61 @@ export type SmmOrderHistoryItem = {
   updatedAt: string;
 };
 
-export async function getSmmOrderHistory(limit = 40) {
+export async function getSmmOrderHistory(limit = 40, options?: { accountContact?: string }) {
   if (!isSmmConfigured()) {
     return [];
   }
 
   const sql = getNeonClient('smm');
+  const accountContact = String(options?.accountContact || '').trim();
+  await sql`alter table smm_orders add column if not exists account_contact text not null default ''`;
   await sql`alter table smm_orders add column if not exists unit_price integer not null default 0`;
   await sql`alter table smm_orders add column if not exists total_price integer not null default 0`;
-  const rows = (await sql`
-    select
-      id,
-      provider_order_id,
-      service_id,
-      service_name,
-      category,
-      target_data,
-      quantity,
-      unit_price,
-      total_price,
-      username,
-      comments,
-      order_status,
-      created_at,
-      updated_at
-    from smm_orders
-    order by created_at desc
-    limit ${Math.max(1, Math.min(limit, 100))}
-  `) as Array<{
+  const queryLimit = Math.max(1, Math.min(limit, 100));
+  const rows = (
+    accountContact
+      ? await sql`
+          select
+            id,
+            provider_order_id,
+            service_id,
+            service_name,
+            category,
+            target_data,
+            quantity,
+            unit_price,
+            total_price,
+            username,
+            comments,
+            order_status,
+            created_at,
+            updated_at
+          from smm_orders
+          where account_contact = ${accountContact}
+          order by created_at desc
+          limit ${queryLimit}
+        `
+      : await sql`
+          select
+            id,
+            provider_order_id,
+            service_id,
+            service_name,
+            category,
+            target_data,
+            quantity,
+            unit_price,
+            total_price,
+            username,
+            comments,
+            order_status,
+            created_at,
+            updated_at
+          from smm_orders
+          order by created_at desc
+          limit ${queryLimit}
+        `
+  ) as Array<{
     id: number;
     provider_order_id: string | null;
     service_id: string;

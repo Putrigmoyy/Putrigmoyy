@@ -5,7 +5,10 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const limit = Number(searchParams.get('limit') || 40);
-    const items = await getSmmOrderHistory(limit);
+    const contact = String(searchParams.get('contact') || '').trim();
+    const items = await getSmmOrderHistory(limit, {
+      accountContact: contact,
+    });
 
     return NextResponse.json({
       status: true,

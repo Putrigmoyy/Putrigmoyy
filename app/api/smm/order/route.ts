@@ -6,6 +6,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as Record<string, unknown>;
     const service = String(body.service || '').trim();
+    const accountContact = String(body.accountContact || '').trim();
     const data = String(body.data || '').trim();
     const quantity = String(body.quantity || '').trim();
     const unitPrice = Number(body.unitPrice || 0);
@@ -38,6 +39,7 @@ export async function POST(request: NextRequest) {
     if (response.status && response.data && 'id' in response.data && response.data.id) {
       await saveSmmOrder({
         providerOrderId: String(response.data.id),
+        accountContact,
         serviceId: service,
         serviceName: serviceName || service,
         category,

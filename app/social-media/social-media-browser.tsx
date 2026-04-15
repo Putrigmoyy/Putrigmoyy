@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { Fragment, useEffect, useMemo, useState, useTransition } from 'react';
 import {
   siApplepodcasts,
   siAudiomack,
@@ -326,6 +326,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   });
   const [statusResult, setStatusResult] = useState<ProviderStatusResult['data'] | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [accountOrderItems, setAccountOrderItems] = useState<HistoryItem[]>([]);
+  const [expandedStatusHistoryId, setExpandedStatusHistoryId] = useState<number | null>(null);
   const [monitoringFilterDraft, setMonitoringFilterDraft] = useState({
     limit: '25',
     status: 'Semua',
@@ -336,9 +338,22 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     status: 'Semua',
     category: 'Semua Kategori',
   });
+  const [statusFilterDraft, setStatusFilterDraft] = useState({
+    limit: '10',
+    status: 'Semua',
+    year: String(new Date().getFullYear()),
+    search: '',
+  });
+  const [appliedStatusFilter, setAppliedStatusFilter] = useState({
+    limit: 10,
+    status: 'Semua',
+    year: String(new Date().getFullYear()),
+    search: '',
+  });
   const [isOrdering, startOrdering] = useTransition();
   const [isCheckingStatus, startStatusCheck] = useTransition();
   const [isRefreshingHistory, startHistoryRefresh] = useTransition();
+  const [isRefreshingAccountOrders, startAccountOrdersRefresh] = useTransition();
   const switchTargets = [
     { label: 'Apprem', href: '/apk-premium' },
     { label: 'OTP Nokos', href: process.env.NEXT_PUBLIC_OTP_URL || '#', external: true },
@@ -351,11 +366,23 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       ),
     [historyItems],
   );
+  const sortedAccountOrderItems = useMemo(
+    () =>
+      [...accountOrderItems].sort(
+        (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+      ),
+    [accountOrderItems],
+  );
 
   const availableStatuses = useMemo(() => {
     const values = Array.from(new Set(sortedHistoryItems.map((item) => String(item.orderStatus || '').trim()).filter(Boolean)));
     return ['Semua', ...values];
   }, [sortedHistoryItems]);
+
+  const availableStatusOrderStatuses = useMemo(() => {
+    const values = Array.from(new Set(sortedAccountOrderItems.map((item) => String(item.orderStatus || '').trim()).filter(Boolean)));
+    return ['Semua', ...values];
+  }, [sortedAccountOrderItems]);
 
   const availableMonitoringCategories = useMemo(() => {
     const values = Array.from(new Set(sortedHistoryItems.map((item) => String(item.category || '').trim()).filter(Boolean))).sort((left, right) =>
@@ -363,6 +390,17 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     );
     return ['Semua Kategori', ...values];
   }, [sortedHistoryItems]);
+
+  const availableStatusYears = useMemo(() => {
+    const years = Array.from(
+      new Set(sortedAccountOrderItems.map((item) => new Date(item.createdAt).getFullYear()).filter(Boolean)),
+    ).sort((left, right) => right - left);
+    const currentYear = new Date().getFullYear();
+    if (!years.includes(currentYear)) {
+      years.unshift(currentYear);
+    }
+    return years.map(String);
+  }, [sortedAccountOrderItems]);
 
   const syncAccountBundle = async (contact: string) => {
     const normalizedContact = String(contact || '').trim();
@@ -424,11 +462,51 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     });
   };
 
+  const refreshAccountOrders = (contactOverride?: string) => {
+    const normalizedContact = String(contactOverride || accountProfile.contact || '').trim();
+    if (!normalizedContact) {
+      setAccountOrderItems([]);
+      setExpandedStatusHistoryId(null);
+      return;
+    }
+
+    startAccountOrdersRefresh(async () => {
+      try {
+        const response = await fetch(`/api/smm/history?limit=150&contact=${encodeURIComponent(normalizedContact)}`, {
+          method: 'GET',
+          cache: 'no-store',
+        });
+        const result = (await response.json()) as {
+          status?: boolean;
+          data?: {
+            items?: HistoryItem[];
+            msg?: string;
+          };
+        };
+        if (!response.ok || !result.status || !result.data?.items) {
+          return;
+        }
+        setAccountOrderItems(result.data.items);
+      } catch {
+        // keep current account history view
+      }
+    });
+  };
+
   const applyMonitoringFilter = () => {
     setAppliedMonitoringFilter({
       limit: Math.max(1, Number(monitoringFilterDraft.limit || 25)),
       status: monitoringFilterDraft.status,
       category: monitoringFilterDraft.category,
+    });
+  };
+
+  const applyStatusFilter = () => {
+    setAppliedStatusFilter({
+      limit: Math.max(1, Number(statusFilterDraft.limit || 10)),
+      status: statusFilterDraft.status,
+      year: statusFilterDraft.year,
+      search: statusFilterDraft.search.trim().toLowerCase(),
     });
   };
 
@@ -450,6 +528,15 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
     void hydrateSession();
   }, []);
+
+  useEffect(() => {
+    if (accountProfile.loggedIn && accountProfile.contact) {
+      refreshAccountOrders(accountProfile.contact);
+      return;
+    }
+    setAccountOrderItems([]);
+    setExpandedStatusHistoryId(null);
+  }, [accountProfile.contact, accountProfile.loggedIn]);
 
   const platformGroups = useMemo<PlatformGroup[]>(() => {
     const buckets = new Map<string, PlatformGroup>();
@@ -592,6 +679,34 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     return filtered.slice(0, appliedMonitoringFilter.limit);
   }, [appliedMonitoringFilter, sortedHistoryItems]);
 
+  const filteredStatusOrders = useMemo(() => {
+    const filtered = sortedAccountOrderItems.filter((item) => {
+      const itemYear = String(new Date(item.createdAt).getFullYear());
+      const matchesYear = !appliedStatusFilter.year || itemYear === appliedStatusFilter.year;
+      const matchesStatus =
+        appliedStatusFilter.status === 'Semua' ||
+        String(item.orderStatus || '').toLowerCase() === appliedStatusFilter.status.toLowerCase();
+      const haystack = [
+        item.providerOrderId,
+        item.serviceName,
+        item.targetData,
+        item.category,
+        item.serviceId,
+      ]
+        .join(' ')
+        .toLowerCase();
+      const matchesSearch = !appliedStatusFilter.search || haystack.includes(appliedStatusFilter.search);
+      return matchesYear && matchesStatus && matchesSearch;
+    });
+
+    return filtered.slice(0, appliedStatusFilter.limit);
+  }, [appliedStatusFilter, sortedAccountOrderItems]);
+
+  const pendingAccountOrderCount = useMemo(
+    () => sortedAccountOrderItems.filter((item) => mapStatusTone(item.orderStatus) === 'pending').length,
+    [sortedAccountOrderItems],
+  );
+
   const submitOrder = () => {
     if (!selectedService) {
       setOrderFeedback({ tone: 'error', text: 'Pilih layanan dulu sebelum kirim order.' });
@@ -634,6 +749,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            accountContact: accountProfile.loggedIn ? accountProfile.contact : '',
             service: selectedService.id,
             serviceName: selectedService.name,
             category: selectedService.category,
@@ -659,6 +775,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
           text: `Order berhasil dibuat. ID provider: ${result.data.id}`,
         });
         refreshHistory();
+        refreshAccountOrders(accountProfile.contact);
         setActiveTab('status');
       } catch (error) {
         setOrderFeedback({
@@ -701,6 +818,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
           text: `Status order saat ini: ${result.data.status}`,
         });
         refreshHistory();
+        refreshAccountOrders(accountProfile.contact);
       } catch (error) {
         setStatusResult(null);
         setStatusFeedback({
@@ -1104,9 +1222,181 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
               <div className="apk-app-panel-head">
                 <div>
                   <span className="apk-app-section-label">Status Order</span>
-                  <h3>Cek status order provider secara manual</h3>
+                  <h3>Riwayat transaksi pengguna akun</h3>
                 </div>
+                <span className="apk-app-count-pill">
+                  {pendingAccountOrderCount.toLocaleString('id-ID')} Pending
+                </span>
               </div>
+
+              <div className="smm-status-order-note">
+                Klik tombol detail untuk melihat rincian pesanan akun yang sedang login.
+              </div>
+
+              {accountProfile.loggedIn ? (
+                <>
+                  <div className="apk-app-info-card smm-status-account-banner">
+                    <div>
+                      <span>Akun aktif</span>
+                      <strong>{accountProfile.name || accountProfile.contact || 'Akun pengguna'}</strong>
+                    </div>
+                    <div>
+                      <span>Kontak</span>
+                      <strong>{accountProfile.contact || '-'}</strong>
+                    </div>
+                    <div>
+                      <span>Total transaksi</span>
+                      <strong>{sortedAccountOrderItems.length.toLocaleString('id-ID')}</strong>
+                    </div>
+                  </div>
+
+                  <div className="apk-app-form-card">
+                    <div className="smm-status-filter-grid">
+                      <label className="apk-app-form-field">
+                        <span>Tampilkan</span>
+                        <select
+                          value={statusFilterDraft.limit}
+                          onChange={(event) => setStatusFilterDraft((current) => ({ ...current, limit: event.target.value }))}
+                          className="smm-select"
+                        >
+                          {['10', '25', '50', '100'].map((limit) => (
+                            <option key={limit} value={limit}>
+                              {limit}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="apk-app-form-field">
+                        <span>Filter Status</span>
+                        <select
+                          value={statusFilterDraft.status}
+                          onChange={(event) => setStatusFilterDraft((current) => ({ ...current, status: event.target.value }))}
+                          className="smm-select"
+                        >
+                          {availableStatusOrderStatuses.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="apk-app-form-field">
+                        <span>Filter Tahun</span>
+                        <select
+                          value={statusFilterDraft.year}
+                          onChange={(event) => setStatusFilterDraft((current) => ({ ...current, year: event.target.value }))}
+                          className="smm-select"
+                        >
+                          {availableStatusYears.map((year) => (
+                            <option key={year} value={year}>
+                              {year}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="apk-app-form-field">
+                        <span>Cari Order ID</span>
+                        <input
+                          value={statusFilterDraft.search}
+                          onChange={(event) => setStatusFilterDraft((current) => ({ ...current, search: event.target.value }))}
+                          placeholder="Cari Order ID/Target"
+                        />
+                      </label>
+                      <div className="smm-monitoring-filter-actions">
+                        <span>Submit</span>
+                        <div className="smm-monitoring-filter-buttons">
+                          <button type="button" className="apk-app-primary-button" onClick={applyStatusFilter}>
+                            Filter
+                          </button>
+                          <button
+                            type="button"
+                            className="apk-app-ghost-button"
+                            onClick={() => refreshAccountOrders(accountProfile.contact)}
+                            disabled={isRefreshingAccountOrders}
+                          >
+                            {isRefreshingAccountOrders ? 'Memuat...' : 'Refresh'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="smm-status-table-wrap">
+                    <table className="smm-status-table">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Waktu</th>
+                          <th>Layanan</th>
+                          <th>Target</th>
+                          <th>Jumlah</th>
+                          <th>Harga</th>
+                          <th>Status</th>
+                          <th>Detail</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredStatusOrders.length ? (
+                          filteredStatusOrders.map((item) => {
+                            const expanded = expandedStatusHistoryId === item.id;
+                            return (
+                              <Fragment key={item.id}>
+                                <tr>
+                                  <td>{item.providerOrderId || '-'}</td>
+                                  <td>{formatDate(item.createdAt)}</td>
+                                  <td>{item.serviceName || '-'}</td>
+                                  <td>
+                                    <div className="smm-status-target">{item.targetData || '-'}</div>
+                                  </td>
+                                  <td>{item.quantity == null ? '-' : item.quantity.toLocaleString('id-ID')}</td>
+                                  <td>Rp {(item.totalPrice || item.unitPrice || 0).toLocaleString('id-ID')}</td>
+                                  <td>
+                                    <span className={`smm-status-badge smm-status-badge--${mapStatusTone(item.orderStatus)}`}>
+                                      {item.orderStatus || '-'}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    <button
+                                      type="button"
+                                      className="smm-status-detail-button"
+                                      onClick={() => setExpandedStatusHistoryId(expanded ? null : item.id)}
+                                    >
+                                      Detail
+                                    </button>
+                                  </td>
+                                </tr>
+                                {expanded ? (
+                                  <tr>
+                                    <td colSpan={8}>
+                                      <div className="smm-status-detail-panel">
+                                        <p>Kategori : {item.category || '-'}</p>
+                                        <p>Service ID : {item.serviceId || '-'}</p>
+                                        <p>Username : {item.username || '-'}</p>
+                                        <p>Komentar : {item.comments || '-'}</p>
+                                        <p>Update terakhir : {formatDate(item.updatedAt)}</p>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ) : null}
+                              </Fragment>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={8}>
+                              <div className="apk-app-empty">Belum ada transaksi social media yang cocok dengan filter akun ini.</div>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <div className="apk-app-empty">
+                  Login akun dulu agar menu Status Order bisa menampilkan riwayat transaksi pengguna akun.
+                </div>
+              )}
 
               <div className="apk-app-form-card">
                 <span className="apk-app-section-label">Cek Status Manual</span>
@@ -1224,7 +1514,12 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
               <span className="apk-app-nav-icon">
                 <SocialNavGlyph type={tab} />
               </span>
-              <span>{label}</span>
+              <span className="apk-app-nav-label">
+                {label}
+                {tab === 'status' && pendingAccountOrderCount > 0 ? (
+                  <small className="apk-app-nav-count">{pendingAccountOrderCount}</small>
+                ) : null}
+              </span>
             </button>
           ))}
         </nav>
