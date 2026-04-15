@@ -1,5 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getApkPremiumOrderStatus } from '@/lib/apk-premium-orders';
 import { getCoreWalletBundle } from '@/lib/core-store';
+import { getSmmCheckoutOrderStatus } from '@/lib/smm-checkout';
+
+async function syncPendingWebsiteOrders(username: string) {
+  const bundle = await getCoreWalletBundle(username, true);
+  if (!bundle) {
+    return null;
+  }
+
+  const pendingOrders = bundle.history
+    .filter((entry) => entry.kind === 'order' && entry.status === 'pending' && entry.reference)
+    .slice(0, 6);
+
+  if (!pendingOrders.length) {
+    return bundle;
+  }
+
+  await Promise.all(
+    pendingOrders.map(async (entry) => {
+      try {
+        if (entry.reference.startsWith('SMM')) {
+          await getSmmCheckoutOrderStatus(entry.reference);
+          return;
+        }
+
+        if (entry.reference.startsWith('APK')) {
+          await getApkPremiumOrderStatus(entry.reference);
+        }
+      } catch {
+        // keep account endpoint responsive even if one order status cannot be refreshed
+      }
+    }),
+  );
+
+  return getCoreWalletBundle(username, true);
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,7 +44,7 @@ export async function GET(request: NextRequest) {
       request.nextUrl.searchParams.get('contact') ||
       request.nextUrl.searchParams.get('account') ||
       '';
-    const bundle = await getCoreWalletBundle(username, true);
+    const bundle = await syncPendingWebsiteOrders(username);
 
     if (!bundle) {
       return NextResponse.json(

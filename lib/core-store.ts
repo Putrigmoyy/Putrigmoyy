@@ -530,24 +530,42 @@ export async function updateCoreOrderHistoryStatusByReference(input: {
     return;
   }
 
+  const statusLabel = String(input.statusLabel || '').trim() || 'Pending';
+  const methodLabel = String(input.methodLabel || '').trim();
+  const detailAppend = String(input.detailAppend || '').trim();
+
   await ensureCoreTables();
   const sql = getNeonClient('core');
-  await sql`
-    update core_transaction_history
-    set
-      status_label = ${String(input.statusLabel || '').trim() || 'Pending'},
-      status = ${input.status},
-      method_label = case
-        when ${String(input.methodLabel || '').trim()} <> '' then ${String(input.methodLabel || '').trim()}
-        else method_label
-      end,
-      detail = case
-        when ${String(input.detailAppend || '').trim()} <> '' then concat(detail, E'\n', ${String(input.detailAppend || '').trim()})
-        else detail
-      end
+  const rows = (await sql`
+    select id, detail, method_label
+    from core_transaction_history
     where reference = ${reference}
       and kind = 'order'
-  `;
+  `) as Array<{
+    id: number;
+    detail: string | null;
+    method_label: string | null;
+  }>;
+
+  for (const row of rows) {
+    const currentDetail = String(row.detail || '');
+    const nextDetail =
+      detailAppend && !currentDetail.includes(detailAppend)
+        ? currentDetail
+          ? `${currentDetail}\n${detailAppend}`
+          : detailAppend
+        : currentDetail;
+
+    await sql`
+      update core_transaction_history
+      set
+        status_label = ${statusLabel},
+        status = ${input.status},
+        method_label = ${methodLabel || String(row.method_label || '')},
+        detail = ${nextDetail}
+      where id = ${row.id}
+    `;
+  }
 }
 
 export async function spendCoreWalletBalanceForOrder(input: {

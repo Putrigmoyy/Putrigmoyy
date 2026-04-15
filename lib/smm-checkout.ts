@@ -171,6 +171,79 @@ function buildSnapshot(order: SmmOrderRow, payment: SmmPaymentRow | null, fallba
   };
 }
 
+async function syncCoreHistoryForSmmOrder(order: SmmOrderRow) {
+  const accountContact = String(order.account_contact || '').trim();
+  if (!accountContact) {
+    return;
+  }
+
+  const paymentMethod = order.payment_method === 'balance' ? 'balance' : 'midtrans';
+  const paymentStatus = String(order.payment_status || '').trim().toLowerCase();
+  const orderStatus = String(order.order_status || '').trim().toLowerCase();
+  const hasProviderOrder = Boolean(String(order.provider_order_id || '').trim());
+
+  if (paymentMethod === 'midtrans') {
+    if (paymentStatus === 'paid' && orderStatus === 'paid-review') {
+      await updateCoreOrderHistoryStatusByReference({
+        reference: order.order_code,
+        statusLabel: 'Pembayaran berhasil',
+        status: 'pending',
+        methodLabel: 'QRIS Midtrans',
+        detailAppend: 'Pembayaran berhasil, tetapi order provider perlu dicek manual.',
+      });
+      return;
+    }
+
+    if (paymentStatus === 'paid' && (hasProviderOrder || orderStatus === 'pending')) {
+      await updateCoreOrderHistoryStatusByReference({
+        reference: order.order_code,
+        statusLabel: 'Berhasil',
+        status: 'success',
+        methodLabel: 'QRIS Midtrans',
+        detailAppend: 'Pembayaran QRIS berhasil dan order diteruskan ke provider.',
+      });
+      return;
+    }
+
+    if (paymentStatus === 'expire' || paymentStatus === 'cancel' || paymentStatus === 'deny' || paymentStatus === 'failed') {
+      await updateCoreOrderHistoryStatusByReference({
+        reference: order.order_code,
+        statusLabel: paymentStatus === 'expire' ? 'Expired' : 'Gagal',
+        status: 'failed',
+        methodLabel: 'QRIS Midtrans',
+        detailAppend:
+          paymentStatus === 'expire'
+            ? 'Pembayaran QRIS expired sebelum diselesaikan.'
+            : 'Pembayaran QRIS tidak berhasil dikonfirmasi.',
+      });
+      return;
+    }
+
+    return;
+  }
+
+  if (paymentStatus === 'paid' && (hasProviderOrder || orderStatus === 'pending')) {
+    await updateCoreOrderHistoryStatusByReference({
+      reference: order.order_code,
+      statusLabel: 'Berhasil',
+      status: 'success',
+      methodLabel: 'Saldo akun',
+      detailAppend: 'Saldo akun berhasil dipakai dan order diteruskan ke provider.',
+    });
+    return;
+  }
+
+  if (orderStatus === 'failed' || paymentStatus === 'failed' || paymentStatus === 'refunded') {
+    await updateCoreOrderHistoryStatusByReference({
+      reference: order.order_code,
+      statusLabel: 'Gagal',
+      status: 'failed',
+      methodLabel: 'Saldo akun',
+      detailAppend: 'Order provider gagal dibuat dan saldo otomatis dikembalikan.',
+    });
+  }
+}
+
 async function getOrderRow(orderCode: string) {
   const sql = getNeonClient('smm');
   const rows = (await sql`
@@ -644,6 +717,7 @@ export async function getSmmCheckoutOrderStatus(orderCode: string): Promise<SmmC
   if (!refreshedOrder) {
     throw new Error('Order sosial media tidak bisa dimuat ulang.');
   }
+  await syncCoreHistoryForSmmOrder(refreshedOrder);
   return buildSnapshot(refreshedOrder, payment);
 }
 

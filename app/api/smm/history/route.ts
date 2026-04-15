@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getSmmCheckoutOrderStatus } from '@/lib/smm-checkout';
 import { requestPusatPanel } from '@/lib/pusatpanel';
 import { getSmmOrderHistory, updateSmmOrderStatus } from '@/lib/smm-store';
 
@@ -67,6 +68,38 @@ async function syncVisibleOrderStatuses(items: HistoryItem[]) {
   return hasUpdates;
 }
 
+function shouldSyncCheckoutItem(item: HistoryItem) {
+  if (!item?.orderCode || item.paymentMethod !== 'midtrans') {
+    return false;
+  }
+
+  const updatedAtMs = new Date(item.updatedAt).getTime();
+  if (!Number.isFinite(updatedAtMs)) {
+    return true;
+  }
+
+  return Date.now() - updatedAtMs >= SYNC_COOLDOWN_MS;
+}
+
+async function syncVisibleCheckoutStatuses(items: HistoryItem[]) {
+  const candidates = items.filter(shouldSyncCheckoutItem).slice(0, MAX_SYNC_ITEMS);
+  if (!candidates.length) {
+    return false;
+  }
+
+  let hasUpdates = false;
+  for (const item of candidates) {
+    try {
+      await getSmmCheckoutOrderStatus(item.orderCode);
+      hasUpdates = true;
+    } catch {
+      // keep local history readable even if checkout status sync fails
+    }
+  }
+
+  return hasUpdates;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -80,7 +113,11 @@ export async function GET(request: Request) {
     });
 
     if (sync && items.length) {
-      const updated = await syncVisibleOrderStatuses(items);
+      const [updatedProvider, updatedCheckout] = await Promise.all([
+        syncVisibleOrderStatuses(items),
+        contact ? syncVisibleCheckoutStatuses(items) : Promise.resolve(false),
+      ]);
+      const updated = updatedProvider || updatedCheckout;
       if (updated) {
         items = await getSmmOrderHistory(limit, {
           accountContact: contact,
