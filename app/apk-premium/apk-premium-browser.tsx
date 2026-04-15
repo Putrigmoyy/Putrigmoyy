@@ -203,6 +203,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
     username: '',
     password: '',
   });
+  const [profileAccessMode, setProfileAccessMode] = useState<'register' | 'login'>('register');
   const [depositFeedback, setDepositFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
     tone: 'idle',
     text: '',
@@ -416,6 +417,13 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
       setDepositFeedback({ tone: 'idle', text: '' });
     }
   }, [walletProfile.loggedIn]);
+
+  useEffect(() => {
+    if (walletProfile.loggedIn) {
+      return;
+    }
+    setProfileAccessMode(walletProfile.registered ? 'login' : 'register');
+  }, [walletProfile.loggedIn, walletProfile.registered]);
 
   useEffect(() => {
     if (!activeQrisOrder || activeQrisOrder.paymentStatus === 'paid' || activeQrisOrder.paymentStatus === 'expire' || activeQrisOrder.paymentStatus === 'cancel' || activeQrisOrder.paymentStatus === 'deny') {
@@ -1731,76 +1739,92 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
                           <button type="button" className="apk-app-primary-button" onClick={updateWalletProfile} disabled={isSubmittingProfile}>
                             {isSubmittingProfile ? 'Memproses...' : 'Simpan Profil'}
                           </button>
-                          <button type="button" className="apk-app-ghost-button" onClick={logoutWalletAccount}>
-                            Logout
-                          </button>
                         </div>
                       </div>
                     ) : null}
 
-                    {!walletProfile.registered ? (
+                    {!walletProfile.loggedIn ? (
                       <div className="account-popup-card">
-                        <div className="apk-app-form-grid smm-profile-form-grid">
-                          <label className="apk-app-form-field">
-                            <span>Nama akun</span>
-                            <input
-                              value={walletRegisterDraft.name}
-                              onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, name: event.target.value }))}
-                              placeholder="Nama lengkap"
-                            />
-                          </label>
-                          <label className="apk-app-form-field">
-                            <span>Username akun</span>
-                            <input
-                              value={walletRegisterDraft.username}
-                              onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
-                              placeholder="contoh: putrigmoyy"
-                            />
-                          </label>
-                          <label className="apk-app-form-field">
-                            <span>Password akun</span>
-                            <input
-                              type="password"
-                              value={walletRegisterDraft.password}
-                              onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, password: event.target.value }))}
-                              placeholder="Minimal 6 karakter"
-                            />
-                          </label>
-                        </div>
-                        <div className="apk-app-action-row apk-app-action-row--compact">
-                          <button type="button" className="apk-app-primary-button" onClick={registerWalletAccount} disabled={isSubmittingProfile}>
-                            {isSubmittingProfile ? 'Memproses...' : 'Daftar akun'}
+                        <div className="account-popup-auth-toggle">
+                          <button
+                            type="button"
+                            className={profileAccessMode === 'register' ? 'account-popup-auth-toggle__active' : ''}
+                            onClick={() => setProfileAccessMode('register')}
+                          >
+                            Daftar
+                          </button>
+                          <button
+                            type="button"
+                            className={profileAccessMode === 'login' ? 'account-popup-auth-toggle__active' : ''}
+                            onClick={() => setProfileAccessMode('login')}
+                          >
+                            Login
                           </button>
                         </div>
-                      </div>
-                    ) : null}
 
-                    {walletProfile.registered && !walletProfile.loggedIn ? (
-                      <div className="account-popup-card">
-                        <div className="apk-app-form-grid smm-profile-form-grid">
-                          <label className="apk-app-form-field">
-                            <span>Username akun</span>
-                            <input
-                              value={walletLoginDraft.username}
-                              onChange={(event) => setWalletLoginDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
-                              placeholder="Masukkan username"
-                            />
-                          </label>
-                          <label className="apk-app-form-field">
-                            <span>Password akun</span>
-                            <input
-                              type="password"
-                              value={walletLoginDraft.password}
-                              onChange={(event) => setWalletLoginDraft((current) => ({ ...current, password: event.target.value }))}
-                              placeholder="Masukkan password"
-                            />
-                          </label>
-                        </div>
-                        <div className="apk-app-action-row apk-app-action-row--compact">
-                          <button type="button" className="apk-app-primary-button" onClick={loginWalletAccount} disabled={isSubmittingProfile}>
-                            {isSubmittingProfile ? 'Memproses...' : 'Login'}
-                          </button>
-                        </div>
+                        {profileAccessMode === 'register' ? (
+                          <>
+                            <div className="apk-app-form-grid smm-profile-form-grid">
+                              <label className="apk-app-form-field">
+                                <span>Nama akun</span>
+                                <input
+                                  value={walletRegisterDraft.name}
+                                  onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, name: event.target.value }))}
+                                  placeholder="Nama lengkap"
+                                />
+                              </label>
+                              <label className="apk-app-form-field">
+                                <span>Username akun</span>
+                                <input
+                                  value={walletRegisterDraft.username}
+                                  onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
+                                  placeholder="contoh: putrigmoyy"
+                                />
+                              </label>
+                              <label className="apk-app-form-field">
+                                <span>Password akun</span>
+                                <input
+                                  type="password"
+                                  value={walletRegisterDraft.password}
+                                  onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, password: event.target.value }))}
+                                  placeholder="Minimal 6 karakter"
+                                />
+                              </label>
+                            </div>
+                            <div className="apk-app-action-row apk-app-action-row--compact">
+                              <button type="button" className="apk-app-primary-button" onClick={registerWalletAccount} disabled={isSubmittingProfile}>
+                                {isSubmittingProfile ? 'Memproses...' : 'Daftar akun'}
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="apk-app-form-grid smm-profile-form-grid">
+                              <label className="apk-app-form-field">
+                                <span>Username akun</span>
+                                <input
+                                  value={walletLoginDraft.username}
+                                  onChange={(event) => setWalletLoginDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
+                                  placeholder="Masukkan username"
+                                />
+                              </label>
+                              <label className="apk-app-form-field">
+                                <span>Password akun</span>
+                                <input
+                                  type="password"
+                                  value={walletLoginDraft.password}
+                                  onChange={(event) => setWalletLoginDraft((current) => ({ ...current, password: event.target.value }))}
+                                  placeholder="Masukkan password"
+                                />
+                              </label>
+                            </div>
+                            <div className="apk-app-action-row apk-app-action-row--compact">
+                              <button type="button" className="apk-app-primary-button" onClick={loginWalletAccount} disabled={isSubmittingProfile}>
+                                {isSubmittingProfile ? 'Memproses...' : 'Login'}
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     ) : null}
 

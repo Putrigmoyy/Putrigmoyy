@@ -1016,12 +1016,15 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
+  min-width: 0;
   gap: 12px;
   margin-top: 14px;
   padding: 14px 16px;
   border-radius: 20px;
   border: 1px solid rgba(23, 153, 242, 0.12);
   background: linear-gradient(135deg, rgba(23, 153, 242, 0.06), rgba(210, 9, 209, 0.06));
+  box-sizing: border-box;
 }
 
 .apk-app-live-total-card span {
@@ -1034,6 +1037,9 @@ a {
   color: #111111;
   font-size: 1rem;
   font-weight: 800;
+  min-width: 0;
+  text-align: right;
+  word-break: break-word;
 }
 
 .apk-app-live-total-card--compact {
@@ -1055,11 +1061,15 @@ a {
 }
 
 .apk-app-qris-shell {
+  width: 100%;
+  min-width: 0;
   margin-top: 14px;
   padding: 16px;
   border: 1px solid rgba(23, 153, 242, 0.14);
   border-radius: 22px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(23, 153, 242, 0.04));
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .apk-app-qris-head {
@@ -1691,6 +1701,13 @@ a {
 .smm-qris-total-card {
   width: 100%;
   margin-top: 14px;
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.smm-qris-total-card strong {
+  text-align: left;
 }
 
 .smm-qris-expiry-note {
@@ -1702,12 +1719,16 @@ a {
 
 .smm-qris-detail-frame {
   display: grid;
+  width: 100%;
+  min-width: 0;
   gap: 8px;
   margin-top: 14px;
   padding: 14px 16px;
   border: 1px solid rgba(23, 153, 242, 0.14);
   border-radius: 18px;
   background: #ffffff;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .smm-qris-detail-frame p {
@@ -1816,18 +1837,27 @@ a {
 }
 
 .account-popup-modal {
+  width: min(calc(100vw - 24px), 420px);
+  max-width: min(calc(100vw - 24px), 420px);
   border-radius: 28px;
 }
 
 .account-popup-modal__body {
   display: grid;
+  width: 100%;
+  min-width: 0;
   gap: 14px;
+  box-sizing: border-box;
 }
 
 .account-popup-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.account-popup-tabs > * {
+  min-width: 0;
 }
 
 .account-popup-tab {
@@ -1880,11 +1910,15 @@ a {
 
 .account-popup-card {
   display: grid;
+  width: 100%;
+  min-width: 0;
   gap: 12px;
   padding: 16px;
   border: 1px solid rgba(23, 153, 242, 0.12);
   border-radius: 20px;
   background: linear-gradient(135deg, rgba(23, 153, 242, 0.04), rgba(210, 9, 209, 0.04));
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .account-popup-card--history {
@@ -1919,6 +1953,39 @@ a {
   font-size: 12px;
   font-weight: 500;
   line-height: 1.4;
+}
+
+.account-popup-auth-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.account-popup-auth-toggle > * {
+  min-width: 0;
+}
+
+.account-popup-auth-toggle button {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 16px;
+  background: #ffffff;
+  color: #111111;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.account-popup-auth-toggle button:active {
+  transform: scale(0.985);
+}
+
+.account-popup-auth-toggle button.account-popup-auth-toggle__active {
+  border-color: rgba(210, 9, 209, 0.24);
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.08), rgba(210, 9, 209, 0.08));
+  box-shadow: 0 10px 20px rgba(23, 153, 242, 0.08);
 }
 
 .account-center-block--plain {
