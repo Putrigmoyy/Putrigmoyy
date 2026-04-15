@@ -82,7 +82,7 @@ export type SmmCheckoutSnapshot = {
 
 function isSmmCheckoutReady() {
   const config = getAppDataSourceConfig();
-  return config.smm.mode === 'neon' && config.smm.databaseConfigured;
+  return config.smm.databaseConfigured;
 }
 
 function createSmmOrderCode() {
@@ -367,7 +367,7 @@ async function placeProviderOrder(order: Pick<SmmOrderRow, 'service_id' | 'targe
 
 export async function submitSmmCheckoutOrder(input: CheckoutInput): Promise<SmmCheckoutSnapshot> {
   if (!isSmmCheckoutReady()) {
-    throw new Error('DATABASE_URL_SMM belum diisi atau mode Neon belum aktif.');
+    throw new Error('DATABASE_URL_SMM belum diisi.');
   }
 
   await ensureSmmTables();
@@ -541,7 +541,7 @@ export async function submitSmmCheckoutOrder(input: CheckoutInput): Promise<SmmC
 
 export async function getSmmCheckoutOrderStatus(orderCode: string): Promise<SmmCheckoutSnapshot> {
   if (!isSmmCheckoutReady()) {
-    throw new Error('DATABASE_URL_SMM belum diisi atau mode Neon belum aktif.');
+    throw new Error('DATABASE_URL_SMM belum diisi.');
   }
 
   await ensureSmmTables();
