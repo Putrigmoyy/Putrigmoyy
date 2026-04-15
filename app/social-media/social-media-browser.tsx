@@ -26,7 +26,7 @@ import {
   siYoutube,
 } from 'simple-icons';
 import type { NormalizedPusatPanelProfile, NormalizedPusatPanelService } from '@/lib/pusatpanel';
-import { TopAccountMenu } from '@/app/components/top-account-menu';
+import { STORE_ACCOUNT_MENU_SECTIONS, TopAccountMenu } from '@/app/components/top-account-menu';
 
 type Props = {
   profile: NormalizedPusatPanelProfile | null;
@@ -370,11 +370,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const [isRefreshingHistory, startHistoryRefresh] = useTransition();
   const [isRefreshingAccountOrders, startAccountOrdersRefresh] = useTransition();
   const [isRefreshingCheckoutStatus, startCheckoutStatusRefresh] = useTransition();
-  const switchTargets = [
-    { label: 'Apprem', href: '/apk-premium' },
-    { label: 'OTP Nokos', href: process.env.NEXT_PUBLIC_OTP_URL || '#', external: true },
-    { label: 'Sewa Bot', href: process.env.NEXT_PUBLIC_BOT_RENTAL_URL || '#', external: true },
-  ];
   const sortedHistoryItems = useMemo(
     () =>
       [...historyItems].sort(
@@ -947,7 +942,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
           <TopAccountMenu
             displayName={accountProfile.loggedIn ? accountProfile.name : 'Profil'}
             balance={accountProfile.balance}
-            targets={switchTargets}
+            sections={STORE_ACCOUNT_MENU_SECTIONS}
           />
         </div>
         <div className="apk-app-content apk-app-content--tight">

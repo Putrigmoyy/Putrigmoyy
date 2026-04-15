@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { useDeferredValue, useEffect, useState, useTransition } from 'react';
 import type { ApkPremiumProduct, ApkPremiumVariant } from '@/lib/apk-premium';
 import { formatRupiah } from '@/lib/apk-premium';
-import { TopAccountMenu } from '@/app/components/top-account-menu';
+import { STORE_ACCOUNT_MENU_SECTIONS, TopAccountMenu } from '@/app/components/top-account-menu';
 
 type Props = {
   products: ApkPremiumProduct[];
   categories: string[];
+  requestedTab?: string | null;
 };
 
 type PremiumTab = 'apprem' | 'deposit' | 'riwayat' | 'profil';
@@ -80,6 +81,13 @@ type AppremQrisState = {
 
 const APK_ACCOUNT_SESSION_KEY = 'putrigmoyy_apk_account_session_v1';
 
+function normalizePremiumTab(value: string | null): PremiumTab | null {
+  if (value === 'apprem' || value === 'deposit' || value === 'riwayat' || value === 'profil') {
+    return value;
+  }
+  return null;
+}
+
 const productArtwork: Record<string, string> = {
   canva: '/premium-icons/canva.jpg',
   netflix: '/premium-icons/netflix.jpg',
@@ -139,7 +147,7 @@ function NavGlyph({ type }: { type: PremiumTab }) {
   );
 }
 
-export function ApkPremiumBrowser({ products, categories }: Props) {
+export function ApkPremiumBrowser({ products, categories, requestedTab }: Props) {
   const quickDepositAmounts = [10000, 20000, 50000, 100000];
   const [activeTab, setActiveTab] = useState<PremiumTab>('apprem');
   const [query, setQuery] = useState('');
@@ -290,11 +298,6 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
   const canPayOrderWithBalance = walletProfile.loggedIn && selectedTotal > 0 && walletProfile.balance >= selectedTotal;
   const orderHistoryEntries = historyEntries.filter((entry) => entry.kind === 'order');
   const depositHistoryEntries = historyEntries.filter((entry) => entry.kind === 'deposit');
-  const switchTargets = [
-    { label: 'Sosmed', href: '/social-media' },
-    { label: 'OTP Nokos', href: process.env.NEXT_PUBLIC_OTP_URL || '#', external: true },
-    { label: 'Sewa Bot', href: process.env.NEXT_PUBLIC_BOT_RENTAL_URL || '#', external: true },
-  ];
 
   useEffect(() => {
     if (depositLocked || !canUseBalance) {
@@ -312,6 +315,31 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
       return;
     }
   }, [canPayOrderWithBalance, orderPaymentMethod, walletProfile.loggedIn]);
+
+  useEffect(() => {
+    const nextTab = normalizePremiumTab(requestedTab || null);
+    if (nextTab && nextTab !== activeTab) {
+      setActiveTab(nextTab);
+    }
+  }, [activeTab, requestedTab]);
+
+  useEffect(() => {
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    if (!hash) {
+      return;
+    }
+
+    const timerId = window.setTimeout(() => {
+      const target = window.document.querySelector(hash);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [activeTab, requestedTab]);
 
   useEffect(() => {
     if (!walletProfile.loggedIn) {
@@ -686,7 +714,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
           <TopAccountMenu
             displayName={walletProfile.loggedIn ? walletProfile.name : 'Profil'}
             balance={walletProfile.balance}
-            targets={switchTargets}
+            sections={STORE_ACCOUNT_MENU_SECTIONS}
           />
         </div>
         <div className="apk-app-content apk-app-content--tight">
@@ -1067,7 +1095,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
               </div>
 
               <div className="apk-app-info-stack">
-                <article className="apk-app-form-card">
+                <article id="deposit-history" className="apk-app-form-card">
                   <span className="apk-app-section-label">Riwayat Deposit</span>
                   {depositHistoryEntries.length ? (
                     <div className="apk-app-info-stack">
@@ -1161,7 +1189,7 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
               </div>
 
               <div className="apk-app-info-stack">
-                <article className="apk-app-info-card">
+                <article id="profile-account" className="apk-app-info-card">
                   <strong>Status akun</strong>
                   <p>
                     {walletProfile.registered
@@ -1257,6 +1285,28 @@ export function ApkPremiumBrowser({ products, categories }: Props) {
                     </div>
                   </article>
                 ) : null}
+
+                <article className="apk-app-form-card">
+                  <span className="apk-app-section-label">Panduan Mulai Transaksi</span>
+                  <div className="apk-app-info-stack">
+                    <article id="guide-deposit" className="apk-app-info-card apk-app-history-card">
+                      <strong>Cara Deposit</strong>
+                      <p>Masuk ke menu Deposit, isi nominal manual atau pilih nominal cepat, lalu lanjutkan pembayaran sampai status deposit berubah berhasil.</p>
+                    </article>
+                    <article id="guide-status" className="apk-app-info-card apk-app-history-card">
+                      <strong>Informasi Status Order</strong>
+                      <p>Status order akan otomatis diperbarui. Jika pembayaran sukses maka order lanjut diproses, sedangkan jika QRIS expired kamu perlu membuat order baru.</p>
+                    </article>
+                    <article id="guide-order" className="apk-app-info-card apk-app-history-card">
+                      <strong>Panduan Cara Pesanan</strong>
+                      <p>Pilih produk, tentukan varian, cek total harga, lalu selesaikan pembayaran. Setelah lunas, data akun atau proses order akan berjalan otomatis sesuai jenis produk.</p>
+                    </article>
+                    <article id="guide-contact" className="apk-app-info-card apk-app-history-card">
+                      <strong>Kontak</strong>
+                      <p>Jika ada kendala transaksi, gunakan kontak store yang aktif pada website atau WhatsApp admin yang kamu pakai saat bertransaksi.</p>
+                    </article>
+                  </div>
+                </article>
 
                 {profileFeedback.text ? (
                   <div className={`apk-app-feedback apk-app-feedback--${profileFeedback.tone}`}>
