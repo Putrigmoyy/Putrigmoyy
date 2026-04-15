@@ -37,6 +37,7 @@ type HistoryEntry = {
 type DepositMethod = 'midtrans' | 'balance';
 type OrderPaymentMethod = 'midtrans' | 'balance';
 type AccountModalView = 'deposit' | 'riwayat' | 'profil';
+type HelperModalView = 'api-docs';
 
 type CoreDepositQrisState = {
   reference: string;
@@ -129,6 +130,119 @@ function getTotalVariantStock(product: ApkPremiumProduct) {
   return product.variants.reduce((sum, variant) => sum + variant.stock, 0);
 }
 
+function formatDateParts(value: string) {
+  if (!value) {
+    return { datePart: '-', timePart: '-' };
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return { datePart: '-', timePart: '-' };
+  }
+
+  return {
+    datePart: new Intl.DateTimeFormat('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(date),
+    timePart: new Intl.DateTimeFormat('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    })
+      .format(date)
+      .replace(/\./g, ':'),
+  };
+}
+
+function mapStatusTone(status: string) {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (normalized.includes('success') || normalized.includes('berhasil') || normalized.includes('paid')) {
+    return 'success';
+  }
+  if (normalized.includes('pending') || normalized.includes('menunggu')) {
+    return 'pending';
+  }
+  return 'failed';
+}
+
+function ModalCloseGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7.2 7.2 16.8 16.8M16.8 7.2 7.2 16.8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function MenuBurgerGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 7h14M5 12h14M5 17h14" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function DetailGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.5 6.5h11v11h-11z" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M9.1 9.2h5.8M9.1 12h5.8M9.1 14.8h4" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+function AccountPopupGlyph({ type }: { type: 'deposit' | 'profil' }) {
+  if (type === 'deposit') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 8h16v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
+        <path d="M4 10h16M8 6h8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="9" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M6.5 18a5.5 5.5 0 0 1 11 0" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function DrawerMenuGlyph({
+  type,
+}: {
+  type: 'dashboard' | 'profil' | 'order' | 'deposit' | 'riwayat' | 'api-docs';
+}) {
+  if (type === 'dashboard') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4.8 5.1h6.5v6.5H4.8zm7.9 0h6.5v6.5h-6.5zm-7.9 7.9h6.5v6.5H4.8zm7.9 0h6.5v6.5h-6.5Z" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.6" />
+      </svg>
+    );
+  }
+  if (type === 'profil') {
+    return <AccountPopupGlyph type="profil" />;
+  }
+  if (type === 'deposit') {
+    return <AccountPopupGlyph type="deposit" />;
+  }
+  if (type === 'riwayat') {
+    return <NavGlyph type="riwayat" />;
+  }
+  if (type === 'order') {
+    return <NavGlyph type="apprem" />;
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5.5 7.2h13M5.5 11.2h13M5.5 15.2h7.2" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" />
+      <path d="M15.2 15.4h3.3v3.2h-3.3z" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
 function NavGlyph({ type }: { type: PremiumTab }) {
   if (type === 'apprem') {
     return (
@@ -219,6 +333,21 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
   const [activeQrisOrder, setActiveQrisOrder] = useState<AppremQrisState | null>(null);
   const [activeDepositQris, setActiveDepositQris] = useState<CoreDepositQrisState | null>(null);
   const [accountModalView, setAccountModalView] = useState<AccountModalView | null>(null);
+  const [helperModalView, setHelperModalView] = useState<HelperModalView | null>(null);
+  const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
+  const [historyFilterDraft, setHistoryFilterDraft] = useState({
+    limit: '10',
+    status: 'Semua',
+    kind: 'Semua Riwayat',
+    search: '',
+  });
+  const [appliedHistoryFilter, setAppliedHistoryFilter] = useState({
+    limit: 10,
+    status: 'Semua',
+    kind: 'Semua Riwayat',
+    search: '',
+  });
+  const [detailHistoryEntry, setDetailHistoryEntry] = useState<HistoryEntry | null>(null);
   const [floatingNotice, setFloatingNotice] = useState<{ tone: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [isSubmittingOrder, startOrderSubmit] = useTransition();
   const [isSubmittingProfile, startProfileSubmit] = useTransition();
@@ -240,7 +369,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
   }, []);
 
   useEffect(() => {
-    if (!accountModalView) {
+    if (!accountModalView && !helperModalView && !isSideMenuOpen && !detailHistoryEntry) {
       return;
     }
 
@@ -250,7 +379,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [accountModalView]);
+  }, [accountModalView, detailHistoryEntry, helperModalView, isSideMenuOpen]);
 
   useEffect(() => {
     if (!profileFeedback.text || profileFeedback.tone === 'idle') {
@@ -373,6 +502,32 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
   const canPayOrderWithBalance = walletProfile.loggedIn && selectedTotal > 0 && walletProfile.balance >= selectedTotal;
   const orderHistoryEntries = historyEntries.filter((entry) => entry.kind === 'order');
   const depositHistoryEntries = historyEntries.filter((entry) => entry.kind === 'deposit');
+  const sortedHistoryEntries = [...historyEntries].sort(
+    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  );
+  const availableHistoryStatuses = ['Semua', ...Array.from(new Set(sortedHistoryEntries.map((entry) => entry.statusLabel).filter(Boolean)))];
+  const availableHistoryKinds = ['Semua Riwayat', 'Deposit', 'Order'];
+  const filteredHistoryEntries = sortedHistoryEntries
+    .filter((entry) => {
+      if (appliedHistoryFilter.status !== 'Semua' && entry.statusLabel !== appliedHistoryFilter.status) {
+        return false;
+      }
+      if (appliedHistoryFilter.kind !== 'Semua Riwayat') {
+        const expectedKind = appliedHistoryFilter.kind === 'Deposit' ? 'deposit' : 'order';
+        if (entry.kind !== expectedKind) {
+          return false;
+        }
+      }
+      if (!appliedHistoryFilter.search) {
+        return true;
+      }
+
+      const haystack = [entry.title, entry.subjectName, entry.amountLabel, entry.methodLabel, entry.reference, entry.detail]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(appliedHistoryFilter.search);
+    })
+    .slice(0, appliedHistoryFilter.limit);
 
   useEffect(() => {
     if (!walletProfile.loggedIn || !canPayOrderWithBalance) {
@@ -385,7 +540,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
 
   useEffect(() => {
     const nextTab = normalizePremiumTab(requestedTab || null);
-    if (nextTab === 'deposit' || nextTab === 'riwayat' || nextTab === 'profil') {
+    if (nextTab === 'deposit' || nextTab === 'profil') {
       setAccountModalView(nextTab);
       return;
     }
@@ -760,6 +915,51 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
     });
   };
 
+  const applyHistoryFilter = () => {
+    setAppliedHistoryFilter({
+      limit: Math.max(1, Number(historyFilterDraft.limit || 10)),
+      status: historyFilterDraft.status,
+      kind: historyFilterDraft.kind,
+      search: historyFilterDraft.search.trim().toLowerCase(),
+    });
+  };
+
+  const refreshHistoryTable = () => {
+    if (!walletProfile.username) {
+      return;
+    }
+    void syncAccountBundle(walletProfile.username).catch(() => {
+      setFloatingNotice({
+        tone: 'error',
+        text: 'Riwayat belum bisa dimuat ulang.',
+      });
+    });
+  };
+
+  const openDrawerTab = (tab: PremiumTab) => {
+    setIsSideMenuOpen(false);
+    setHelperModalView(null);
+    setAccountModalView(null);
+    setActiveTab(tab);
+    if (tab === 'apprem') {
+      setAppremMode('catalog');
+    }
+  };
+
+  const openDrawerModal = (view: AccountModalView) => {
+    setIsSideMenuOpen(false);
+    setHelperModalView(null);
+    setAccountModalView(view);
+  };
+
+  const openHelperModal = (view: HelperModalView) => {
+    setIsSideMenuOpen(false);
+    setAccountModalView(null);
+    setHelperModalView(view);
+  };
+
+  const helperModalTitle = helperModalView === 'api-docs' ? 'Dokumentasi API' : '';
+
   const submitDepositFlow = () => {
     startDepositSubmit(async () => {
       if (depositLocked) {
@@ -944,12 +1144,63 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
     <div className="apk-app-shell">
       <div className="apk-app-phone">
         <FloatingNotice notice={floatingNotice} />
-        <div className="apk-app-top-strip">
+        <div className="apk-app-top-strip apk-app-top-strip--with-menu">
+          <button
+            type="button"
+            className={isSideMenuOpen ? 'apk-app-top-menu-button apk-app-top-menu-button--open' : 'apk-app-top-menu-button'}
+            onClick={() => setIsSideMenuOpen(true)}
+            aria-label="Buka menu utama aplikasi premium"
+          >
+            <MenuBurgerGlyph />
+          </button>
           <TopAccountMenu
             displayName={walletProfile.loggedIn ? walletProfile.name : 'Profil'}
             balance={walletProfile.balance}
           />
         </div>
+        {isSideMenuOpen ? (
+          <div className="site-side-drawer-backdrop" onClick={() => setIsSideMenuOpen(false)}>
+            <aside className="site-side-drawer" onClick={(event) => event.stopPropagation()}>
+              <div className="site-side-drawer__head">
+                <strong>Menu</strong>
+                <button type="button" className="site-side-drawer__close" onClick={() => setIsSideMenuOpen(false)} aria-label="Tutup menu">
+                  <ModalCloseGlyph />
+                </button>
+              </div>
+              <div className="site-side-drawer__body">
+                <section className="site-side-drawer__section">
+                  <span className="site-side-drawer__title">Menu Utama</span>
+                  <div className="site-side-drawer__list">
+                    <a href="/" className="site-side-drawer__item" onClick={() => setIsSideMenuOpen(false)}>
+                      <span className="site-side-drawer__icon"><DrawerMenuGlyph type="dashboard" /></span>
+                      <span>Dashboard</span>
+                    </a>
+                    <button type="button" className="site-side-drawer__item" onClick={() => openDrawerModal('profil')}>
+                      <span className="site-side-drawer__icon"><DrawerMenuGlyph type="profil" /></span>
+                      <span>Profil</span>
+                    </button>
+                    <button type="button" className="site-side-drawer__item" onClick={() => openDrawerTab('apprem')}>
+                      <span className="site-side-drawer__icon"><DrawerMenuGlyph type="order" /></span>
+                      <span>Order</span>
+                    </button>
+                    <button type="button" className="site-side-drawer__item" onClick={() => openDrawerModal('deposit')}>
+                      <span className="site-side-drawer__icon"><DrawerMenuGlyph type="deposit" /></span>
+                      <span>Deposit</span>
+                    </button>
+                    <button type="button" className="site-side-drawer__item" onClick={() => openDrawerTab('riwayat')}>
+                      <span className="site-side-drawer__icon"><DrawerMenuGlyph type="riwayat" /></span>
+                      <span>Riwayat</span>
+                    </button>
+                    <button type="button" className="site-side-drawer__item" onClick={() => openHelperModal('api-docs')}>
+                      <span className="site-side-drawer__icon"><DrawerMenuGlyph type="api-docs" /></span>
+                      <span>Dokumentasi API</span>
+                    </button>
+                  </div>
+                </section>
+              </div>
+            </aside>
+          </div>
+        ) : null}
         <div className="apk-app-content apk-app-content--tight">
           {activeTab === 'apprem' ? (
             <section className="apk-app-panel apk-app-panel--plain">
@@ -1272,92 +1523,143 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
               <div className="apk-app-panel-head">
                 <div>
                   <span className="apk-app-section-label">Riwayat Transaksi</span>
-                  <h3>Riwayat deposit dan order tersimpan terpisah</h3>
+                  <h3>Riwayat deposit dan order akun website</h3>
                 </div>
               </div>
 
-              <div className="apk-app-info-stack">
-                <article id="deposit-history" className="apk-app-form-card">
-                  <span className="apk-app-section-label">Riwayat Deposit</span>
-                  {depositHistoryEntries.length ? (
-                    <div className="apk-app-info-stack">
-                      {depositHistoryEntries.map((entry) => {
-                        const expanded = expandedHistoryId === entry.id;
-                        return (
-                          <article key={entry.id} className="apk-app-info-card apk-app-history-card">
-                            <div className="apk-app-history-head">
-                              <strong>{entry.title}</strong>
-                              <span className={`apk-app-history-status apk-app-history-status--${entry.status}`}>{entry.statusLabel}</span>
-                            </div>
-                            <div className="apk-app-history-meta">
-                              <span>Waktu : {entry.createdLabel}</span>
-                              <span>Nama : {entry.subjectName}</span>
-                              <span>Harga : {entry.amountLabel}</span>
-                              <span>Metode : {entry.methodLabel}</span>
-                            </div>
-                            <button
-                              type="button"
-                              className="apk-app-ghost-button"
-                              onClick={() => setExpandedHistoryId(expanded ? null : entry.id)}
-                            >
-                              {expanded ? 'Tutup Detail Deposit' : 'Lihat Detail Deposit'}
-                            </button>
-                            {expanded ? (
-                              <div className="apk-app-history-detail">
-                                <p>{entry.detail}</p>
-                                <p>Referensi : {entry.reference}</p>
-                              </div>
-                            ) : null}
-                          </article>
-                        );
-                      })}
+              {walletProfile.loggedIn ? (
+                <>
+                  <div className="apk-app-form-card">
+                    <div className="smm-status-filter-grid">
+                      <label className="apk-app-form-field">
+                        <span>Tampilkan</span>
+                        <select
+                          value={historyFilterDraft.limit}
+                          onChange={(event) => setHistoryFilterDraft((current) => ({ ...current, limit: event.target.value }))}
+                          className="smm-select"
+                        >
+                          {['10', '25', '50', '100'].map((limit) => (
+                            <option key={limit} value={limit}>
+                              {limit}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="apk-app-form-field">
+                        <span>Filter Status</span>
+                        <select
+                          value={historyFilterDraft.status}
+                          onChange={(event) => setHistoryFilterDraft((current) => ({ ...current, status: event.target.value }))}
+                          className="smm-select"
+                        >
+                          {availableHistoryStatuses.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="apk-app-form-field">
+                        <span>Filter Riwayat</span>
+                        <select
+                          value={historyFilterDraft.kind}
+                          onChange={(event) => setHistoryFilterDraft((current) => ({ ...current, kind: event.target.value }))}
+                          className="smm-select"
+                        >
+                          {availableHistoryKinds.map((kind) => (
+                            <option key={kind} value={kind}>
+                              {kind}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="apk-app-form-field">
+                        <span>Cari Riwayat</span>
+                        <input
+                          value={historyFilterDraft.search}
+                          onChange={(event) => setHistoryFilterDraft((current) => ({ ...current, search: event.target.value }))}
+                          placeholder="Cari nama, referensi, atau detail"
+                        />
+                      </label>
+                      <div className="smm-monitoring-filter-actions">
+                        <span>Submit</span>
+                        <div className="smm-monitoring-filter-buttons">
+                          <button type="button" className="apk-app-primary-button" onClick={applyHistoryFilter}>
+                            Filter
+                          </button>
+                          <button
+                            type="button"
+                            className="apk-app-ghost-button"
+                            onClick={refreshHistoryTable}
+                            disabled={!walletProfile.username || isSubmittingProfile || isSubmittingDeposit}
+                          >
+                            Refresh
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="apk-app-empty">Belum ada riwayat deposit.</div>
-                  )}
-                </article>
+                  </div>
 
-                <article className="apk-app-form-card">
-                  <span className="apk-app-section-label">Riwayat Order</span>
-                  {orderHistoryEntries.length ? (
-                    <div className="apk-app-info-stack">
-                      {orderHistoryEntries.map((entry) => {
-                        const expanded = expandedHistoryId === entry.id;
-                        return (
-                          <article key={entry.id} className="apk-app-info-card apk-app-history-card">
-                            <div className="apk-app-history-head">
-                              <strong>{entry.title}</strong>
-                              <span className={`apk-app-history-status apk-app-history-status--${entry.status}`}>{entry.statusLabel}</span>
-                            </div>
-                            <div className="apk-app-history-meta">
-                              <span>Waktu : {entry.createdLabel}</span>
-                              <span>Order : {entry.title}</span>
-                              <span>Nama : {entry.subjectName}</span>
-                              <span>Harga : {entry.amountLabel}</span>
-                            </div>
-                            <button
-                              type="button"
-                              className="apk-app-ghost-button"
-                              onClick={() => setExpandedHistoryId(expanded ? null : entry.id)}
-                            >
-                              {expanded ? 'Tutup Detail Order' : 'Lihat Detail Order'}
-                            </button>
-                            {expanded ? (
-                              <div className="apk-app-history-detail">
-                                <p>{entry.detail}</p>
-                                <p>Metode : {entry.methodLabel}</p>
-                                <p>Referensi : {entry.reference}</p>
-                              </div>
-                            ) : null}
-                          </article>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="apk-app-empty">Belum ada riwayat order.</div>
-                  )}
-                </article>
-              </div>
+                  <div className="smm-status-table-wrap">
+                    <table className="smm-status-table">
+                      <thead>
+                        <tr>
+                          <th>Waktu</th>
+                          <th>Jenis</th>
+                          <th>Transaksi</th>
+                          <th>Jumlah</th>
+                          <th>Metode</th>
+                          <th>Status</th>
+                          <th>Detail</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredHistoryEntries.length ? (
+                          filteredHistoryEntries.map((entry) => {
+                            const createdAt = formatDateParts(entry.createdAt);
+                            return (
+                              <tr key={entry.id}>
+                                <td className="smm-status-time-cell">
+                                  <span>{createdAt.datePart}</span>
+                                  <span>{createdAt.timePart}</span>
+                                </td>
+                                <td className="smm-status-cell--nowrap">{entry.kind === 'deposit' ? 'Deposit' : 'Order'}</td>
+                                <td>
+                                  <div className="smm-status-service-name">{entry.title}</div>
+                                  <div className="smm-status-service-name">{entry.subjectName}</div>
+                                </td>
+                                <td className="smm-status-cell--nowrap">{entry.amountLabel}</td>
+                                <td className="smm-status-cell--nowrap">{entry.methodLabel || '-'}</td>
+                                <td className="smm-status-cell--nowrap">
+                                  <span className={`smm-status-badge smm-status-badge--${mapStatusTone(entry.statusLabel)}`}>{entry.statusLabel}</span>
+                                </td>
+                                <td className="smm-status-cell--nowrap">
+                                  <button
+                                    type="button"
+                                    className="smm-status-detail-button"
+                                    onClick={() => setDetailHistoryEntry(entry)}
+                                    aria-label="Detail riwayat"
+                                  >
+                                    <DetailGlyph />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={7}>
+                              <div className="apk-app-empty">Belum ada riwayat transaksi yang cocok dengan filter ini.</div>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <div className="apk-app-empty">Login akun dulu agar riwayat deposit dan order bisa ditampilkan.</div>
+              )}
             </section>
           ) : null}
 
@@ -1549,8 +1851,11 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
           </button>
           <button
             type="button"
-            className={accountModalView === 'riwayat' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
-            onClick={() => setAccountModalView('riwayat')}
+            className={activeTab === 'riwayat' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
+            onClick={() => {
+              setAccountModalView(null);
+              setActiveTab('riwayat');
+            }}
           >
             <span className="apk-app-nav-icon">
               <NavGlyph type="riwayat" />
@@ -1573,26 +1878,37 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
           <div className="smm-detail-modal-backdrop" onClick={() => setAccountModalView(null)}>
             <div className="smm-detail-modal account-popup-modal" onClick={(event) => event.stopPropagation()}>
               <div className="smm-detail-modal-head">
-                <strong>
-                  {accountModalView === 'deposit'
-                    ? 'Deposit'
-                    : accountModalView === 'riwayat'
-                      ? 'Riwayat Deposit'
-                      : 'Profil'}
-                </strong>
+                <strong>{accountModalView === 'deposit' ? 'Deposit' : 'Profil'}</strong>
                 <button
                   type="button"
                   className="smm-detail-modal-close"
                   onClick={() => setAccountModalView(null)}
                   aria-label="Tutup popup akun"
                 >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M7.2 7.2 16.8 16.8M16.8 7.2 7.2 16.8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
-                  </svg>
+                  <ModalCloseGlyph />
                 </button>
               </div>
 
               <div className="smm-detail-modal-body account-popup-modal__body">
+                <div className="account-popup-tabs">
+                  {([
+                    ['profil', 'Profil'],
+                    ['deposit', 'Deposit'],
+                  ] as Array<['profil' | 'deposit', string]>).map(([view, label]) => (
+                    <button
+                      key={view}
+                      type="button"
+                      className={accountModalView === view ? 'account-popup-tab account-popup-tab--active' : 'account-popup-tab'}
+                      onClick={() => setAccountModalView(view)}
+                    >
+                      <span className="account-popup-tab__icon">
+                        <AccountPopupGlyph type={view} />
+                      </span>
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+
                 {accountModalView === 'deposit' ? (
                   <div className="account-popup-stack">
                     <div className="account-popup-card">
@@ -1604,6 +1920,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
                     </div>
 
                     <div className="account-popup-card">
+                      <span className="smm-profile-title">Deposit</span>
                       {!activeDepositQris ? (
                         <>
                           <div className="apk-app-form-grid smm-profile-form-grid">
@@ -1680,32 +1997,17 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
                   </div>
                 ) : null}
 
-                {accountModalView === 'riwayat' ? (
-                  <div className="account-popup-stack">
-                    {depositHistoryEntries.length ? (
-                      <div className="account-popup-history-mini">
-                        {depositHistoryEntries.slice(0, 8).map((entry) => (
-                          <article key={entry.id} className="account-popup-history-mini__row">
-                            <div className="account-popup-history-mini__top">
-                              <span className="account-popup-history-mini__time">{entry.createdLabel}</span>
-                              <span className={`apk-app-history-status apk-app-history-status--${entry.status}`}>{entry.statusLabel}</span>
-                            </div>
-                            <div className="account-popup-history-mini__bottom">
-                              <span className="account-popup-history-mini__amount">{entry.amountLabel}</span>
-                            </div>
-                          </article>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="apk-app-empty">Belum ada riwayat deposit.</div>
-                    )}
-                  </div>
-                ) : null}
-
                 {accountModalView === 'profil' ? (
                   <div className="account-popup-stack">
                     <div className="account-popup-card">
-                      <span className="smm-profile-title">Status akun</span>
+                      <div className="account-popup-card__head">
+                        <span className="smm-profile-title">Status akun</span>
+                        {walletProfile.loggedIn ? (
+                          <button type="button" className="account-popup-inline-action" onClick={logoutWalletAccount}>
+                            Log out
+                          </button>
+                        ) : null}
+                      </div>
                       <div className="smm-profile-lines">
                         <p>Nama akun : {walletProfile.name || '-'}</p>
                         <p>Username : {walletProfile.username ? `@${walletProfile.username}` : '-'}</p>
@@ -1716,6 +2018,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
 
                     {walletProfile.loggedIn ? (
                       <div className="account-popup-card">
+                        <span className="smm-profile-title">Profil</span>
                         <div className="apk-app-form-grid smm-profile-form-grid">
                           <label className="apk-app-form-field">
                             <span>Username baru</span>
@@ -1745,6 +2048,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
 
                     {!walletProfile.loggedIn ? (
                       <div className="account-popup-card">
+                        <span className="smm-profile-title">Profil</span>
                         <div className="account-popup-auth-toggle">
                           <button
                             type="button"
@@ -1830,6 +2134,97 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
 
                   </div>
                 ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {detailHistoryEntry ? (
+          <div className="smm-detail-modal-backdrop" onClick={() => setDetailHistoryEntry(null)}>
+            <div className="smm-detail-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="smm-detail-modal-head">
+                <strong>Detail Riwayat</strong>
+                <button
+                  type="button"
+                  className="smm-detail-modal-close"
+                  onClick={() => setDetailHistoryEntry(null)}
+                  aria-label="Tutup detail riwayat"
+                >
+                  <ModalCloseGlyph />
+                </button>
+              </div>
+
+              <div className="smm-detail-modal-body">
+                <table className="smm-detail-table">
+                  <tbody>
+                    <tr>
+                      <th>Jenis</th>
+                      <td>{detailHistoryEntry.kind === 'deposit' ? 'Deposit' : 'Order'}</td>
+                    </tr>
+                    <tr>
+                      <th>Transaksi</th>
+                      <td>{detailHistoryEntry.title || '-'}</td>
+                    </tr>
+                    <tr>
+                      <th>Nama</th>
+                      <td>{detailHistoryEntry.subjectName || '-'}</td>
+                    </tr>
+                    <tr>
+                      <th>Jumlah</th>
+                      <td>{detailHistoryEntry.amountLabel || '-'}</td>
+                    </tr>
+                    <tr>
+                      <th>Metode</th>
+                      <td>{detailHistoryEntry.methodLabel || '-'}</td>
+                    </tr>
+                    <tr>
+                      <th>Status</th>
+                      <td>{detailHistoryEntry.statusLabel || '-'}</td>
+                    </tr>
+                    <tr>
+                      <th>Referensi</th>
+                      <td>{detailHistoryEntry.reference || '-'}</td>
+                    </tr>
+                    <tr>
+                      <th>Tanggal &amp; Waktu</th>
+                      <td>{detailHistoryEntry.createdLabel || '-'}</td>
+                    </tr>
+                    <tr>
+                      <th>Detail</th>
+                      <td>{detailHistoryEntry.detail || '-'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {helperModalView ? (
+          <div className="smm-detail-modal-backdrop" onClick={() => setHelperModalView(null)}>
+            <div className="smm-detail-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="smm-detail-modal-head">
+                <strong>{helperModalTitle}</strong>
+                <button
+                  type="button"
+                  className="smm-detail-modal-close"
+                  onClick={() => setHelperModalView(null)}
+                  aria-label="Tutup dokumentasi api"
+                >
+                  <ModalCloseGlyph />
+                </button>
+              </div>
+
+              <div className="smm-detail-modal-body">
+                <div className="account-popup-stack">
+                  <div className="account-popup-card">
+                    <div className="smm-profile-lines">
+                      <p>Mode aplikasi premium memakai API internal website untuk katalog, checkout, status order, dan saldo akun umum.</p>
+                      <p>Route utama : `/api/apk-premium/catalog`, `/api/apk-premium/order`, `/api/apk-premium/order-status`, dan `/api/core/deposit`.</p>
+                      <p>Saldo akun di menu ini sama dengan saldo umum yang dipakai bersama dengan mode sosial media.</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
