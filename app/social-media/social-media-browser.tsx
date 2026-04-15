@@ -27,6 +27,7 @@ import {
   siYoutube,
 } from 'simple-icons';
 import type { NormalizedPusatPanelProfile, NormalizedPusatPanelService } from '@/lib/pusatpanel';
+import { ActionLoadingOverlay } from '@/app/components/action-loading-overlay';
 import { STORE_ACCOUNT_MENU_SECTIONS, TopAccountMenu } from '@/app/components/top-account-menu';
 
 type Props = {
@@ -1098,32 +1099,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   }, [platformGroups]);
 
   const activePlatform = platformGroups.find((group) => group.key === selectedPlatformKey) || platformGroups[0] || null;
-  const socialAccountMenuSections = useMemo(
-    () =>
-      STORE_ACCOUNT_MENU_SECTIONS.map((section) => ({
-        ...section,
-        items: section.items.map((item) => {
-          if (item.label === 'Profil') {
-            return { ...item, href: '/social-media?tab=profil#profile-account' };
-          }
-          if (item.label === 'Cara Deposit') {
-            return { ...item, href: '/social-media?tab=profil#guide-deposit' };
-          }
-          if (item.label === 'Informasi Status Order') {
-            return { ...item, href: '/social-media?tab=profil#guide-status' };
-          }
-          if (item.label === 'Panduan Cara Pesanan') {
-            return { ...item, href: '/social-media?tab=profil#guide-order' };
-          }
-          if (item.label === 'Kontak') {
-            return { ...item, href: '/social-media?tab=profil#guide-contact' };
-          }
-          return item;
-        }),
-      })),
-    [],
-  );
-
   useEffect(() => {
     if (!activePlatform) {
       setSelectedCategory('');
@@ -1255,6 +1230,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const showPaidCheckoutResult =
     activeCheckoutOrder?.paymentMethod === 'midtrans' && activeCheckoutOrder.paymentStatus === 'paid';
   const activeCheckoutProviderId = String(activeCheckoutOrder?.providerOrderId || '').trim();
+  const isActionLoading =
+    isOrdering || isRefreshingHistory || isRefreshingAccountOrders || isRefreshingCheckoutStatus || isSubmittingProfile;
 
   const submitOrder = () => {
     if (!selectedService) {
@@ -1358,12 +1335,13 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
   return (
     <div className="apk-app-shell smm-app-page">
+      <ActionLoadingOverlay visible={isActionLoading} label="Memuat..." />
       <div className="apk-app-phone">
         <div className="apk-app-top-strip">
           <TopAccountMenu
             displayName={accountProfile.loggedIn ? accountProfile.name : 'Profil'}
             balance={accountProfile.balance}
-            sections={socialAccountMenuSections}
+            sections={STORE_ACCOUNT_MENU_SECTIONS}
           />
         </div>
         <div className="apk-app-content apk-app-content--tight">
@@ -1782,7 +1760,14 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                   <div className="smm-monitoring-filter-actions">
                     <span>Submit</span>
                     <div className="smm-monitoring-filter-buttons">
-                      <button type="button" className="apk-app-primary-button" onClick={applyMonitoringFilter}>
+                      <button
+                        type="button"
+                        className="apk-app-primary-button"
+                        onClick={() => {
+                          applyMonitoringFilter();
+                          refreshHistory();
+                        }}
+                      >
                         Filter
                       </button>
                       <button type="button" className="apk-app-ghost-button" onClick={refreshHistory} disabled={isRefreshingHistory}>
@@ -1908,7 +1893,14 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                       <div className="smm-monitoring-filter-actions">
                         <span>Submit</span>
                         <div className="smm-monitoring-filter-buttons">
-                          <button type="button" className="apk-app-primary-button" onClick={applyStatusFilter}>
+                          <button
+                            type="button"
+                            className="apk-app-primary-button"
+                            onClick={() => {
+                              applyStatusFilter();
+                              refreshAccountOrders(accountProfile.username);
+                            }}
+                          >
                             Filter
                           </button>
                           <button
@@ -2092,7 +2084,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
               <div className="apk-app-panel-head">
                 <div>
                   <span className="apk-app-section-label">Profil</span>
-                  <h3>Daftar akun, login, dan akses saldo website</h3>
                 </div>
               </div>
 
@@ -2107,81 +2098,20 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                   </div>
                 </div>
 
-                {!accountProfile.registered ? (
-                  <div className="smm-profile-block">
-                    <span className="smm-profile-title">Daftar akun baru</span>
-                    <div className="apk-app-form-grid smm-profile-form-grid">
-                      <label className="apk-app-form-field">
-                        <span>Nama akun</span>
-                        <input
-                          value={accountRegisterDraft.name}
-                          onChange={(event) => setAccountRegisterDraft((current) => ({ ...current, name: event.target.value }))}
-                          placeholder="Nama lengkap"
-                        />
-                      </label>
-                      <label className="apk-app-form-field">
-                        <span>Username akun</span>
-                        <input
-                          value={accountRegisterDraft.username}
-                          onChange={(event) => setAccountRegisterDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
-                          placeholder="contoh: putrigmoyy"
-                        />
-                      </label>
-                      <label className="apk-app-form-field">
-                        <span>Password akun</span>
-                        <input
-                          type="password"
-                          value={accountRegisterDraft.password}
-                          onChange={(event) => setAccountRegisterDraft((current) => ({ ...current, password: event.target.value }))}
-                          placeholder="Minimal 6 karakter"
-                        />
-                      </label>
-                    </div>
-                    <div className="apk-app-action-row smm-profile-action-row">
-                      <button type="button" className="apk-app-primary-button" onClick={registerAccount} disabled={isSubmittingProfile}>
-                        {isSubmittingProfile ? 'Memproses...' : 'Daftar Akun'}
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                {accountProfile.registered && !accountProfile.loggedIn ? (
-                  <div className="smm-profile-block">
-                    <span className="smm-profile-title">Login akun</span>
-                    <div className="apk-app-form-grid smm-profile-form-grid">
-                      <label className="apk-app-form-field">
-                        <span>Username akun</span>
-                        <input
-                          value={accountLoginDraft.username}
-                          onChange={(event) => setAccountLoginDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
-                          placeholder="Masukkan username"
-                        />
-                      </label>
-                      <label className="apk-app-form-field">
-                        <span>Password akun</span>
-                        <input
-                          type="password"
-                          value={accountLoginDraft.password}
-                          onChange={(event) => setAccountLoginDraft((current) => ({ ...current, password: event.target.value }))}
-                          placeholder="Masukkan password"
-                        />
-                      </label>
-                    </div>
-                    <div className="apk-app-action-row smm-profile-action-row">
-                      <button type="button" className="apk-app-primary-button" onClick={loginAccount} disabled={isSubmittingProfile}>
-                        {isSubmittingProfile ? 'Memproses...' : 'Login'}
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
                 <div className="smm-profile-block">
-                  <span className="smm-profile-title">Menu utama</span>
+                  <span className="smm-profile-title">Pusat akun</span>
                   <div className="smm-profile-links">
-                    <Link href="/apk-premium?tab=deposit">Deposit</Link>
-                    <Link href="/apk-premium?tab=riwayat#deposit-history">Riwayat Deposit</Link>
+                    <Link href="/account-center?tab=profil#profile-edit">Profil</Link>
+                    <Link href="/account-center?tab=deposit">Deposit</Link>
+                    <Link href="/account-center?tab=riwayat#deposit-history">Riwayat Deposit</Link>
                   </div>
                 </div>
+
+                {!accountProfile.loggedIn ? (
+                  <div className="apk-app-feedback apk-app-feedback--idle">
+                    Buka pusat akun untuk daftar, login, atau ubah username dan password akun website.
+                  </div>
+                ) : null}
 
                 <div className="smm-profile-block">
                   <span className="smm-profile-title">Panduan mulai transaksi</span>
@@ -2196,14 +2126,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                 {profileFeedback.text ? (
                   <div className={`apk-app-feedback apk-app-feedback--${profileFeedback.tone}`}>
                     {profileFeedback.text}
-                  </div>
-                ) : null}
-
-                {accountProfile.registered && accountProfile.loggedIn ? (
-                  <div className="apk-app-action-row smm-profile-logout-row">
-                    <button type="button" className="apk-app-ghost-button" onClick={logoutAccount}>
-                      Logout
-                    </button>
                   </div>
                 ) : null}
               </article>

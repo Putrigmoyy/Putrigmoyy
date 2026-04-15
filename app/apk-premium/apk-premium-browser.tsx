@@ -1358,7 +1358,9 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
           <button
             type="button"
             className={activeTab === 'deposit' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
-            onClick={() => setActiveTab('deposit')}
+            onClick={() => {
+              window.location.href = '/account-center?tab=deposit';
+            }}
           >
             <span className="apk-app-nav-icon">
               <NavGlyph type="deposit" />
@@ -1368,7 +1370,9 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
           <button
             type="button"
             className={activeTab === 'riwayat' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
-            onClick={() => setActiveTab('riwayat')}
+            onClick={() => {
+              window.location.href = '/account-center?tab=riwayat#deposit-history';
+            }}
           >
             <span className="apk-app-nav-icon">
               <NavGlyph type="riwayat" />
@@ -1378,7 +1382,9 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
           <button
             type="button"
             className={activeTab === 'profil' ? 'apk-app-nav-item apk-app-nav-item--active' : 'apk-app-nav-item'}
-            onClick={() => setActiveTab('profil')}
+            onClick={() => {
+              window.location.href = '/account-center?tab=profil#profile-account';
+            }}
           >
             <span className="apk-app-nav-icon">
               <NavGlyph type="profil" />

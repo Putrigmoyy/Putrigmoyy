@@ -314,6 +314,7 @@ a {
 .site-mini-account__link {
   display: flex;
   align-items: center;
+  gap: 10px;
   min-height: 40px;
   padding: 0 12px;
   border: 1px solid rgba(23, 153, 242, 0.08);
@@ -322,6 +323,22 @@ a {
   color: #111111;
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.site-mini-account__link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: rgba(17, 17, 17, 0.76);
+  flex-shrink: 0;
+}
+
+.site-mini-account__link-icon svg {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 
 @keyframes site-mini-account-slide {
@@ -338,6 +355,41 @@ a {
 .site-mini-account__link--disabled {
   opacity: 0.45;
   pointer-events: none;
+}
+
+.site-action-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.site-action-loading__card {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  min-width: 132px;
+  padding: 18px 20px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 36px rgba(23, 153, 242, 0.12);
+}
+
+.site-action-loading__image {
+  width: 62px;
+  height: 62px;
+  display: block;
+}
+
+.site-action-loading__card span {
+  color: #111111;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .apk-app-header {
@@ -400,6 +452,18 @@ a {
 }
 
 .smm-app-page .apk-app-section-label::before {
+  display: none;
+}
+
+.account-center-page .apk-app-section-label {
+  gap: 0;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.account-center-page .apk-app-section-label::before {
   display: none;
 }
 
@@ -1176,6 +1240,7 @@ a {
   border-color: rgba(82, 92, 255, 0.5);
   background: linear-gradient(135deg, rgba(23, 153, 242, 0.08), rgba(210, 9, 209, 0.08));
   box-shadow: 0 12px 24px rgba(23, 153, 242, 0.1);
+  animation: apk-app-soft-pop 0.28s ease;
 }
 
 .smm-platform-icon {
@@ -1656,6 +1721,10 @@ a {
   gap: 14px;
 }
 
+.account-center-sheet {
+  margin-top: 0;
+}
+
 .smm-profile-block {
   display: grid;
   gap: 10px;
@@ -1704,6 +1773,14 @@ a {
 .smm-profile-action-row,
 .smm-profile-logout-row {
   margin-top: 0;
+}
+
+.account-center-block--plain {
+  gap: 14px;
+}
+
+.account-center-guide-lines {
+  gap: 10px;
 }
 
 .smm-status-order-note {

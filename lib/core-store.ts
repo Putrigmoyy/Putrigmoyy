@@ -355,6 +355,71 @@ export async function loginCoreWalletAccount(input: { username: string; password
   return bundle;
 }
 
+export async function updateCoreWalletAccount(input: {
+  currentUsername: string;
+  newUsername?: string;
+  newPassword?: string;
+}) {
+  if (!isCoreConfigured()) {
+    throw new Error('DATABASE_URL_CORE belum diisi.');
+  }
+
+  const currentUsername = normalizeUsername(input.currentUsername);
+  const newUsername = normalizeUsername(input.newUsername || '');
+  const newPassword = String(input.newPassword || '').trim();
+
+  if (!currentUsername) {
+    throw new Error('Username akun wajib diisi.');
+  }
+
+  const row = await getWalletRow(currentUsername);
+  if (!row) {
+    throw new Error('Akun belum ditemukan.');
+  }
+
+  const currentResolvedUsername = resolveAccountKey(row) || currentUsername;
+  const nextUsername = newUsername || currentResolvedUsername;
+
+  if (nextUsername !== currentResolvedUsername && !validateUsername(nextUsername)) {
+    throw new Error('Username hanya boleh 4-24 karakter, huruf kecil, angka, titik, garis bawah, atau strip.');
+  }
+
+  if (nextUsername !== currentResolvedUsername) {
+    const existing = await getWalletRow(nextUsername);
+    if (existing && resolveAccountKey(existing) !== currentResolvedUsername) {
+      throw new Error('Username baru sudah dipakai akun lain.');
+    }
+  }
+
+  if (newPassword && newPassword.length < 6) {
+    throw new Error('Password baru minimal 6 karakter.');
+  }
+
+  if (nextUsername === currentResolvedUsername && !newPassword) {
+    throw new Error('Belum ada perubahan profil yang dikirim.');
+  }
+
+  const sql = getNeonClient('core');
+  await sql`
+    update core_wallet_accounts
+    set
+      username = ${nextUsername},
+      password_hash = case
+        when ${newPassword} <> '' then ${hashPassword(newPassword)}
+        else password_hash
+      end,
+      updated_at = now()
+    where lower(username) = ${currentResolvedUsername}
+      or lower(contact) = ${currentResolvedUsername}
+  `;
+
+  const bundle = await getCoreWalletBundle(nextUsername, true);
+  if (!bundle) {
+    throw new Error('Profil berhasil diperbarui, tetapi data akun belum bisa dimuat.');
+  }
+  return bundle;
+}
+
 type CoreHistoryInsert = {
   accountContact: string;
   kind: 'order' | 'deposit';

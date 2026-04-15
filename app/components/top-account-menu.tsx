@@ -8,6 +8,7 @@ export type TopAccountMenuItem = {
   href: string;
   external?: boolean;
   disabled?: boolean;
+  icon?: 'profil' | 'deposit' | 'riwayat';
 };
 
 export type TopAccountMenuSection = {
@@ -25,21 +26,49 @@ export const STORE_ACCOUNT_MENU_SECTIONS: TopAccountMenuSection[] = [
   {
     title: 'Menu Utama',
     items: [
-      { label: 'Profil', href: '/apk-premium?tab=profil#profile-account' },
-      { label: 'Deposit', href: '/apk-premium?tab=deposit' },
-      { label: 'Riwayat Deposit', href: '/apk-premium?tab=riwayat#deposit-history' },
+      { label: 'Profil', href: '/account-center?tab=profil#profile-account', icon: 'profil' },
+      { label: 'Deposit', href: '/account-center?tab=deposit', icon: 'deposit' },
+      { label: 'Riwayat Deposit', href: '/account-center?tab=riwayat#deposit-history', icon: 'riwayat' },
     ],
   },
   {
     title: 'Panduan Mulai Transaksi',
     items: [
-      { label: 'Cara Deposit', href: '/apk-premium?tab=profil#guide-deposit' },
-      { label: 'Informasi Status Order', href: '/apk-premium?tab=profil#guide-status' },
-      { label: 'Panduan Cara Pesanan', href: '/apk-premium?tab=profil#guide-order' },
-      { label: 'Kontak', href: '/apk-premium?tab=profil#guide-contact' },
+      { label: 'Cara Deposit', href: '/account-center?tab=profil#guide-deposit' },
+      { label: 'Informasi Status Order', href: '/account-center?tab=profil#guide-status' },
+      { label: 'Panduan Cara Pesanan', href: '/account-center?tab=profil#guide-order' },
+      { label: 'Kontak', href: '/account-center?tab=profil#guide-contact' },
     ],
   },
 ];
+
+function TopAccountMenuLinkIcon({ type }: { type: NonNullable<TopAccountMenuItem['icon']> }) {
+  if (type === 'deposit') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4.8 8.2h14.4v9.1a1.8 1.8 0 0 1-1.8 1.8H6.6a1.8 1.8 0 0 1-1.8-1.8V8.2Z" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.7" />
+        <path d="M4.8 10.2h14.4M8.2 6.1h7.6" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
+      </svg>
+    );
+  }
+
+  if (type === 'riwayat') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 7.1v4.75l2.8 1.85" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+        <path d="M19.4 12a7.4 7.4 0 1 1-2.2-5.3" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+        <path d="M19.45 5.75V8.6H16.6" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="8.4" r="3.1" fill="none" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M6.8 18.25a5.2 5.2 0 0 1 10.4 0" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
+    </svg>
+  );
+}
 
 export function TopAccountMenu({ displayName, balance, sections }: Props) {
   const [open, setOpen] = useState(false);
@@ -106,7 +135,12 @@ export function TopAccountMenu({ displayName, balance, sections }: Props) {
                         setOpen(false);
                       }}
                     >
-                      {item.label}
+                      {item.icon ? (
+                        <span className="site-mini-account__link-icon">
+                          <TopAccountMenuLinkIcon type={item.icon} />
+                        </span>
+                      ) : null}
+                      <span>{item.label}</span>
                     </a>
                   ) : (
                     <Link
@@ -121,7 +155,12 @@ export function TopAccountMenu({ displayName, balance, sections }: Props) {
                         setOpen(false);
                       }}
                     >
-                      {item.label}
+                      {item.icon ? (
+                        <span className="site-mini-account__link-icon">
+                          <TopAccountMenuLinkIcon type={item.icon} />
+                        </span>
+                      ) : null}
+                      <span>{item.label}</span>
                     </Link>
                   ),
                 )}
