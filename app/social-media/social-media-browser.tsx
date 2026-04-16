@@ -3238,48 +3238,53 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                     <div className="account-popup-card">
                       {helperModalView === 'kontak' ? (
                         <div className="smm-contact-list">
-                          {contactEntries.map((item) => (
-                            <div key={item.key} className="smm-contact-item">
-                              <span
-                                className="smm-contact-icon"
-                                aria-hidden="true"
-                                style={{
-                                  color:
-                                    item.icon === 'instagram'
-                                      ? '#e4408b'
-                                      : item.icon === 'telegram'
-                                        ? '#27a7e7'
-                                        : item.icon === 'whatsapp'
-                                          ? '#25d366'
-                                          : '#1799f2',
-                                }}
-                              >
-                                {item.icon === 'email' ? <MailGlyph /> : <SocialPlatformIcon icon={item.icon} />}
-                              </span>
-                              <div className="smm-contact-copy">
-                                <strong>{item.label}</strong>
-                                <span>{item.value}</span>
-                              </div>
-                              <div className="smm-contact-actions">
-                                {item.href ? (
-                                  <a
-                                    href={item.href}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="smm-contact-action smm-contact-action--open"
-                                  >
-                                    Buka
-                                  </a>
-                                ) : null}
-                                <button
-                                  type="button"
-                                  className="smm-contact-action"
-                                  onClick={() => void copyToClipboard(item.copyValue, `${item.label} berhasil disalin.`)}
+                          {contactEntries.map((item, index) => (
+                            <details key={item.key} className="smm-guide-accordion smm-guide-accordion--contact" open={index === 0}>
+                              <summary className="smm-guide-summary">
+                                <span
+                                  className="smm-contact-icon"
+                                  aria-hidden="true"
+                                  style={{
+                                    color:
+                                      item.icon === 'instagram'
+                                        ? '#e4408b'
+                                        : item.icon === 'telegram'
+                                          ? '#27a7e7'
+                                          : item.icon === 'whatsapp'
+                                            ? '#25d366'
+                                            : '#1799f2',
+                                  }}
                                 >
-                                  Salin
-                                </button>
+                                  {item.icon === 'email' ? <MailGlyph /> : <SocialPlatformIcon icon={item.icon} />}
+                                </span>
+                                <span className="smm-guide-summary__copy">
+                                  <strong>{item.label}</strong>
+                                  <span>{item.value}</span>
+                                </span>
+                                <span className="smm-guide-summary__arrow" aria-hidden="true" />
+                              </summary>
+                              <div className="smm-guide-content">
+                                <div className="smm-contact-actions">
+                                  {item.href ? (
+                                    <a
+                                      href={item.href}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="smm-contact-action smm-contact-action--open"
+                                    >
+                                      Buka
+                                    </a>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    className="smm-contact-action"
+                                    onClick={() => void copyToClipboard(item.copyValue, `${item.label} berhasil disalin.`)}
+                                  >
+                                    Salin
+                                  </button>
+                                </div>
                               </div>
-                            </div>
+                            </details>
                           ))}
                         </div>
                       ) : null}
@@ -3300,28 +3305,45 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
                       {helperModalView === 'status-info' ? (
                         <div className="smm-status-guide-grid">
-                          {statusGuideItems.map((item) => (
-                            <div key={item.label} className="smm-status-guide-card">
-                              <div className="smm-status-guide-copy">
+                          {statusGuideItems.map((item, index) => (
+                            <details key={item.label} className="smm-guide-accordion" open={index === 0}>
+                              <summary className="smm-guide-summary smm-guide-summary--status">
                                 <span className={`smm-status-guide-badge smm-status-guide-badge--${item.tone}`}>{item.label}</span>
-                                <p>{item.description}</p>
+                                <span className="smm-guide-summary__copy">
+                                  <strong>{item.label}</strong>
+                                </span>
+                                <span className="smm-guide-summary__arrow" aria-hidden="true" />
+                              </summary>
+                              <div className="smm-guide-content">
+                                <div className="smm-status-guide-copy">
+                                  <p>{item.description}</p>
+                                </div>
                               </div>
-                            </div>
+                            </details>
                           ))}
                         </div>
                       ) : null}
 
                       {helperModalView === 'target' ? (
                         <div className="smm-target-guide">
-                          {targetGuideSections.map((section) => (
-                            <section key={section.title} className="smm-target-guide-section">
-                              <strong>{section.title}</strong>
-                              <ul>
-                                {section.items.map((item) => (
-                                  <li key={item}>{item}</li>
-                                ))}
-                              </ul>
-                            </section>
+                          {targetGuideSections.map((section, index) => (
+                            <details key={section.title} className="smm-guide-accordion" open={index === 0}>
+                              <summary className="smm-guide-summary">
+                                <span className="smm-guide-summary__copy">
+                                  <strong>{section.title}</strong>
+                                </span>
+                                <span className="smm-guide-summary__arrow" aria-hidden="true" />
+                              </summary>
+                              <div className="smm-guide-content">
+                                <section className="smm-target-guide-section">
+                                  <ul>
+                                    {section.items.map((item) => (
+                                      <li key={item}>{item}</li>
+                                    ))}
+                                  </ul>
+                                </section>
+                              </div>
+                            </details>
                           ))}
                         </div>
                       ) : null}

@@ -2795,14 +2795,70 @@ a {
   gap: 12px;
 }
 
-.smm-contact-item {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 12px;
-  padding: 14px;
+.smm-guide-accordion {
   border: 1px solid rgba(23, 153, 242, 0.12);
   border-radius: 18px;
   background: linear-gradient(135deg, rgba(23, 153, 242, 0.04), rgba(210, 9, 209, 0.04));
+  overflow: hidden;
+}
+
+.smm-guide-accordion[open] {
+  box-shadow: 0 16px 34px rgba(23, 153, 242, 0.08);
+}
+
+.smm-guide-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.smm-guide-summary::-webkit-details-marker {
+  display: none;
+}
+
+.smm-guide-summary__copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.smm-guide-summary__copy strong {
+  color: #111111;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.smm-guide-summary__copy span {
+  color: rgba(17, 17, 17, 0.74);
+  font-size: 10px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.smm-guide-summary__arrow {
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid rgba(17, 17, 17, 0.34);
+  border-bottom: 2px solid rgba(17, 17, 17, 0.34);
+  transform: rotate(45deg) translateY(-1px);
+  transition: transform 0.18s ease;
+}
+
+.smm-guide-accordion[open] .smm-guide-summary__arrow {
+  transform: rotate(-135deg) translateY(-1px);
+}
+
+.smm-guide-summary--status {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.smm-guide-content {
+  padding: 0 14px 14px;
 }
 
 .smm-contact-icon {
@@ -2824,31 +2880,10 @@ a {
   display: block;
 }
 
-.smm-contact-copy {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.smm-contact-copy strong {
-  color: #111111;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.3;
-}
-
-.smm-contact-copy span {
-  color: rgba(17, 17, 17, 0.74);
-  font-size: 10px;
-  line-height: 1.45;
-  word-break: break-word;
-}
-
 .smm-contact-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  grid-column: 2 / -1;
 }
 
 .smm-contact-action {
@@ -2880,13 +2915,9 @@ a {
   gap: 14px;
 }
 
-.smm-status-guide-card {
-  padding: 0;
-}
-
 .smm-status-guide-copy {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .smm-status-guide-copy p {
@@ -2937,14 +2968,7 @@ a {
 
 .smm-target-guide-section {
   display: grid;
-  gap: 10px;
-}
-
-.smm-target-guide-section strong {
-  color: #111111;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1.35;
+  gap: 8px;
 }
 
 .smm-target-guide-section ul {
@@ -2958,13 +2982,6 @@ a {
   color: #111111;
   font-size: 12px;
   line-height: 1.7;
-}
-
-@media (min-width: 720px) {
-  .smm-status-guide-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-  }
 }
 
 .smm-detail-table th {
