@@ -2730,6 +2730,10 @@ a {
   animation: apk-app-fade-up 0.22s ease;
 }
 
+.smm-detail-modal--wide {
+  width: min(100%, 900px);
+}
+
 .smm-detail-modal-head {
   display: flex;
   align-items: center;
@@ -2869,6 +2873,98 @@ a {
 
 .smm-contact-action:active {
   transform: scale(0.97);
+}
+
+.smm-status-guide-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.smm-status-guide-card {
+  padding: 0;
+}
+
+.smm-status-guide-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.smm-status-guide-copy p {
+  margin: 0;
+  color: #111111;
+  font-size: 12px;
+  line-height: 1.62;
+}
+
+.smm-status-guide-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.smm-status-guide-badge--success {
+  background: #20c7b3;
+}
+
+.smm-status-guide-badge--processing {
+  background: #27a7e7;
+}
+
+.smm-status-guide-badge--pending {
+  background: #f0b000;
+}
+
+.smm-status-guide-badge--partial {
+  background: #e53950;
+}
+
+.smm-status-guide-badge--error {
+  background: #e53950;
+}
+
+.smm-target-guide {
+  display: grid;
+  gap: 18px;
+}
+
+.smm-target-guide-section {
+  display: grid;
+  gap: 10px;
+}
+
+.smm-target-guide-section strong {
+  color: #111111;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.smm-target-guide-section ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.smm-target-guide-section li {
+  color: #111111;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+@media (min-width: 720px) {
+  .smm-status-guide-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
 }
 
 .smm-detail-table th {

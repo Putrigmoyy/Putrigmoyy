@@ -57,6 +57,15 @@ type ManualPickerOption = {
   value: string;
   label: string;
 };
+type StatusGuideItem = {
+  label: string;
+  tone: 'success' | 'processing' | 'pending' | 'partial' | 'error';
+  description: string;
+};
+type TargetGuideSection = {
+  title: string;
+  items: string[];
+};
 
 type CoreDepositQrisState = {
   reference: string;
@@ -1867,6 +1876,170 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       icon: 'whatsapp',
     },
   ] as const;
+  const statusGuideItems: StatusGuideItem[] = [
+    {
+      label: 'SUCCESS',
+      tone: 'success',
+      description:
+        'Pesanan selesai diproses. Jika pesanan tidak sesuai dengan jumlah order, segera infokan kepada admin untuk dilakukan pengecekan atau penyesuaian.',
+    },
+    {
+      label: 'PROCESSING',
+      tone: 'processing',
+      description:
+        'Pesanan sedang diproses. Lama proses tergantung pada masing-masing layanan, ini dijelaskan di nama layanan atau deskripsi yang dipilih saat melakukan order. Jika tidak ditampilkan, kemungkinan pengerjaan akan lebih lama dari layanan yang terdapat di bawahnya.',
+    },
+    {
+      label: 'PENDING',
+      tone: 'pending',
+      description:
+        'Pesanan dalam antrian untuk diproses. Orderan Anda telah berhasil, tetapi belum diproses. Status pending juga bisa terjadi ketika layanan yang dipilih sedang maintenance atau pesanan nyangkut di server.',
+    },
+    {
+      label: 'PARTIAL',
+      tone: 'partial',
+      description:
+        'Pesanan hanya masuk sebagian dari jumlah yang diorder. Anda hanya membayar yang masuk saja, dan sebagian dana akan kami kembalikan. Pada kasus tertentu status partial tetapi saldo yang dikembalikan penuh sesuai dengan jumlah orderan, jika remains sama dengan jumlah orderan.',
+    },
+    {
+      label: 'ERROR',
+      tone: 'error',
+      description:
+        'Terjadi kesalahan sistem atau kesalahan memasukkan target pesanan, atau orderan terlalu padat pada suatu layanan sehingga harus kami batalkan untuk menghindari proses yang memakan waktu lama. Jika error, saldo otomatis kembali penuh ke akun Anda.',
+    },
+  ];
+  const targetGuideSections: TargetGuideSection[] = [
+    {
+      title: 'Facebook',
+      items: [
+        'Page Likes, Page Followers, Profil Followers, Friends : Link halaman atau profil Facebook // Contoh : https://www.facebook.com/putrigmoyystore/',
+        'Post Likes, Post Comments, Post Video, Emoticon Likes : Link postingan Facebook // Contoh : https://www.facebook.com/putrigmoyystore/posts/722289351896143 (diawali dengan m.facebook.com jika link dari mobile)',
+        'Video Views, Live Streaming : Link video Facebook // Contoh : https://www.facebook.com/putrigmoyystore/videos/722289351896143 (link terdapat di tanggal postingan, di bawah nama akun. Didapat dengan klik kanan tanggal postingan & copy link address, diawali dengan m.facebook.com jika link dari mobile)',
+        'Group Members : Link grup Facebook // Contoh : https://www.facebook.com/groups/putrigmoyystore',
+      ],
+    },
+    {
+      title: 'Instagram',
+      items: [
+        'Followers, Story Views, Live Video, Profil Visits : Username akun Instagram tanpa tanda @ // Contoh : putrigmoyy',
+        'Likes, Video Views, Comments, Impressions, Saves, IGTV : Link postingan akun Instagram // Contoh : https://www.instagram.com/p/putrigmoyy-promo-1/',
+      ],
+    },
+    {
+      title: 'Likee App',
+      items: [
+        'Followers : Link akun Likee // Contoh : https://likee.com/@putrigmoyy atau https://likee.video/@putrigmoyy',
+        'Post Likes : Link video Likee // Contoh : https://likee.com/@putrigmoyy/video/123456789 atau https://likee.video/@putrigmoyy/video/123456789',
+      ],
+    },
+    {
+      title: 'LinkedIn',
+      items: [
+        'Followers : Link akun LinkedIn // Contoh : https://www.linkedin.com/in/putrigmoyy/',
+        'Likes, Comments : Link postingan LinkedIn // Contoh : https://www.linkedin.com/posts/putrigmoyy_social-campaign-update-1234567890',
+      ],
+    },
+    {
+      title: 'Pinterest',
+      items: [
+        'Account Followers : Link akun Pinterest // Contoh : https://id.pinterest.com/putrigmoyystore/',
+        'Board Follower : Link board Pinterest // Contoh : https://id.pinterest.com/putrigmoyystore/board-promo-store/',
+        'Likes : Link postingan Pinterest // Contoh : https://id.pinterest.com/pin/754493743820940621/',
+      ],
+    },
+    {
+      title: 'SoundCloud',
+      items: [
+        'Followers : Link akun SoundCloud // Contoh : https://soundcloud.com/putrigmoyy',
+        'Plays, Likes : Link konten/lagu/musik/sounds // Contoh : https://soundcloud.com/putrigmoyy/promo-store-track',
+      ],
+    },
+    {
+      title: 'Spotify',
+      items: [
+        'Follower : Link akun Spotify // Contoh : https://open.spotify.com/artist/3zkqzEu0nHPDeP93vvY49U',
+        'Plays : Link konten/lagu/musik/sounds // Contoh : https://open.spotify.com/track/4Iv41kISupmIA1USRpqc8D',
+        'Albums, Playlist : Link albums atau playlist // Contoh : https://open.spotify.com/album/4qYIQgEeEeFQ1rl9IYNVoj atau https://open.spotify.com/playlist/5Cv0perCVIUk3iboUtHs7x',
+      ],
+    },
+    {
+      title: 'Telegram',
+      items: [
+        'Channel Member : Link channel Telegram // Contoh : https://t.me/putrigmoyystore',
+        'Post Views : Link channel Telegram tempat postingan // Contoh : https://t.me/c/putrigmoyystore (berdasarkan last post postingan Anda di channel tersebut)',
+      ],
+    },
+    {
+      title: 'TikTok',
+      items: [
+        'Follower : Link profil TikTok // Contoh : https://www.tiktok.com/@putrigmoyystore',
+        'Views, Likes, Comments, Shares : Link video TikTok // Contoh : https://www.tiktok.com/@putrigmoyystore/video/6913480030462954754 atau copy link via App TikTok',
+      ],
+    },
+    {
+      title: 'Twitch',
+      items: [
+        'Follower : Link profil Twitch // Contoh : https://www.twitch.tv/putrigmoyystore',
+      ],
+    },
+    {
+      title: 'Twitter',
+      items: [
+        'Follower, Profil Click : Link profil atau username Twitter tanpa tanda @ // Contoh : https://twitter.com/putrigmoyystore atau putrigmoyystore',
+        'Retweet, Comments, Shares, Likes, Favorites, Hashtag Clicks : Link postingan Twitter // Contoh : https://twitter.com/putrigmoyystore/status/1351742017726889984',
+        'Views, Video Views, Impression, Live : Link video Twitter // Contoh : https://twitter.com/putrigmoyystore/status/1360547605290229774 atau https://twitter.com/i/status/1360547605290229774',
+        'Poll Votes : Link dengan button number // Contoh : www.contoh.com?vote=ButtonNumber',
+      ],
+    },
+    {
+      title: 'Website',
+      items: [
+        'Web Traffic : Link home page situs web atau link artikel // Contoh : https://putrigmoyystore.com/ atau https://putrigmoyystore.com/halaman/produk-dan-layanan',
+      ],
+    },
+    {
+      title: 'Youtube',
+      items: [
+        'Subscribers : Link channel YouTube // Contoh : https://www.youtube.com/channel/UCZVJmTK9ynqFf4slQb_4vA atau https://www.youtube.com/c/putrigmoyystore',
+        'Watchtimes (Jam Tayang), Viewers atau Video Views, Live Streaming, Premier atau Tayang Perdana, Likes, Dislikes, Shares, Comments : Link video YouTube // Contoh : https://www.youtube.com/watch?v=4cz0cKqgLxE atau https://youtu.be/4cz0cKqgLxE',
+      ],
+    },
+    {
+      title: 'Tokopedia',
+      items: [
+        'Tokopedia Followers : Username akun Tokopedia atau link toko // Contoh : putrigmoyystore atau https://www.tokopedia.com/putrigmoyystore',
+        'Tokopedia Wishlist atau Favorite : Link produk Tokopedia // Contoh : https://www.tokopedia.com/putrigmoyystore/barang-premium',
+      ],
+    },
+    {
+      title: 'Shopee',
+      items: [
+        'Followers : Username akun Shopee atau link toko // Contoh : putrigmoyystore atau https://shopee.co.id/putrigmoyystore',
+        'Product Likes : Link produk Shopee // Contoh : https://shopee.co.id/M231-Kemeja-Pria-Batik-Navy.197800',
+        'Product Soldout atau Terjual : Username, password, dan link product akun Shopee // Contoh : putrigmoyystore|senjasuci1719|https://shopee.co.id/M231-Kemeja-Pria-Batik-Navy.197800',
+        'Feed Likes, Feed Comments : Link feed postingan Shopee // Contoh : https://feeds.shopee.co.id/share/AAg95N2FBABgpfkFAAAAAA==',
+      ],
+    },
+    {
+      title: 'Bukalapak',
+      items: [
+        'Followers : Username akun Bukalapak atau link toko // Contoh : putrigmoyystore atau https://www.bukalapak.com/u/putrigmoyystore',
+        'Product Likes, Product Soldout atau Terjual : Link produk Bukalapak // Contoh : https://www.bukalapak.com/p/elektronik/gadget/produk-putrigmoyystore',
+      ],
+    },
+    {
+      title: 'SEO (Search Engine Optimization)',
+      items: [
+        'Youtube Social Shares : Link video YouTube // Contoh : https://www.youtube.com/watch?v=4cz0cKqgLxE atau https://youtu.be/4cz0cKqgLxE',
+      ],
+    },
+    {
+      title: 'Jasa Programming',
+      items: [
+        'Jasa Pembuatan Website Panel SMM, Desktop : Nomor WhatsApp // Contoh : 081286444795',
+      ],
+    },
+  ];
 
   const platformGroups = useMemo<PlatformGroup[]>(() => {
     const buckets = new Map<string, PlatformGroup>();
@@ -3040,7 +3213,14 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
           {helperModalView ? (
             <div className="smm-detail-modal-backdrop" onClick={() => setHelperModalView(null)}>
-              <div className="smm-detail-modal" onClick={(event) => event.stopPropagation()}>
+              <div
+                className={
+                  helperModalView === 'target' || helperModalView === 'status-info'
+                    ? 'smm-detail-modal smm-detail-modal--wide'
+                    : 'smm-detail-modal'
+                }
+                onClick={(event) => event.stopPropagation()}
+              >
                 <div className="smm-detail-modal-head">
                   <strong>{helperModalTitle}</strong>
                   <button
@@ -3119,16 +3299,30 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                       ) : null}
 
                       {helperModalView === 'status-info' ? (
-                        <div className="smm-profile-lines">
-                          <p>Menu status order dipakai untuk memantau pesanan akun yang sedang login, termasuk ID order, target, harga, dan status prosesnya.</p>
-                          <p>Kalau pembayaran sudah sukses, detail order bisa dibuka dari tombol detail pesanan untuk melihat progress lebih lengkap.</p>
+                        <div className="smm-status-guide-grid">
+                          {statusGuideItems.map((item) => (
+                            <div key={item.label} className="smm-status-guide-card">
+                              <div className="smm-status-guide-copy">
+                                <span className={`smm-status-guide-badge smm-status-guide-badge--${item.tone}`}>{item.label}</span>
+                                <p>{item.description}</p>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ) : null}
 
                       {helperModalView === 'target' ? (
-                        <div className="smm-profile-lines">
-                          <p>Kolom target diisi sesuai kebutuhan layanan, misalnya URL postingan, username akun, atau link video.</p>
-                          <p>Pastikan target benar dan aktif agar provider bisa memproses order dengan lancar tanpa error atau pending terlalu lama.</p>
+                        <div className="smm-target-guide">
+                          {targetGuideSections.map((section) => (
+                            <section key={section.title} className="smm-target-guide-section">
+                              <strong>{section.title}</strong>
+                              <ul>
+                                {section.items.map((item) => (
+                                  <li key={item}>{item}</li>
+                                ))}
+                              </ul>
+                            </section>
+                          ))}
                         </div>
                       ) : null}
 
