@@ -80,6 +80,12 @@ function cleanText(value: unknown, fallback = '') {
   return text || fallback;
 }
 
+function stripWrappedImageQuotes(value: string) {
+  return String(value || '')
+    .trim()
+    .replace(/^[\s"'â€œâ€â€˜â€™]+|[\s"'â€œâ€â€˜â€™]+$/g, '');
+}
+
 function normalizeImageUrlInput(value: unknown) {
   const raw = String(value || '')
     .trim()
@@ -97,6 +103,45 @@ function normalizeImageUrlInput(value: unknown) {
     return encodeURI(raw);
   } catch {
     return raw.replace(/\s+/g, '%20');
+  }
+}
+
+function normalizePremiumImageUrl(value: unknown) {
+  const raw = stripWrappedImageQuotes(String(value || ''));
+
+  if (!raw) {
+    return '';
+  }
+
+  if (raw.startsWith('data:image/') || raw.startsWith('/')) {
+    return raw;
+  }
+
+  try {
+    const url = new URL(raw);
+
+    if (url.hostname.includes('drive.google.com')) {
+      const driveIdFromPath = url.pathname.match(/\/file\/d\/([^/]+)/i)?.[1];
+      const driveId = driveIdFromPath || url.searchParams.get('id') || '';
+      if (driveId) {
+        return `https://drive.google.com/uc?export=view&id=${encodeURIComponent(driveId)}`;
+      }
+    }
+
+    if (url.hostname.endsWith('dropbox.com')) {
+      url.searchParams.delete('dl');
+      url.searchParams.set('raw', '1');
+      return url.toString();
+    }
+
+    if (url.hostname === 'github.com' && url.pathname.includes('/blob/')) {
+      const rawPath = url.pathname.replace(/^\/+/, '').replace('/blob/', '/');
+      return `https://raw.githubusercontent.com/${rawPath}`;
+    }
+
+    return encodeURI(url.toString());
+  } catch {
+    return normalizeImageUrlInput(raw);
   }
 }
 
@@ -499,7 +544,7 @@ export async function createAdminApkProduct(input: {
       id,
       title,
       subtitle,
-      ${normalizeImageUrlInput(input.imageUrl)},
+      image_url,
       category,
       stock,
       sold,
@@ -514,7 +559,7 @@ export async function createAdminApkProduct(input: {
       ${productId},
       ${title},
       ${cleanText(input.subtitle, 'Aplikasi premium siap order cepat.')},
-      ${cleanText(input.imageUrl)},
+      ${normalizePremiumImageUrl(input.imageUrl)},
       ${cleanText(input.category, 'App Premium')},
       ${0},
       ${0},
@@ -587,7 +632,7 @@ export async function adminUpdateApkProduct(input: {
       delivery = ${cleanText(input.delivery, current.delivery || 'Auto kirim akun')},
       note = ${cleanText(input.note, current.note || 'Detail produk mengikuti varian yang dipilih.')},
       guarantee = ${cleanText(input.guarantee, current.guarantee || 'Garansi mengikuti ketentuan toko dan durasi varian.')},
-      image_url = ${normalizeImageUrlInput(input.imageUrl || current.image_url || '')},
+      image_url = ${normalizePremiumImageUrl(input.imageUrl || current.image_url || '')},
       updated_at = now()
     where id = ${productId}
   `;

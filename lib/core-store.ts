@@ -1315,6 +1315,15 @@ export async function adminDeleteCoreWalletUser(input: { currentUsername: string
 
   const resolvedCurrentUsername = resolveAccountKey(row) || currentUsername;
   const sql = getNeonClient('core');
+  const countRows = (await sql`
+    select count(*)::int as total
+    from core_wallet_accounts
+  `) as Array<{ total?: number | null }>;
+  const totalUsers = Math.max(0, Number(countRows[0]?.total || 0));
+
+  if (totalUsers <= 1) {
+    throw new Error('Minimal harus tersisa 1 user website. Tambah user lain dulu jika ingin menghapus akun ini.');
+  }
 
   await sql`
     delete from core_deposit_payments

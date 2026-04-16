@@ -58,6 +58,44 @@ function normalizeImagePreviewUrl(value: string) {
   }
 }
 
+function normalizeAdminImagePreviewUrl(value: string) {
+  const raw = String(value || '').trim().replace(/^[\s"']+|[\s"']+$/g, '');
+  if (!raw) {
+    return '';
+  }
+
+  if (raw.startsWith('data:image/') || raw.startsWith('/')) {
+    return raw;
+  }
+
+  try {
+    const url = new URL(raw);
+
+    if (url.hostname.includes('drive.google.com')) {
+      const driveIdFromPath = url.pathname.match(/\/file\/d\/([^/]+)/i)?.[1];
+      const driveId = driveIdFromPath || url.searchParams.get('id') || '';
+      if (driveId) {
+        return `https://drive.google.com/uc?export=view&id=${encodeURIComponent(driveId)}`;
+      }
+    }
+
+    if (url.hostname.endsWith('dropbox.com')) {
+      url.searchParams.delete('dl');
+      url.searchParams.set('raw', '1');
+      return url.toString();
+    }
+
+    if (url.hostname === 'github.com' && url.pathname.includes('/blob/')) {
+      const rawPath = url.pathname.replace(/^\/+/, '').replace('/blob/', '/');
+      return `https://raw.githubusercontent.com/${rawPath}`;
+    }
+
+    return encodeURI(url.toString());
+  } catch {
+    return normalizeImagePreviewUrl(raw);
+  }
+}
+
 function getAdminAccountStatusLabel(status: AdminApkAccountRow['deliveryStatus']) {
   if (status === 'delivered') {
     return 'Delivered';
@@ -122,6 +160,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     category: 'App Premium',
     imageUrl: '',
   });
+  const [newProductPreviewFailed, setNewProductPreviewFailed] = useState(false);
   const [newVariantForm, setNewVariantForm] = useState({
     productId: initialSnapshot.apkProducts[0]?.productId || '',
     variantTitle: '',
@@ -141,6 +180,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     accountData: '',
     adminNote: '',
   });
+  const [productPreviewFailed, setProductPreviewFailed] = useState(false);
 
   useEffect(() => {
     if (!notice?.text) {
@@ -165,6 +205,8 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     () => snapshot.users.find((user) => user.username === selectedUsername) || filteredUsers[0] || null,
     [filteredUsers, selectedUsername, snapshot.users],
   );
+  const canDeleteSelectedUser = Boolean(selectedUser) && snapshot.users.length > 1;
+  const newProductPreviewUrl = useMemo(() => normalizeAdminImagePreviewUrl(newProductForm.imageUrl), [newProductForm.imageUrl]);
 
   const filteredProducts = useMemo(() => {
     const normalizedQuery = productQuery.trim().toLowerCase();
@@ -181,6 +223,15 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     () => snapshot.apkProducts.find((product) => product.productId === selectedProductId) || filteredProducts[0] || null,
     [filteredProducts, selectedProductId, snapshot.apkProducts],
   );
+  const productPreviewUrl = useMemo(() => normalizeAdminImagePreviewUrl(productForm.imageUrl), [productForm.imageUrl]);
+
+  useEffect(() => {
+    setNewProductPreviewFailed(false);
+  }, [newProductPreviewUrl]);
+
+  useEffect(() => {
+    setProductPreviewFailed(false);
+  }, [productPreviewUrl]);
 
   useEffect(() => {
     if (!selectedUser) {
@@ -737,6 +788,14 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                         </label>
                       </div>
 
+                      <div className={canDeleteSelectedUser ? 'admin-portal-preview-card admin-portal-preview-card--warning' : 'admin-portal-preview-card admin-portal-preview-card--danger'}>
+                        <p>
+                          {canDeleteSelectedUser
+                            ? `Jika @${selectedUser.username} dihapus, seluruh riwayat transaksi, saldo, dan data deposit akun ini akan ikut terhapus permanen.`
+                            : 'Hapus user dikunci karena portal harus selalu menyisakan minimal 1 user website aktif.'}
+                        </p>
+                      </div>
+
                       <div className="apk-app-action-row apk-app-action-row--compact">
                         <button
                           type="button"
@@ -782,6 +841,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                         <button
                           type="button"
                           className="apk-app-secondary-button"
+                          disabled={!canDeleteSelectedUser}
                           onClick={() =>
                             runAction(async () => {
                               if (!window.confirm(`Hapus akun @${selectedUser.username}? Riwayat dan deposit user ini juga akan ikut terhapus.`)) {
@@ -876,10 +936,24 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                       />
                     </label>
                   </div>
-                  {normalizeImagePreviewUrl(newProductForm.imageUrl) ? (
-                    <div className="admin-portal-image-preview">
-                      <img src={normalizeImagePreviewUrl(newProductForm.imageUrl)} alt="Preview produk baru" />
-                    </div>
+                  <div className="admin-portal-preview-card">
+                    <p>Link gambar bisa pakai URL langsung, Google Drive share, Dropbox share, GitHub raw/blob, atau path lokal seperti `/premium-icons/namafile.png`.</p>
+                  </div>
+                  {newProductPreviewUrl ? (
+                    newProductPreviewFailed ? (
+                      <div className="admin-portal-preview-card admin-portal-preview-card--warning">
+                        <p>Preview belum bisa dimuat. Link tetap akan disimpan, tetapi sebaiknya pastikan URL memang langsung menuju file gambar.</p>
+                      </div>
+                    ) : (
+                      <div className="admin-portal-image-preview">
+                        <img
+                          src={newProductPreviewUrl}
+                          alt="Preview produk baru"
+                          onLoad={() => setNewProductPreviewFailed(false)}
+                          onError={() => setNewProductPreviewFailed(true)}
+                        />
+                      </div>
+                    )
                   ) : null}
                   <div className="apk-app-action-row apk-app-action-row--compact">
                     <button
@@ -1241,10 +1315,24 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                         </label>
                       </div>
 
-                      {normalizeImagePreviewUrl(productForm.imageUrl) ? (
-                        <div className="admin-portal-image-preview">
-                          <img src={normalizeImagePreviewUrl(productForm.imageUrl)} alt={`Preview ${productForm.title || selectedProductEditor.title}`} />
-                        </div>
+                      <div className="admin-portal-preview-card">
+                        <p>Preview akan otomatis menyesuaikan link gambar yang kamu tempel, termasuk link share Google Drive, Dropbox, GitHub raw/blob, dan path lokal website.</p>
+                      </div>
+                      {productPreviewUrl ? (
+                        productPreviewFailed ? (
+                          <div className="admin-portal-preview-card admin-portal-preview-card--warning">
+                            <p>Preview gambar belum bisa dimuat. Link tetap bisa disimpan, tetapi sebaiknya cek lagi apakah URL mengarah langsung ke file gambar.</p>
+                          </div>
+                        ) : (
+                          <div className="admin-portal-image-preview">
+                            <img
+                              src={productPreviewUrl}
+                              alt={`Preview ${productForm.title || selectedProductEditor.title}`}
+                              onLoad={() => setProductPreviewFailed(false)}
+                              onError={() => setProductPreviewFailed(true)}
+                            />
+                          </div>
+                        )
                       ) : null}
 
                       <div className="apk-app-action-row apk-app-action-row--compact">
