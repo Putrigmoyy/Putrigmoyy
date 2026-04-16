@@ -919,6 +919,60 @@ export async function adminDeleteApkAccount(input: { accountId: number }) {
   };
 }
 
+export async function adminDeleteApkAccountsBulk(input: { accountIds: number[] }) {
+  await ensureApkAdminTables();
+  const accountIds = Array.from(
+    new Set(
+      (Array.isArray(input.accountIds) ? input.accountIds : [])
+        .map((value) => Math.trunc(Number(value || 0)))
+        .filter((value) => value > 0),
+    ),
+  );
+  if (!accountIds.length) {
+    throw new Error('Pilih minimal 1 data akun.');
+  }
+
+  const sql = getNeonClient('apk');
+  const rows = (await sql`
+    select
+      account.id,
+      account.delivery_status,
+      variant.product_id
+    from apk_variant_accounts account
+    inner join apk_product_variants variant
+      on variant.id = account.variant_id
+    where account.id = any(${accountIds})
+  `) as Array<{
+    id: number;
+    delivery_status: string;
+    product_id: string;
+  }>;
+
+  if (rows.length !== accountIds.length) {
+    throw new Error('Sebagian data akun tidak ditemukan. Muat ulang daftar akun lalu coba lagi.');
+  }
+
+  const blockedRows = rows.filter((row) => row.delivery_status !== 'available');
+  if (blockedRows.length) {
+    throw new Error('Hapus massal hanya tersedia untuk data akun yang masih available.');
+  }
+
+  await sql`
+    delete from apk_variant_accounts
+    where id = any(${accountIds})
+  `;
+
+  const productIds = Array.from(new Set(rows.map((row) => row.product_id).filter(Boolean)));
+  for (const productId of productIds) {
+    await syncProductStock(productId);
+  }
+
+  return {
+    deletedCount: accountIds.length,
+    accountIds,
+  };
+}
+
 export async function adminDeleteApkVariant(input: { variantId: string }) {
   await ensureApkAdminTables();
   const variantId = cleanText(input.variantId);

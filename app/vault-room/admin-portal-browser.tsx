@@ -18,6 +18,8 @@ type NoticeState = {
   text: string;
 } | null;
 
+type AdminAccountStatusFilter = 'all' | AdminApkAccountRow['deliveryStatus'];
+
 function formatDateLabel(value: string) {
   if (!value) {
     return '-';
@@ -173,7 +175,10 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     accountBatch: '',
     adminNote: '',
   });
+  const [accountQuery, setAccountQuery] = useState('');
+  const [accountStatusFilter, setAccountStatusFilter] = useState<AdminAccountStatusFilter>('all');
   const [variantAccounts, setVariantAccounts] = useState<AdminApkAccountRow[]>([]);
+  const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState(0);
   const [accountEditForm, setAccountEditForm] = useState({
     variantId: initialSnapshot.apkVariants[0]?.variantId || '',
@@ -289,6 +294,38 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     () => snapshot.apkVariants.find((variant) => variant.variantId === accountStockForm.variantId) || snapshot.apkVariants[0] || null,
     [accountStockForm.variantId, snapshot.apkVariants],
   );
+  const filteredVariantAccounts = useMemo(() => {
+    const normalizedQuery = accountQuery.trim().toLowerCase();
+    return variantAccounts.filter((account) => {
+      if (accountStatusFilter !== 'all' && account.deliveryStatus !== accountStatusFilter) {
+        return false;
+      }
+
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      const haystack = [
+        String(account.id),
+        account.accountData,
+        account.adminNote,
+        account.assignedOrderCode,
+        getAdminAccountStatusLabel(account.deliveryStatus),
+      ]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalizedQuery);
+    });
+  }, [accountQuery, accountStatusFilter, variantAccounts]);
+  const availableFilteredAccountIds = useMemo(
+    () => filteredVariantAccounts.filter((account) => account.deliveryStatus === 'available').map((account) => account.id),
+    [filteredVariantAccounts],
+  );
+  const selectedBulkAccountIds = useMemo(
+    () => selectedAccountIds.filter((id) => availableFilteredAccountIds.includes(id)),
+    [availableFilteredAccountIds, selectedAccountIds],
+  );
+  const canBulkDeleteSelectedAccounts = selectedBulkAccountIds.length > 0;
 
   useEffect(() => {
     if (!selectedVariant) {
@@ -327,6 +364,13 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
         : snapshot.apkVariants[0]?.variantId || '',
     }));
   }, [snapshot.apkVariants]);
+
+  useEffect(() => {
+    setAccountQuery('');
+    setAccountStatusFilter('all');
+    setSelectedAccountIds([]);
+    setSelectedAccountId(0);
+  }, [accountStockForm.variantId]);
 
   async function fetchVariantAccounts(variantId: string) {
     const response = await fetch('/api/admin/portal', {
@@ -370,6 +414,11 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
       });
     });
   }, [accountStockForm.variantId, secret]);
+
+  useEffect(() => {
+    const accountIdSet = new Set(variantAccounts.map((account) => account.id));
+    setSelectedAccountIds((current) => current.filter((id) => accountIdSet.has(id)));
+  }, [variantAccounts]);
 
   const selectedAccount = useMemo(
     () => variantAccounts.find((account) => account.id === selectedAccountId) || variantAccounts[0] || null,
@@ -428,6 +477,10 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     startTransition(() => {
       void task();
     });
+  }
+
+  function toggleBulkAccountSelection(accountId: number) {
+    setSelectedAccountIds((current) => (current.includes(accountId) ? current.filter((id) => id !== accountId) : [...current, accountId]));
   }
 
   const previewBasePrice = 1000;
@@ -1627,15 +1680,109 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                     <p>Pilih akun di bawah untuk edit, pindah varian, atau hapus data akun yang masih available.</p>
                   </div>
 
+                  <div className="apk-app-form-grid smm-profile-form-grid">
+                    <label className="apk-app-form-field">
+                      <span>Cari akun</span>
+                      <input
+                        value={accountQuery}
+                        onChange={(event) => setAccountQuery(event.target.value)}
+                        placeholder="Cari ID, isi akun, catatan, atau order code"
+                      />
+                    </label>
+                    <label className="apk-app-form-field">
+                      <span>Filter status</span>
+                      <select
+                        value={accountStatusFilter}
+                        onChange={(event) => setAccountStatusFilter(event.target.value as AdminAccountStatusFilter)}
+                        className="smm-select"
+                      >
+                        <option value="all">Semua status</option>
+                        <option value="available">Available</option>
+                        <option value="reserved">Reserved</option>
+                        <option value="delivered">Delivered</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="admin-portal-preview-card">
+                    <p>
+                      Tampil {filteredVariantAccounts.length.toLocaleString('id-ID')} dari {variantAccounts.length.toLocaleString('id-ID')} data akun.
+                      Dipilih untuk hapus massal: {selectedBulkAccountIds.length.toLocaleString('id-ID')} akun available.
+                    </p>
+                  </div>
+
+                  <div className="apk-app-action-row apk-app-action-row--compact">
+                    <button
+                      type="button"
+                      className="apk-app-ghost-button"
+                      onClick={() => setSelectedAccountIds(availableFilteredAccountIds)}
+                      disabled={!availableFilteredAccountIds.length}
+                    >
+                      Pilih Semua Available
+                    </button>
+                    <button
+                      type="button"
+                      className="apk-app-ghost-button"
+                      onClick={() => setSelectedAccountIds([])}
+                      disabled={!selectedAccountIds.length}
+                    >
+                      Reset Pilihan
+                    </button>
+                    <button
+                      type="button"
+                      className="apk-app-secondary-button"
+                      disabled={!canBulkDeleteSelectedAccounts}
+                      onClick={() =>
+                        runAction(async () => {
+                          if (!window.confirm(`Hapus ${selectedBulkAccountIds.length} data akun available yang sedang dipilih?`)) {
+                            return;
+                          }
+
+                          const response = await fetch('/api/admin/portal', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'x-admin-secret': secret,
+                            },
+                            body: JSON.stringify({
+                              action: 'delete-apk-accounts-bulk',
+                              accountIds: selectedBulkAccountIds,
+                            }),
+                          });
+                          const result = (await response.json()) as {
+                            status?: boolean;
+                            data?: {
+                              msg?: string;
+                              snapshot?: AdminPortalSnapshot;
+                            };
+                          };
+                          if (!response.ok || !result.status || !result.data?.snapshot) {
+                            throw new Error(result.data?.msg || 'Hapus massal akun premium belum bisa dijalankan.');
+                          }
+                          setSnapshot(result.data.snapshot);
+                          setSelectedAccountIds([]);
+                          setSelectedAccountId(0);
+                          await fetchVariantAccounts(accountStockForm.variantId);
+                          setNotice({
+                            tone: 'success',
+                            text: result.data.msg || 'Data akun premium terpilih berhasil dihapus.',
+                          });
+                        })
+                      }
+                    >
+                      Hapus Terpilih
+                    </button>
+                  </div>
+
                   <div className="admin-portal-list">
-                    {variantAccounts.length ? (
-                      variantAccounts.map((account) => (
-                        <button
-                          key={account.id}
-                          type="button"
-                          className={selectedAccountId === account.id ? 'admin-portal-list-item admin-portal-list-item--active' : 'admin-portal-list-item'}
-                          onClick={() => setSelectedAccountId(account.id)}
-                        >
+                    {filteredVariantAccounts.length ? (
+                      filteredVariantAccounts.map((account) => (
+                        <div key={account.id} className="admin-portal-account-row">
+                          <button
+                            type="button"
+                            className={selectedAccountId === account.id ? 'admin-portal-list-item admin-portal-list-item--active' : 'admin-portal-list-item'}
+                            onClick={() => setSelectedAccountId(account.id)}
+                          >
                           <div className="admin-portal-status-row">
                             <strong>#{account.id}</strong>
                             <span className={`admin-portal-status-chip admin-portal-status-chip--${account.deliveryStatus}`}>
@@ -1644,10 +1791,20 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                           </div>
                           <span>{account.accountData}</span>
                           <small>{account.adminNote || 'Tanpa catatan admin'}</small>
-                        </button>
+                          </button>
+                          {account.deliveryStatus === 'available' ? (
+                            <button
+                              type="button"
+                              className={selectedAccountIds.includes(account.id) ? 'admin-portal-pick-button admin-portal-pick-button--active' : 'admin-portal-pick-button'}
+                              onClick={() => toggleBulkAccountSelection(account.id)}
+                            >
+                              {selectedAccountIds.includes(account.id) ? 'Dipilih' : 'Pilih'}
+                            </button>
+                          ) : null}
+                        </div>
                       ))
                     ) : (
-                      <div className="apk-app-empty">Belum ada data akun pada varian ini.</div>
+                      <div className="apk-app-empty">Data akun yang cocok dengan pencarian atau filter ini belum ditemukan.</div>
                     )}
                   </div>
                 </article>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   deleteAdminApkAccount,
+  deleteAdminApkAccountsBulk,
   deleteAdminApkProduct,
   deleteAdminApkVariant,
   deleteAdminUser,
@@ -291,6 +292,21 @@ export async function POST(request: NextRequest) {
         status: true,
         data: {
           msg: 'Data akun premium berhasil dihapus.',
+          deleted,
+          snapshot,
+        },
+      });
+    }
+
+    if (action === 'delete-apk-accounts-bulk') {
+      const deleted = await deleteAdminApkAccountsBulk({
+        accountIds: Array.isArray(body.accountIds) ? body.accountIds.map((value) => Number(value || 0)) : [],
+      });
+      const snapshot = await getAdminPortalSnapshot();
+      return NextResponse.json({
+        status: true,
+        data: {
+          msg: 'Data akun premium terpilih berhasil dihapus.',
           deleted,
           snapshot,
         },
