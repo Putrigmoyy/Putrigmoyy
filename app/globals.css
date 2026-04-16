@@ -2802,6 +2802,13 @@ a {
   white-space: nowrap;
 }
 
+.smm-status-badge-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
 .smm-status-badge--success {
   background: rgba(39, 198, 168, 0.14);
   color: #16a085;
@@ -2815,6 +2822,28 @@ a {
 .smm-status-badge--pending {
   background: rgba(23, 153, 242, 0.12);
   color: #146fc0;
+}
+
+.smm-source-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.smm-source-badge--live {
+  background: rgba(39, 198, 168, 0.12);
+  color: #16a085;
+}
+
+.smm-source-badge--local {
+  background: rgba(17, 17, 17, 0.08);
+  color: rgba(17, 17, 17, 0.72);
 }
 
 .smm-status-detail-button {

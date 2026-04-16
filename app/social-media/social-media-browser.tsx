@@ -641,6 +641,14 @@ function mapStatusTone(status: string) {
   return 'pending';
 }
 
+function formatStatusSourceLabel(source?: 'provider-live' | 'local') {
+  return source === 'provider-live' ? 'Live Provider' : 'Cache Lokal';
+}
+
+function mapStatusSourceTone(source?: 'provider-live' | 'local') {
+  return source === 'provider-live' ? 'live' : 'local';
+}
+
 function SocialNavGlyph({ type }: { type: SocialTab }) {
   if (type === 'sosmed') {
     return (
@@ -2937,6 +2945,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                 <div>
                   <span className="apk-app-section-label">Monitoring Sosmed</span>
                   <p className="smm-section-copy">Direkomendasikan untuk pantau monitoring sosmed terlebih dahulu, sebelum melakukan order untuk melihat layanan yang bagus dan lancar untuk saat ini, agar tidak ada kendala error atau proses lama saat pemesanan.</p>
+                  <p className="smm-section-copy">Status, start, dan remains akan ditandai khusus saat berhasil dibaca live langsung dari provider.</p>
                 </div>
               </div>
 
@@ -3060,7 +3069,12 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                           <td className="smm-status-cell--nowrap">{item.quantity == null ? '-' : item.quantity.toLocaleString('id-ID')}</td>
                           <td className="smm-status-cell--nowrap">Rp {(item.totalPrice || item.unitPrice || 0).toLocaleString('id-ID')}</td>
                           <td className="smm-status-cell--nowrap">
-                            <span className={`smm-status-badge smm-status-badge--${mapStatusTone(item.orderStatus)}`}>{item.orderStatus || '-'}</span>
+                            <div className="smm-status-badge-stack">
+                              <span className={`smm-status-badge smm-status-badge--${mapStatusTone(item.orderStatus)}`}>{item.orderStatus || '-'}</span>
+                              <span className={`smm-source-badge smm-source-badge--${mapStatusSourceTone(item.statusSource)}`}>
+                                {formatStatusSourceLabel(item.statusSource)}
+                              </span>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -3231,9 +3245,14 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                                 <td className="smm-status-cell--nowrap">{item.quantity == null ? '-' : item.quantity.toLocaleString('id-ID')}</td>
                                 <td className="smm-status-cell--nowrap">Rp {(item.totalPrice || item.unitPrice || 0).toLocaleString('id-ID')}</td>
                                 <td className="smm-status-cell--nowrap">
-                                  <span className={`smm-status-badge smm-status-badge--${mapStatusTone(item.orderStatus)}`}>
-                                    {item.orderStatus || '-'}
-                                  </span>
+                                  <div className="smm-status-badge-stack">
+                                    <span className={`smm-status-badge smm-status-badge--${mapStatusTone(item.orderStatus)}`}>
+                                      {item.orderStatus || '-'}
+                                    </span>
+                                    <span className={`smm-source-badge smm-source-badge--${mapStatusSourceTone(item.statusSource)}`}>
+                                      {formatStatusSourceLabel(item.statusSource)}
+                                    </span>
+                                  </div>
                                 </td>
                                 <td className="smm-status-cell--nowrap">
                                   <button
@@ -3329,11 +3348,18 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                             <span className={`smm-status-badge smm-status-badge--${mapStatusTone(detailProviderStatus?.status || detailStatusOrder.orderStatus)}`}>
                               {detailProviderStatus?.status || detailStatusOrder.orderStatus || '-'}
                             </span>
+                            <span className={`smm-source-badge smm-source-badge--${mapStatusSourceTone(detailStatusOrder.statusSource)}`}>
+                              {formatStatusSourceLabel(detailStatusOrder.statusSource)}
+                            </span>
                             <span className="smm-detail-status-info" aria-hidden="true">
                               <StatusInfoGlyph />
                             </span>
                           </div>
                         </td>
+                      </tr>
+                      <tr>
+                        <th>Sumber Status</th>
+                        <td>{formatStatusSourceLabel(detailStatusOrder.statusSource)}</td>
                       </tr>
                       <tr>
                         <th>Tanggal &amp; Waktu</th>
