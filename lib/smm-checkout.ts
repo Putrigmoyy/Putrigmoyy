@@ -3,12 +3,11 @@ import { formatRupiah } from '@/lib/apk-premium';
 import { getAppDataSourceConfig } from '@/lib/data-sources';
 import {
   getCoreWalletBundle,
-  recordCoreOrderHistory,
   refundCoreWalletBalanceOrder,
   spendCoreWalletBalanceForOrder,
   updateCoreOrderHistoryStatusByReference,
 } from '@/lib/core-store';
-import { createMidtransQrisCharge, getMidtransPublicConfig, getMidtransTransactionStatus, isMidtransConfigured } from '@/lib/midtrans';
+import { getMidtransPublicConfig, getMidtransTransactionStatus, isMidtransConfigured } from '@/lib/midtrans';
 import { getNeonClient } from '@/lib/neon-clients';
 import { fetchPusatPanelServices, requestPusatPanel } from '@/lib/pusatpanel';
 import { ensureSmmTables, markSmmOrderAsFailedAndRefund } from '@/lib/smm-store';
@@ -662,142 +661,77 @@ export async function submitSmmCheckoutOrder(input: CheckoutInput): Promise<SmmC
     throw new Error('Total harga belum valid.');
   }
 
-  let useBalance = false;
-  let fallbackNotice = '';
-  if (accountContact) {
-    try {
-      const bundle = await getCoreWalletBundle(accountContact, true);
-      if (bundle?.account.balance != null && Number(bundle.account.balance) >= totalPrice) {
-        useBalance = true;
-      } else if (bundle?.account.loggedIn) {
-        fallbackNotice = 'Saldo akun tidak cukup. Pembayaran dialihkan ke QRIS.';
-      }
-    } catch {
-      fallbackNotice = '';
-    }
+  if (!accountContact) {
+    throw new Error('Login akun dulu agar order sosial media dibayar memakai saldo akun.');
   }
 
-  if (useBalance) {
-    try {
-      await spendCoreWalletBalanceForOrder({
-        accountContact,
-        amount: totalPrice,
-        subjectName: customerName,
-        title: serviceName,
-        detail,
-        reference: orderCode,
-      });
-
-      const providerOrderId = await placeProviderOrder({
-        service_id: service,
-        target_data: targetData,
-        quantity,
-        username,
-        comments,
-        menuType: selectedService.menuType,
-      });
-
-      await upsertOrderRow({
-        orderCode,
-        providerOrderId,
-        accountContact,
-        serviceId: service,
-        serviceName,
-        category,
-        targetData,
-        quantity,
-        unitPrice,
-        totalPrice,
-        username,
-        comments,
-        orderStatus: 'pending',
-        paymentStatus: 'paid',
-        paymentMethod: 'balance',
-      });
-
-      const order = await getOrderRow(orderCode);
-      if (!order) {
-        throw new Error('Order saldo berhasil dibuat, tetapi data lokal belum bisa dimuat.');
-      }
-      return buildSnapshot(order, null);
-    } catch (error) {
-      await refundCoreWalletBalanceOrder({
-        accountContact,
-        amount: totalPrice,
-        subjectName: customerName,
-        reference: orderCode,
-        reason: error instanceof Error ? error.message : 'Order sosial media gagal dibuat.',
-      });
-      await updateCoreOrderHistoryStatusByReference({
-        reference: orderCode,
-        statusLabel: 'Gagal',
-        status: 'failed',
-        methodLabel: 'Saldo akun',
-        detailAppend: 'Order provider gagal dibuat dan saldo otomatis dikembalikan.',
-      });
-      throw error;
-    }
+  const bundle = await getCoreWalletBundle(accountContact, true);
+  if (!bundle?.account.loggedIn) {
+    throw new Error('Akun saldo belum aktif. Login akun dulu sebelum order sosial media.');
+  }
+  if (Number(bundle.account.balance || 0) < totalPrice) {
+    throw new Error(`Saldo akun tidak cukup. Total order ini Rp ${formatRupiah(totalPrice)}. Deposit dulu lalu ulangi order.`);
   }
 
-  if (!isMidtransConfigured()) {
-    throw new Error('MIDTRANS_SERVER_KEY belum diisi. QRIS website belum aktif.');
-  }
-
-  const charge = await createMidtransQrisCharge({
-    orderId: orderCode,
-    grossAmount: totalPrice,
-    customerName,
-    customerContact: accountContact,
-  });
-
-  await upsertOrderRow({
-    orderCode,
-    providerOrderId: '',
-    accountContact,
-    serviceId: service,
-    serviceName,
-    category,
-    targetData,
-    quantity,
-    unitPrice,
-    totalPrice,
-    username,
-    comments,
-    orderStatus: 'awaiting-payment',
-    paymentStatus: 'awaiting-payment',
-    paymentMethod: 'midtrans',
-  });
-
-  await upsertPaymentRow({
-    orderCode,
-    transactionId: charge.transactionId,
-    transactionStatus: charge.transactionStatus,
-    grossAmount: totalPrice,
-    expiryTime: charge.expiryTime,
-    qrUrl: charge.qrUrl,
-    qrString: charge.qrString,
-    deeplinkUrl: charge.deeplinkUrl,
-    raw: charge.raw,
-  });
-
-  if (accountContact) {
-    await recordCoreOrderHistory({
+  try {
+    await spendCoreWalletBalanceForOrder({
       accountContact,
       subjectName: customerName,
       title: serviceName,
       amount: totalPrice,
       detail,
-      methodLabel: 'QRIS',
       reference: orderCode,
     });
-  }
 
-  const order = await getOrderRow(orderCode);
-  const payment = await getPaymentRow(orderCode);
-  if (!order) {
-    throw new Error('Checkout sosial media berhasil dibuat, tetapi data order belum bisa dimuat.');
+    const providerOrderId = await placeProviderOrder({
+      service_id: service,
+      target_data: targetData,
+      quantity,
+      username,
+      comments,
+      menuType: selectedService.menuType,
+    });
+
+    await upsertOrderRow({
+      orderCode,
+      providerOrderId,
+      accountContact,
+      serviceId: service,
+      serviceName,
+      category,
+      targetData,
+      quantity,
+      unitPrice,
+      totalPrice,
+      username,
+      comments,
+      orderStatus: 'pending',
+      paymentStatus: 'paid',
+      paymentMethod: 'balance',
+    });
+
+    const order = await getOrderRow(orderCode);
+    if (!order) {
+      throw new Error('Order saldo berhasil dibuat, tetapi data lokal belum bisa dimuat.');
+    }
+    return buildSnapshot(order, null);
+  } catch (error) {
+    await refundCoreWalletBalanceOrder({
+      accountContact,
+      amount: totalPrice,
+      subjectName: customerName,
+      reference: orderCode,
+      reason: error instanceof Error ? error.message : 'Order sosial media gagal dibuat.',
+    });
+    await updateCoreOrderHistoryStatusByReference({
+      reference: orderCode,
+      statusLabel: 'Gagal',
+      status: 'failed',
+      methodLabel: 'Saldo akun',
+      detailAppend: 'Order provider gagal dibuat dan saldo otomatis dikembalikan.',
+    });
+    throw error;
   }
-  return buildSnapshot(order, payment, fallbackNotice);
 }
 
 export async function getSmmCheckoutOrderStatus(orderCode: string): Promise<SmmCheckoutSnapshot> {

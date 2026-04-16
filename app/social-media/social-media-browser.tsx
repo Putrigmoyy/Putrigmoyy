@@ -112,6 +112,7 @@ type CoreBundlePayload = {
     name?: string;
     username?: string;
     contact?: string;
+    email?: string;
     balance?: number;
   };
   history?: WalletHistoryEntry[];
@@ -863,6 +864,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     loggedIn: false,
     name: '',
     username: '',
+    email: '',
     balance: 0,
   });
   const [accountModalView, setAccountModalView] = useState<AccountModalView | null>(null);
@@ -871,6 +873,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const [accountRegisterDraft, setAccountRegisterDraft] = useState({
     name: '',
     username: '',
+    email: '',
     password: '',
   });
   const [accountLoginDraft, setAccountLoginDraft] = useState({
@@ -879,6 +882,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   });
   const [profileEditDraft, setProfileEditDraft] = useState({
     username: '',
+    email: '',
     password: '',
   });
   const [profileAccessMode, setProfileAccessMode] = useState<'register' | 'login'>('register');
@@ -1025,6 +1029,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       loggedIn: account.loggedIn === true,
       name: String(account.name || ''),
       username,
+      email: String(account.email || ''),
       balance: Math.max(0, Number(account.balance || 0)),
     });
     setAccountLoginDraft({
@@ -1033,6 +1038,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     });
     setProfileEditDraft({
       username,
+      email: String(account.email || ''),
       password: '',
     });
     setWalletHistoryEntries(Array.isArray(bundle.history) ? bundle.history : []);
@@ -1537,11 +1543,12 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     startProfileSubmit(async () => {
       const name = accountRegisterDraft.name.trim();
       const username = accountRegisterDraft.username.trim().toLowerCase();
+      const email = accountRegisterDraft.email.trim().toLowerCase();
       const password = accountRegisterDraft.password.trim();
-      if (!name || !username || !password) {
+      if (!name || !username || !email || !password) {
         setProfileFeedback({
           tone: 'error',
-          text: 'Isi nama, username, dan password dulu untuk membuat akun.',
+          text: 'Isi nama, username, email, dan password dulu untuk membuat akun.',
         });
         return;
       }
@@ -1552,7 +1559,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ name, username, password }),
+          body: JSON.stringify({ name, username, email, password }),
         });
         const result = (await response.json()) as CoreBundleResult;
         if (!response.ok || !result.status || !result.data || !('account' in result.data)) {
@@ -1564,7 +1571,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
         }
 
         applyCoreBundle(result.data);
-        setAccountRegisterDraft({ name: '', username: '', password: '' });
+        setAccountRegisterDraft({ name: '', username: '', email: '', password: '' });
         window.localStorage.setItem(WEBSITE_ACCOUNT_SESSION_KEY, username);
         setProfileFeedback({
           tone: 'success',
@@ -1634,11 +1641,12 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       }
 
       const nextUsername = profileEditDraft.username.trim().toLowerCase();
+      const nextEmail = profileEditDraft.email.trim().toLowerCase();
       const nextPassword = profileEditDraft.password.trim();
-      if (!nextUsername && !nextPassword) {
+      if (!nextUsername && !nextEmail && !nextPassword) {
         setProfileFeedback({
           tone: 'error',
-          text: 'Isi username baru atau password baru dulu.',
+          text: 'Isi username baru, email, atau password baru dulu.',
         });
         return;
       }
@@ -1652,6 +1660,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
           body: JSON.stringify({
             currentUsername: accountProfile.username,
             newUsername: nextUsername,
+            newEmail: nextEmail,
             newPassword: nextPassword,
           }),
         });
@@ -1845,6 +1854,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     });
     setProfileEditDraft({
       username: '',
+      email: '',
       password: '',
     });
     setProfileFeedback({
@@ -2359,6 +2369,17 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       setOrderFeedback({ tone: 'error', text: 'Keyword / komen wajib diisi untuk tipe SEO.' });
       return;
     }
+    if (!accountProfile.loggedIn || !accountProfile.username) {
+      setOrderFeedback({ tone: 'error', text: 'Login akun dulu agar order sosial media bisa dibayar memakai saldo akun.' });
+      return;
+    }
+    if (accountProfile.balance < liveTotal) {
+      setOrderFeedback({
+        tone: 'error',
+        text: `Saldo akun belum cukup. Total order ini Rp ${liveTotal.toLocaleString('id-ID')}. Deposit dulu lalu coba lagi.`,
+      });
+      return;
+    }
 
     startOrdering(async () => {
       setOrderFeedback({ tone: 'idle', text: 'Menyiapkan checkout sosial media...' });
@@ -2757,15 +2778,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                       </label>
 
                       <label className="apk-app-form-field">
-                        <span>Email Notifikasi</span>
-                        <input
-                          value={orderForm.emailNotification}
-                          onChange={(event) => setOrderForm((prev) => ({ ...prev, emailNotification: event.target.value }))}
-                          placeholder="Masukkan email penerima notifikasi"
-                        />
-                      </label>
-
-                      <label className="apk-app-form-field">
                         <span>Total Harga</span>
                         <input value={`Rp ${liveTotal.toLocaleString('id-ID')}`} readOnly className="smm-readonly-input" />
                       </label>
@@ -2796,8 +2808,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
                     <div className="apk-app-inline-helper">
                       {accountProfile.loggedIn
-                        ? `Saldo aktif kamu Rp ${accountProfile.balance.toLocaleString('id-ID')}. Sistem akan memakai saldo dulu jika cukup, lalu otomatis dialihkan ke QRIS jika saldo kurang.`
-                        : 'Jika ingin prioritas memakai saldo akun, login akun dulu. Kalau belum login, pembayaran akan langsung memakai QRIS.'}
+                        ? `Saldo aktif kamu Rp ${accountProfile.balance.toLocaleString('id-ID')}. Order sosial media sekarang hanya memakai saldo akun. Jika saldo kurang, deposit dulu ke akun yang sama.`
+                        : 'Login akun dulu agar order sosial media bisa dibayar memakai saldo akun.'}
                     </div>
 
                     {showPendingQris ? (
@@ -2889,7 +2901,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                     {!showPendingQris && !showPaidCheckoutResult ? (
                     <div className="apk-app-action-row">
                       <button type="button" className="apk-app-primary-button" onClick={submitOrder} disabled={isOrdering}>
-                        {isOrdering ? 'Mengirim...' : 'Lanjutkan Pembayaran'}
+                        {isOrdering ? 'Mengirim...' : 'Order Dengan Saldo'}
                       </button>
                     </div>
                     ) : null}
@@ -3580,6 +3592,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                       <div className="smm-profile-lines">
                         <p>Nama akun : {accountProfile.name || '-'}</p>
                         <p>Username : {accountProfile.username ? `@${accountProfile.username}` : '-'}</p>
+                        <p>Email : {accountProfile.email || '-'}</p>
                         <p>Saldo : Rp {formatRupiah(accountProfile.balance)}</p>
                         <p>Status : {accountProfile.loggedIn ? 'Login' : accountProfile.registered ? 'Belum login' : 'Belum terdaftar'}</p>
                       </div>
@@ -3595,6 +3608,15 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                               value={profileEditDraft.username}
                               onChange={(event) => setProfileEditDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
                               placeholder="contoh: putrigmoyy"
+                            />
+                          </label>
+                          <label className="apk-app-form-field">
+                            <span>Email receipt Midtrans</span>
+                            <input
+                              type="email"
+                              value={profileEditDraft.email}
+                              onChange={(event) => setProfileEditDraft((current) => ({ ...current, email: event.target.value.trim().toLowerCase() }))}
+                              placeholder="contoh: kamu@email.com"
                             />
                           </label>
                           <label className="apk-app-form-field">
@@ -3655,6 +3677,15 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                                 />
                               </label>
                               <label className="apk-app-form-field">
+                                <span>Email receipt Midtrans</span>
+                                <input
+                                  type="email"
+                                  value={accountRegisterDraft.email}
+                                  onChange={(event) => setAccountRegisterDraft((current) => ({ ...current, email: event.target.value.trim().toLowerCase() }))}
+                                  placeholder="contoh: kamu@email.com"
+                                />
+                              </label>
+                              <label className="apk-app-form-field">
                                 <span>Password akun</span>
                                 <input
                                   type="password"
@@ -3710,6 +3741,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                       <span className="smm-profile-title">Status akun</span>
                       <div className="smm-profile-lines">
                         <p>Username : {accountProfile.username ? `@${accountProfile.username}` : '-'}</p>
+                        <p>Email : {accountProfile.email || '-'}</p>
                         <p>Saldo : Rp {formatRupiah(accountProfile.balance)}</p>
                       </div>
                     </div>
@@ -3757,6 +3789,9 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                             >
                               {isSubmittingDeposit ? 'Memproses...' : 'Deposit'}
                             </button>
+                          </div>
+                          <div className="apk-app-inline-helper">
+                            Receipt Midtrans untuk deposit akan dikirim ke email akun: {accountProfile.email || '-'}.
                           </div>
                         </>
                       ) : (

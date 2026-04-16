@@ -62,6 +62,7 @@ type CoreBundlePayload = {
     name?: string;
     username?: string;
     contact?: string;
+    email?: string;
     balance?: number;
   };
   history?: HistoryEntry[];
@@ -377,11 +378,13 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
     loggedIn: false,
     name: '',
     username: '',
+    email: '',
     balance: 0,
   });
   const [walletRegisterDraft, setWalletRegisterDraft] = useState({
     name: '',
     username: '',
+    email: '',
     password: '',
   });
   const [walletLoginDraft, setWalletLoginDraft] = useState({
@@ -390,6 +393,7 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
   });
   const [profileEditDraft, setProfileEditDraft] = useState({
     username: '',
+    email: '',
     password: '',
   });
   const [profileAccessMode, setProfileAccessMode] = useState<'register' | 'login'>('register');
@@ -498,6 +502,7 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
       loggedIn: account.loggedIn === true,
       name: String(account.name || ''),
       username,
+      email: String(account.email || ''),
       balance: Math.max(0, Number(account.balance || 0)),
     });
     setWalletLoginDraft({
@@ -506,6 +511,7 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
     });
     setProfileEditDraft({
       username,
+      email: String(account.email || ''),
       password: '',
     });
     setHistoryEntries(Array.isArray(bundle.history) ? bundle.history : []);
@@ -765,6 +771,17 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
       setCheckoutFeedback({ tone: 'error', text: 'Jumlah order melebihi stok akun yang siap dikirim.' });
       return;
     }
+    if (!walletProfile.loggedIn || !walletProfile.username) {
+      setCheckoutFeedback({ tone: 'error', text: 'Login akun dulu agar order aplikasi premium bisa dibayar memakai saldo akun.' });
+      return;
+    }
+    if (walletProfile.balance < selectedTotal) {
+      setCheckoutFeedback({
+        tone: 'error',
+        text: `Saldo akun belum cukup. Total order ini Rp ${formatRupiah(selectedTotal)}. Deposit dulu lalu ulangi order.`,
+      });
+      return;
+    }
 
     startOrderSubmit(async () => {
       setCheckoutFeedback({ tone: 'idle', text: 'Membuat order APK premium...' });
@@ -854,11 +871,12 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
     startProfileSubmit(async () => {
       const name = walletRegisterDraft.name.trim();
       const username = walletRegisterDraft.username.trim().toLowerCase();
+      const email = walletRegisterDraft.email.trim().toLowerCase();
       const password = walletRegisterDraft.password.trim();
-      if (!name || !username || !password) {
+      if (!name || !username || !email || !password) {
         setProfileFeedback({
           tone: 'error',
-          text: 'Isi nama, username, dan password dulu untuk membuat akun.',
+          text: 'Isi nama, username, email, dan password dulu untuk membuat akun.',
         });
         return;
       }
@@ -869,7 +887,7 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ name, username, password }),
+          body: JSON.stringify({ name, username, email, password }),
         });
         const result = (await response.json()) as CoreBundleResult;
         if (!response.ok || !result.status || !result.data || !('account' in result.data)) {
@@ -881,7 +899,7 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
         }
 
         applyCoreBundle(result.data);
-        setWalletRegisterDraft({ name: '', username: '', password: '' });
+        setWalletRegisterDraft({ name: '', username: '', email: '', password: '' });
         window.localStorage.setItem(APK_ACCOUNT_SESSION_KEY, username);
         setProfileFeedback({
           tone: 'success',
@@ -951,11 +969,12 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
       }
 
       const nextUsername = profileEditDraft.username.trim().toLowerCase();
+      const nextEmail = profileEditDraft.email.trim().toLowerCase();
       const nextPassword = profileEditDraft.password.trim();
-      if (!nextUsername && !nextPassword) {
+      if (!nextUsername && !nextEmail && !nextPassword) {
         setProfileFeedback({
           tone: 'error',
-          text: 'Isi username baru atau password baru dulu.',
+          text: 'Isi username baru, email, atau password baru dulu.',
         });
         return;
       }
@@ -969,6 +988,7 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
           body: JSON.stringify({
             currentUsername: walletProfile.username,
             newUsername: nextUsername,
+            newEmail: nextEmail,
             newPassword: nextPassword,
           }),
         });
@@ -1008,6 +1028,7 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
     setWalletLoginDraft((current) => ({ ...current, username: '', password: '' }));
     setProfileEditDraft({
       username: '',
+      email: '',
       password: '',
     });
     setProfileFeedback({
@@ -1478,9 +1499,14 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
                     </div>
                     {selectedVariant && selectedAdminFee > 0 ? (
                       <div className="apk-app-inline-helper">
-                        Sudah termasuk fee admin QRIS Rp {formatRupiah(selectedAdminFee)}.
+                        Sudah termasuk fee admin Rp {formatRupiah(selectedAdminFee)}.
                       </div>
                     ) : null}
+                    <div className="apk-app-inline-helper">
+                      {walletProfile.loggedIn
+                        ? `Saldo aktif kamu Rp ${formatRupiah(walletProfile.balance)}. Order aplikasi premium sekarang hanya memakai saldo akun.`
+                        : 'Login akun dulu agar order aplikasi premium bisa dibayar memakai saldo akun.'}
+                    </div>
 
                     {showPendingQris ? (
                       <div className="apk-app-qris-shell">
@@ -1846,6 +1872,7 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
                         : `Akun ${walletProfile.name} sudah terdaftar, tetapi belum login.`
                       : 'Belum ada akun yang terdaftar untuk akses saldo dan deposit.'}
                   </p>
+                  <p>Email receipt : {walletProfile.email || '-'}</p>
                   <div className="apk-app-live-total-card">
                     <span>Saldo akun</span>
                     <strong>Rp {formatRupiah(walletProfile.balance)}</strong>
@@ -1870,6 +1897,15 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
                           value={walletRegisterDraft.username}
                           onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
                           placeholder="contoh: putrigmoyy"
+                        />
+                      </label>
+                      <label className="apk-app-form-field">
+                        <span>Email receipt Midtrans</span>
+                        <input
+                          type="email"
+                          value={walletRegisterDraft.email}
+                          onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, email: event.target.value.trim().toLowerCase() }))}
+                          placeholder="contoh: kamu@email.com"
                         />
                       </label>
                       <label className="apk-app-form-field">
@@ -1926,6 +1962,7 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
                     <div className="apk-app-history-meta">
                       <span>Nama : {walletProfile.name}</span>
                       <span>Username : @{walletProfile.username}</span>
+                      <span>Email : {walletProfile.email || '-'}</span>
                       <span>Status : Login</span>
                     </div>
                     <div className="apk-app-action-row">
@@ -1945,11 +1982,11 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
                     </article>
                     <article id="guide-status" className="apk-app-info-card apk-app-history-card">
                       <strong>Informasi Status Order</strong>
-                      <p>Status order akan otomatis diperbarui. Jika pembayaran sukses maka order lanjut diproses, sedangkan jika QRIS expired kamu perlu membuat order baru.</p>
+                      <p>Status order akan otomatis diperbarui. Jika saldo berhasil dipakai maka order langsung diproses, dan jika order provider gagal saldo akan otomatis dikembalikan.</p>
                     </article>
                     <article id="guide-order" className="apk-app-info-card apk-app-history-card">
                       <strong>Panduan Cara Pesanan</strong>
-                      <p>Pilih produk, tentukan varian, cek total harga, lalu selesaikan pembayaran. Setelah lunas, data akun atau proses order akan berjalan otomatis sesuai jenis produk.</p>
+                      <p>Pilih produk, tentukan varian, cek total harga, lalu order memakai saldo akun. Setelah saldo terpotong, data akun atau proses order akan berjalan otomatis sesuai jenis produk.</p>
                     </article>
                     <article id="guide-contact" className="apk-app-info-card apk-app-history-card">
                       <strong>Kontak</strong>
@@ -2079,6 +2116,7 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
                       <span className="smm-profile-title">Status akun</span>
                       <div className="smm-profile-lines">
                         <p>Username : {walletProfile.username ? `@${walletProfile.username}` : '-'}</p>
+                        <p>Email : {walletProfile.email || '-'}</p>
                         <p>Saldo : Rp {formatRupiah(walletProfile.balance)}</p>
                       </div>
                     </div>
@@ -2126,6 +2164,9 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
                             >
                               {isSubmittingDeposit ? 'Memproses...' : 'Deposit'}
                             </button>
+                          </div>
+                          <div className="apk-app-inline-helper">
+                            Receipt Midtrans untuk deposit akan dikirim ke email akun: {walletProfile.email || '-'}.
                           </div>
                         </>
                       ) : (
@@ -2192,6 +2233,7 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
                       <div className="smm-profile-lines">
                         <p>Nama akun : {walletProfile.name || '-'}</p>
                         <p>Username : {walletProfile.username ? `@${walletProfile.username}` : '-'}</p>
+                        <p>Email : {walletProfile.email || '-'}</p>
                         <p>Saldo : Rp {formatRupiah(walletProfile.balance)}</p>
                         <p>Status : {walletProfile.loggedIn ? 'Login' : walletProfile.registered ? 'Belum login' : 'Belum terdaftar'}</p>
                       </div>
@@ -2207,6 +2249,15 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
                               value={profileEditDraft.username}
                               onChange={(event) => setProfileEditDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
                               placeholder="contoh: putrigmoyy"
+                            />
+                          </label>
+                          <label className="apk-app-form-field">
+                            <span>Email receipt Midtrans</span>
+                            <input
+                              type="email"
+                              value={profileEditDraft.email}
+                              onChange={(event) => setProfileEditDraft((current) => ({ ...current, email: event.target.value.trim().toLowerCase() }))}
+                              placeholder="contoh: kamu@email.com"
                             />
                           </label>
                           <label className="apk-app-form-field">
@@ -2264,6 +2315,15 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminF
                                   value={walletRegisterDraft.username}
                                   onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
                                   placeholder="contoh: putrigmoyy"
+                                />
+                              </label>
+                              <label className="apk-app-form-field">
+                                <span>Email receipt Midtrans</span>
+                                <input
+                                  type="email"
+                                  value={walletRegisterDraft.email}
+                                  onChange={(event) => setWalletRegisterDraft((current) => ({ ...current, email: event.target.value.trim().toLowerCase() }))}
+                                  placeholder="contoh: kamu@email.com"
                                 />
                               </label>
                               <label className="apk-app-form-field">

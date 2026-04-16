@@ -6,6 +6,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       name?: string;
       username?: string;
+      email?: string;
       password?: string;
       contact?: string;
       pin?: string;
@@ -14,6 +15,7 @@ export async function POST(request: Request) {
     const bundle = await registerCoreWalletAccount({
       name: String(body.name || ''),
       username: String(body.username || body.contact || ''),
+      email: String(body.email || ''),
       password: String(body.password || body.pin || ''),
     });
 

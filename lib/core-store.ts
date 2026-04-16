@@ -10,6 +10,7 @@ export type CoreWalletProfile = {
   name: string;
   username: string;
   contact: string;
+  email: string;
   balance: number;
 };
 
@@ -37,6 +38,7 @@ type WalletRow = {
   display_name: string | null;
   username: string | null;
   contact: string | null;
+  email: string | null;
   password_hash: string | null;
   pin_hash: string | null;
   balance: number | null;
@@ -102,8 +104,16 @@ function normalizeUsername(value: string) {
   return String(value || '').trim().toLowerCase();
 }
 
+function normalizeEmail(value: string) {
+  return String(value || '').trim().toLowerCase();
+}
+
 function validateUsername(username: string) {
   return /^[a-z0-9._-]{4,24}$/.test(username);
+}
+
+function validateEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function hashLegacyPin(pin: string) {
@@ -206,6 +216,7 @@ function mapWalletRow(row?: WalletRow | null, loggedIn = false): CoreWalletProfi
       name: '',
       username: '',
       contact: '',
+      email: '',
       balance: 0,
     };
   }
@@ -217,6 +228,7 @@ function mapWalletRow(row?: WalletRow | null, loggedIn = false): CoreWalletProfi
     name: String(row.display_name || '').trim(),
     username,
     contact: username,
+    email: normalizeEmail(row.email || ''),
     balance: Number(row.balance || 0),
   };
 }
@@ -246,6 +258,7 @@ export async function ensureCoreTables() {
       display_name text not null default '',
       username text not null default '',
       contact text not null default '',
+      email text not null default '',
       password_hash text not null default '',
       pin_hash text not null default '',
       balance integer not null default 0,
@@ -292,6 +305,7 @@ export async function ensureCoreTables() {
   await sql`alter table core_wallet_accounts add column if not exists username text not null default ''`;
   await sql`alter table core_wallet_accounts add column if not exists password_hash text not null default ''`;
   await sql`alter table core_wallet_accounts add column if not exists contact text not null default ''`;
+  await sql`alter table core_wallet_accounts add column if not exists email text not null default ''`;
   await sql`alter table core_wallet_accounts add column if not exists pin_hash text not null default ''`;
   await sql`alter table core_wallet_accounts add column if not exists balance integer not null default 0`;
   await sql`update core_wallet_accounts set username = lower(trim(contact)) where username = '' and contact <> ''`;
@@ -369,6 +383,7 @@ async function getWalletRow(identifier: string) {
       display_name,
       username,
       contact,
+      email,
       password_hash,
       pin_hash,
       balance
@@ -424,7 +439,7 @@ export async function getCoreWalletBundle(identifier: string, loggedIn = true): 
   };
 }
 
-export async function registerCoreWalletAccount(input: { name: string; username: string; password: string }) {
+export async function registerCoreWalletAccount(input: { name: string; username: string; password: string; email: string }) {
   if (!isCoreConfigured()) {
     throw new Error('DATABASE_URL_CORE belum diisi.');
   }
@@ -432,12 +447,16 @@ export async function registerCoreWalletAccount(input: { name: string; username:
   const name = String(input.name || '').trim();
   const username = normalizeUsername(input.username);
   const password = String(input.password || '').trim();
+  const email = normalizeEmail(input.email);
 
-  if (!name || !username || !password) {
-    throw new Error('Nama, username, dan password wajib diisi.');
+  if (!name || !username || !password || !email) {
+    throw new Error('Nama, username, email, dan password wajib diisi.');
   }
   if (!validateUsername(username)) {
     throw new Error('Username hanya boleh 4-24 karakter, huruf kecil, angka, titik, garis bawah, atau strip.');
+  }
+  if (!validateEmail(email)) {
+    throw new Error('Format email belum valid.');
   }
   if (password.length < 6) {
     throw new Error('Password minimal 6 karakter.');
@@ -454,12 +473,14 @@ export async function registerCoreWalletAccount(input: { name: string; username:
       display_name,
       username,
       contact,
+      email,
       password_hash,
       pin_hash
     ) values (
       ${name},
       ${username},
       ${username},
+      ${email},
       ${hashPassword(password)},
       ${''}
     )
@@ -521,6 +542,7 @@ export async function loginCoreWalletAccount(input: { username: string; password
 export async function updateCoreWalletAccount(input: {
   currentUsername: string;
   newUsername?: string;
+  newEmail?: string;
   newPassword?: string;
 }) {
   if (!isCoreConfigured()) {
@@ -529,6 +551,7 @@ export async function updateCoreWalletAccount(input: {
 
   const currentUsername = normalizeUsername(input.currentUsername);
   const newUsername = normalizeUsername(input.newUsername || '');
+  const newEmail = normalizeEmail(input.newEmail || '');
   const newPassword = String(input.newPassword || '').trim();
 
   if (!currentUsername) {
@@ -542,6 +565,8 @@ export async function updateCoreWalletAccount(input: {
 
   const currentResolvedUsername = resolveAccountKey(row) || currentUsername;
   const nextUsername = newUsername || currentResolvedUsername;
+  const currentEmail = normalizeEmail(row.email || '');
+  const nextEmail = newEmail || currentEmail;
 
   if (nextUsername !== currentResolvedUsername && !validateUsername(nextUsername)) {
     throw new Error('Username hanya boleh 4-24 karakter, huruf kecil, angka, titik, garis bawah, atau strip.');
@@ -558,7 +583,14 @@ export async function updateCoreWalletAccount(input: {
     throw new Error('Password baru minimal 6 karakter.');
   }
 
-  if (nextUsername === currentResolvedUsername && !newPassword) {
+  if (!nextEmail) {
+    throw new Error('Email akun wajib diisi agar receipt Midtrans bisa dikirim.');
+  }
+  if (!validateEmail(nextEmail)) {
+    throw new Error('Format email belum valid.');
+  }
+
+  if (nextUsername === currentResolvedUsername && nextEmail === currentEmail && !newPassword) {
     throw new Error('Belum ada perubahan profil yang dikirim.');
   }
 
@@ -567,6 +599,8 @@ export async function updateCoreWalletAccount(input: {
     update core_wallet_accounts
     set
       username = ${nextUsername},
+      contact = ${nextUsername},
+      email = ${nextEmail},
       password_hash = case
         when ${newPassword} <> '' then ${hashPassword(newPassword)}
         else password_hash
@@ -699,6 +733,14 @@ export async function submitCoreDeposit(input: {
     throw new Error('Akun belum ditemukan. Silakan daftar atau login dulu.');
   }
 
+  const accountEmail = normalizeEmail(row.email || '');
+  if (!accountEmail) {
+    throw new Error('Isi email akun dulu di menu profil agar receipt Midtrans bisa dikirim.');
+  }
+  if (!validateEmail(accountEmail)) {
+    throw new Error('Email akun belum valid. Perbarui email dulu sebelum deposit.');
+  }
+
   if (!isMidtransConfigured()) {
     throw new Error('MIDTRANS_SERVER_KEY belum diisi. Deposit QRIS belum aktif.');
   }
@@ -710,6 +752,7 @@ export async function submitCoreDeposit(input: {
     grossAmount: amount,
     customerName: String(row.display_name || '').trim() || accountContact,
     customerContact: accountContact,
+    customerEmail: accountEmail,
   });
 
   await insertCoreHistory({
@@ -720,7 +763,7 @@ export async function submitCoreDeposit(input: {
     amount,
     statusLabel: 'Menunggu pembayaran',
     status: 'pending',
-    detail: `Metode: QRIS\nUsername: ${accountContact}\nNominal: Rp ${formatRupiah(amount)}`,
+    detail: `Metode: QRIS\nUsername: ${accountContact}\nEmail: ${accountEmail}\nNominal: Rp ${formatRupiah(amount)}`,
     methodLabel: 'QRIS',
     reference,
   });

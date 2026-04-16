@@ -115,7 +115,7 @@ async function buildCheckoutCore(input: CheckoutInput) {
   const customerName = String(input.customerName || '').trim();
   const customerContact = String(input.customerContact || '').trim();
   const accountContact = String(input.accountContact || '').trim();
-  const paymentMethod: 'midtrans' | 'balance' = input.paymentMethod === 'balance' ? 'balance' : 'midtrans';
+  const paymentMethod: 'midtrans' | 'balance' = input.paymentMethod === 'midtrans' ? 'midtrans' : 'balance';
   const note = String(input.note || '').trim();
 
   if (!customerName) {
@@ -518,7 +518,7 @@ export async function submitApkPremiumOrder(input: CheckoutInput): Promise<ApkSu
     orderStatus: 'pending',
     queueCreated: false,
     syncReady: false,
-    paymentMethod: 'midtrans',
+    paymentMethod: 'balance',
     deliveredAccounts: [],
     qris: null,
     nextStep: 'Hubungkan DATABASE_URL_APK dan ubah APK_PREMIUM_DATA_SOURCE=neon agar order website tersimpan penuh.',

@@ -6,12 +6,14 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       currentUsername?: string;
       newUsername?: string;
+      newEmail?: string;
       newPassword?: string;
     };
 
     const bundle = await updateCoreWalletAccount({
       currentUsername: String(body.currentUsername || ''),
       newUsername: String(body.newUsername || ''),
+      newEmail: String(body.newEmail || ''),
       newPassword: String(body.newPassword || ''),
     });
 

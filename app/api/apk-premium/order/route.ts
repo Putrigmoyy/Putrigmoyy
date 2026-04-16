@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       customerName: String(body.customerName || ''),
       customerContact: String(body.customerContact || ''),
       accountContact: String(body.accountContact || ''),
-      paymentMethod: 'midtrans',
+      paymentMethod: 'balance',
       note: String(body.note || ''),
     });
 

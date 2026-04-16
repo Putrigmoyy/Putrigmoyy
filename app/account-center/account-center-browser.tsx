@@ -36,6 +36,7 @@ type CoreBundlePayload = {
     name?: string;
     username?: string;
     contact?: string;
+    email?: string;
     balance?: number;
   };
   history?: HistoryEntry[];
@@ -178,12 +179,14 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
     loggedIn: false,
     name: '',
     username: '',
+    email: '',
     balance: 0,
   });
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [registerDraft, setRegisterDraft] = useState({
     name: '',
     username: '',
+    email: '',
     password: '',
   });
   const [loginDraft, setLoginDraft] = useState({
@@ -192,6 +195,7 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
   });
   const [profileEditDraft, setProfileEditDraft] = useState({
     username: '',
+    email: '',
     password: '',
   });
   const [depositAmount, setDepositAmount] = useState('10000');
@@ -229,6 +233,7 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
       loggedIn: account.loggedIn === true,
       name: String(account.name || ''),
       username,
+      email: String(account.email || ''),
       balance: Math.max(0, Number(account.balance || 0)),
     });
     setHistoryEntries(Array.isArray(bundle.history) ? bundle.history : []);
@@ -239,6 +244,7 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
     }));
     setProfileEditDraft({
       username,
+      email: String(account.email || ''),
       password: '',
     });
   };
@@ -424,11 +430,12 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
     startProfileSubmit(async () => {
       const name = registerDraft.name.trim();
       const username = registerDraft.username.trim().toLowerCase();
+      const email = registerDraft.email.trim().toLowerCase();
       const password = registerDraft.password.trim();
-      if (!name || !username || !password) {
+      if (!name || !username || !email || !password) {
         setProfileFeedback({
           tone: 'error',
-          text: 'Isi nama, username, dan password dulu untuk membuat akun.',
+          text: 'Isi nama, username, email, dan password dulu untuk membuat akun.',
         });
         return;
       }
@@ -439,7 +446,7 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ name, username, password }),
+          body: JSON.stringify({ name, username, email, password }),
         });
         const result = (await response.json()) as CoreBundleResult;
         if (!response.ok || !result.status || !result.data || !('account' in result.data)) {
@@ -451,7 +458,7 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
         }
 
         applyCoreBundle(result.data);
-        setRegisterDraft({ name: '', username: '', password: '' });
+        setRegisterDraft({ name: '', username: '', email: '', password: '' });
         window.localStorage.setItem(ACCOUNT_SESSION_KEY, username);
         setProfileFeedback({
           tone: 'success',
@@ -521,11 +528,12 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
       }
 
       const nextUsername = profileEditDraft.username.trim().toLowerCase();
+      const nextEmail = profileEditDraft.email.trim().toLowerCase();
       const nextPassword = profileEditDraft.password.trim();
-      if (!nextUsername && !nextPassword) {
+      if (!nextUsername && !nextEmail && !nextPassword) {
         setProfileFeedback({
           tone: 'error',
-          text: 'Isi username baru atau password baru dulu.',
+          text: 'Isi username baru, email, atau password baru dulu.',
         });
         return;
       }
@@ -539,6 +547,7 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
           body: JSON.stringify({
             currentUsername: accountProfile.username,
             newUsername: nextUsername,
+            newEmail: nextEmail,
             newPassword: nextPassword,
           }),
         });
@@ -580,6 +589,7 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
       loggedIn: false,
       name: preservedName,
       username: preservedUsername,
+      email: accountProfile.email,
       balance: 0,
     });
     setHistoryEntries([]);
@@ -589,6 +599,7 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
     });
     setProfileEditDraft({
       username: preservedUsername,
+      email: accountProfile.email,
       password: '',
     });
     setDepositFeedback({ tone: 'idle', text: '' });
@@ -679,6 +690,7 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
                   <div className="smm-profile-lines">
                     <p>Nama akun : {accountProfile.name || '-'}</p>
                     <p>Username : {accountProfile.username ? `@${accountProfile.username}` : '-'}</p>
+                    <p>Email : {accountProfile.email || '-'}</p>
                     <p>Saldo : Rp {accountProfile.balance.toLocaleString('id-ID')}</p>
                     <p>Status : {accountProfile.loggedIn ? 'Login' : accountProfile.registered ? 'Belum login' : 'Belum terdaftar'}</p>
                   </div>
@@ -699,6 +711,20 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
                             }))
                           }
                           placeholder="contoh: putrigmoyy"
+                        />
+                      </label>
+                      <label className="apk-app-form-field">
+                        <span>Email receipt Midtrans</span>
+                        <input
+                          type="email"
+                          value={profileEditDraft.email}
+                          onChange={(event) =>
+                            setProfileEditDraft((current) => ({
+                              ...current,
+                              email: event.target.value.trim().toLowerCase(),
+                            }))
+                          }
+                          placeholder="contoh: kamu@email.com"
                         />
                       </label>
                       <label className="apk-app-form-field">
@@ -746,6 +772,15 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
                             }))
                           }
                           placeholder="contoh: putrigmoyy"
+                        />
+                      </label>
+                      <label className="apk-app-form-field">
+                        <span>Email receipt Midtrans</span>
+                        <input
+                          type="email"
+                          value={registerDraft.email}
+                          onChange={(event) => setRegisterDraft((current) => ({ ...current, email: event.target.value.trim().toLowerCase() }))}
+                          placeholder="contoh: kamu@email.com"
                         />
                       </label>
                       <label className="apk-app-form-field">
@@ -840,6 +875,7 @@ export function AccountCenterBrowser({ requestedTab }: Props) {
                   <article className="apk-app-info-card">
                     <strong>Saldo akun bersama</strong>
                     <p>Saldo ini dipakai bersama untuk App Premium dan Kebutuhan Social Media.</p>
+                    <p>Email receipt deposit : {accountProfile.email || '-'}</p>
                     <div className="apk-app-live-total-card">
                       <span>Saldo aktif</span>
                       <strong>Rp {formatRupiah(accountProfile.balance)}</strong>

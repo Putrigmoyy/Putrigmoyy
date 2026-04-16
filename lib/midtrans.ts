@@ -122,8 +122,10 @@ export async function createMidtransQrisCharge(input: {
   grossAmount: number;
   customerName: string;
   customerContact: string;
+  customerEmail?: string;
 }) {
   const serverKey = getRequiredMidtransServerKey();
+  const customerEmail = String(input.customerEmail || '').trim();
   const response = await fetch(`${getMidtransApiBaseUrl()}/v2/charge`, {
     method: 'POST',
     headers: {
@@ -140,6 +142,7 @@ export async function createMidtransQrisCharge(input: {
       customer_details: {
         first_name: String(input.customerName || '').trim().slice(0, 80) || 'Customer',
         phone: String(input.customerContact || '').trim().slice(0, 40),
+        ...(customerEmail ? { email: customerEmail.slice(0, 120) } : {}),
       },
       qris: {
         acquirer: 'gopay',
