@@ -46,6 +46,17 @@ type SocialTab = 'sosmed' | 'riwayat' | 'status' | 'provider';
 type DepositMethod = 'midtrans' | 'balance';
 type AccountModalView = 'profil' | 'deposit' | 'riwayat';
 type HelperModalView = 'kontak' | 'mulai' | 'cara-deposit' | 'status-info' | 'target' | 'api-docs';
+type FilterPickerKey =
+  | 'monitoring-limit'
+  | 'monitoring-status'
+  | 'monitoring-category'
+  | 'status-limit'
+  | 'status-status'
+  | 'status-year';
+type ManualPickerOption = {
+  value: string;
+  label: string;
+};
 
 type CoreDepositQrisState = {
   reference: string;
@@ -409,6 +420,158 @@ function formatServicePickerLabel(service?: NormalizedPusatPanelService | null) 
   return `${service.id} - ${service.name} - Rp${service.priceLabel}`;
 }
 
+function formatStatusOptionLabel(value: string) {
+  const normalized = String(value || '').trim();
+  if (!normalized) return '';
+  if (normalized.toLowerCase() === 'semua') return 'Semua';
+  return normalized
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function buildStatusFilterOptions(defaultValues: string[], sourceValues: string[]) {
+  const seen = new Set<string>();
+  const items: ManualPickerOption[] = [];
+
+  for (const value of [...defaultValues, ...sourceValues]) {
+    const normalized = String(value || '').trim();
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push({
+      value: normalized,
+      label: formatStatusOptionLabel(normalized),
+    });
+  }
+
+  return items;
+}
+
+function matchesStatusFilter(status: string, filterValue: string) {
+  const normalizedStatus = String(status || '').trim().toLowerCase();
+  const normalizedFilter = String(filterValue || '').trim().toLowerCase();
+
+  if (!normalizedFilter || normalizedFilter === 'semua') {
+    return true;
+  }
+  if (!normalizedStatus) {
+    return false;
+  }
+  if (normalizedStatus === normalizedFilter) {
+    return true;
+  }
+  if (normalizedFilter === 'success') {
+    return normalizedStatus.includes('success') || normalizedStatus.includes('complete');
+  }
+  if (normalizedFilter === 'pending') {
+    return normalizedStatus.includes('pending') || normalizedStatus.includes('waiting');
+  }
+  if (normalizedFilter === 'processing') {
+    return normalizedStatus.includes('process');
+  }
+  if (normalizedFilter === 'partial') {
+    return normalizedStatus.includes('partial');
+  }
+  if (normalizedFilter === 'error') {
+    return (
+      normalizedStatus.includes('error') ||
+      normalizedStatus.includes('fail') ||
+      normalizedStatus.includes('cancel') ||
+      normalizedStatus.includes('deny')
+    );
+  }
+  if (normalizedFilter === 'expired') {
+    return normalizedStatus.includes('expire') || normalizedStatus.includes('expired');
+  }
+  return normalizedStatus === normalizedFilter;
+}
+
+function SearchableManualPicker({
+  value,
+  placeholder,
+  open,
+  onToggle,
+  onSelect,
+  query,
+  onQueryChange,
+  options,
+  searchPlaceholder,
+  emptyMessage,
+  disabled = false,
+  multiline = false,
+  stackClassName = 'smm-select-stack',
+}: {
+  value: string;
+  placeholder: string;
+  open: boolean;
+  onToggle: () => void;
+  onSelect: (value: string) => void;
+  query: string;
+  onQueryChange: (value: string) => void;
+  options: ManualPickerOption[];
+  searchPlaceholder: string;
+  emptyMessage: string;
+  disabled?: boolean;
+  multiline?: boolean;
+  stackClassName?: string;
+}) {
+  const selectedOption = options.find((option) => option.value === value);
+  const displayValue = selectedOption?.label || value || placeholder;
+  const normalizedQuery = String(query || '').trim().toLowerCase();
+  const filteredOptions = normalizedQuery
+    ? options.filter((option) => `${option.label} ${option.value}`.toLowerCase().includes(normalizedQuery))
+    : options;
+
+  return (
+    <div className={stackClassName}>
+      <button
+        type="button"
+        className={
+          open
+            ? `smm-picker-trigger${multiline ? ' smm-picker-trigger--multiline' : ''}${!value ? ' smm-picker-trigger--placeholder' : ''} smm-picker-trigger--open`
+            : !value
+              ? `smm-picker-trigger${multiline ? ' smm-picker-trigger--multiline' : ''} smm-picker-trigger--placeholder`
+              : `smm-picker-trigger${multiline ? ' smm-picker-trigger--multiline' : ''}`
+        }
+        onClick={onToggle}
+        disabled={disabled}
+      >
+        <span>{displayValue}</span>
+        <i aria-hidden="true" />
+      </button>
+
+      {open ? (
+        <div className="smm-picker-panel">
+          <div className="apk-app-form-field">
+            <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder={searchPlaceholder} />
+          </div>
+          <div className={multiline ? 'smm-manual-list smm-manual-list--service' : 'smm-manual-list'}>
+            {filteredOptions.length ? (
+              filteredOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={value === option.value ? 'smm-manual-item smm-manual-item--active' : 'smm-manual-item'}
+                  onClick={() => onSelect(option.value)}
+                >
+                  <div className="smm-manual-item-copy">
+                    <strong>{option.label}</strong>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="apk-app-empty">{emptyMessage}</div>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function calculateSmmTotal(service: NormalizedPusatPanelService | null, quantity: number) {
   if (!service) {
     return 0;
@@ -488,6 +651,24 @@ function StatusDetailGlyph() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M6.4 6.5h11.2v11H6.4z" fill="none" stroke="currentColor" strokeWidth="1.6" />
       <path d="M9 9.2h6M9 12h6M9 14.8h4.1" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+function CopyGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="8" y="8" width="10" height="10" rx="2.1" fill="none" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M6.3 14.9H6a2 2 0 0 1-2-2V6.2a2 2 0 0 1 2-2h6.7a2 2 0 0 1 2 2v.3" fill="none" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function MailGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4.2" y="6.2" width="15.6" height="11.6" rx="2.6" fill="none" stroke="currentColor" strokeWidth="1.7" />
+      <path d="m6.5 9 5.5 4.1L17.5 9" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
     </svg>
   );
 }
@@ -712,6 +893,15 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     year: String(new Date().getFullYear()),
     search: '',
   });
+  const [activeFilterPicker, setActiveFilterPicker] = useState<FilterPickerKey | null>(null);
+  const [filterPickerQueries, setFilterPickerQueries] = useState<Record<FilterPickerKey, string>>({
+    'monitoring-limit': '',
+    'monitoring-status': '',
+    'monitoring-category': '',
+    'status-limit': '',
+    'status-status': '',
+    'status-year': '',
+  });
   const [appliedStatusFilter, setAppliedStatusFilter] = useState({
     limit: 10,
     status: 'Semua',
@@ -740,15 +930,26 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     [accountOrderItems],
   );
 
-  const availableStatuses = useMemo(() => {
-    const values = Array.from(new Set(sortedHistoryItems.map((item) => String(item.orderStatus || '').trim()).filter(Boolean)));
-    return ['Semua', ...values];
-  }, [sortedHistoryItems]);
-
-  const availableStatusOrderStatuses = useMemo(() => {
-    const values = Array.from(new Set(sortedAccountOrderItems.map((item) => String(item.orderStatus || '').trim()).filter(Boolean)));
-    return ['Semua', ...values];
-  }, [sortedAccountOrderItems]);
+  const monitoringLimitOptions = useMemo<ManualPickerOption[]>(
+    () => ['10', '25', '50', '100'].map((limit) => ({ value: limit, label: limit })),
+    [],
+  );
+  const monitoringStatusOptions = useMemo(
+    () =>
+      buildStatusFilterOptions(
+        ['Semua', 'Pending', 'Processing', 'Success', 'Partial', 'Error', 'Expired'],
+        sortedHistoryItems.map((item) => String(item.orderStatus || '').trim()).filter(Boolean),
+      ),
+    [sortedHistoryItems],
+  );
+  const statusOrderStatusOptions = useMemo(
+    () =>
+      buildStatusFilterOptions(
+        ['Semua', 'Awaiting-payment', 'Pending', 'Processing', 'Success', 'Partial', 'Error', 'Expired'],
+        sortedAccountOrderItems.map((item) => String(item.orderStatus || '').trim()).filter(Boolean),
+      ),
+    [sortedAccountOrderItems],
+  );
 
   const availableMonitoringCategories = useMemo(() => {
     const values = Array.from(new Set(sortedHistoryItems.map((item) => String(item.category || '').trim()).filter(Boolean))).sort((left, right) =>
@@ -756,6 +957,10 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     );
     return ['Semua Kategori', ...values];
   }, [sortedHistoryItems]);
+  const monitoringCategoryOptions = useMemo(
+    () => availableMonitoringCategories.map((category) => ({ value: category, label: category })),
+    [availableMonitoringCategories],
+  );
 
   const availableStatusYears = useMemo(() => {
     const years = Array.from(
@@ -767,6 +972,14 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     }
     return years.map(String);
   }, [sortedAccountOrderItems]);
+  const statusLimitOptions = useMemo<ManualPickerOption[]>(
+    () => ['10', '25', '50', '100'].map((limit) => ({ value: limit, label: limit })),
+    [],
+  );
+  const statusYearOptions = useMemo(
+    () => availableStatusYears.map((year) => ({ value: year, label: year })),
+    [availableStatusYears],
+  );
 
   const applyCoreBundle = (bundle: CoreBundlePayload) => {
     const account = bundle.account || {};
@@ -831,6 +1044,10 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       document.body.style.overflow = previousOverflow;
     };
   }, [accountModalView, helperModalView, isSideMenuOpen]);
+
+  useEffect(() => {
+    setActiveFilterPicker(null);
+  }, [activeTab, accountModalView, helperModalView, isSideMenuOpen]);
 
   useEffect(() => {
     if (accountProfile.loggedIn) {
@@ -928,6 +1145,41 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     });
   };
 
+  const toggleFilterPicker = (key: FilterPickerKey) => {
+    setActiveFilterPicker((current) => (current === key ? null : key));
+  };
+
+  const updateFilterPickerQuery = (key: FilterPickerKey, value: string) => {
+    setFilterPickerQueries((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  };
+
+  const copyToClipboard = async (value: string, successText: string) => {
+    const normalizedValue = String(value || '').trim();
+    if (!normalizedValue) {
+      setFloatingNotice({
+        tone: 'error',
+        text: 'Data yang ingin disalin belum tersedia.',
+      });
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(normalizedValue);
+      setFloatingNotice({
+        tone: 'success',
+        text: successText,
+      });
+    } catch {
+      setFloatingNotice({
+        tone: 'error',
+        text: 'Data belum bisa disalin dari perangkat ini.',
+      });
+    }
+  };
+
   const handleCheckoutStatusPayload = async (payload: SocialCheckoutState) => {
     setActiveCheckoutOrder(payload);
     if (payload.fallbackNotice) {
@@ -998,6 +1250,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   };
 
   const applyMonitoringFilter = () => {
+    setActiveFilterPicker(null);
     setAppliedMonitoringFilter({
       limit: Math.max(1, Number(monitoringFilterDraft.limit || 25)),
       status: monitoringFilterDraft.status,
@@ -1006,6 +1259,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   };
 
   const applyStatusFilter = () => {
+    setActiveFilterPicker(null);
     setAppliedStatusFilter({
       limit: Math.max(1, Number(statusFilterDraft.limit || 10)),
       status: statusFilterDraft.status,
@@ -1555,6 +1809,64 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     if (helperModalView === 'api-docs') return 'Dokumentasi API';
     return '';
   })();
+  const contactEntries = [
+    {
+      key: 'instagram',
+      label: 'Instagram',
+      value: '@aca_app_premium',
+      copyValue: 'aca_app_premium',
+      href: 'https://instagram.com/aca_app_premium',
+      icon: 'instagram',
+    },
+    {
+      key: 'telegram',
+      label: 'Telegram',
+      value: '082322633452',
+      copyValue: '082322633452',
+      href: '',
+      icon: 'telegram',
+    },
+    {
+      key: 'email-utama',
+      label: 'Email Utama',
+      value: 'senjaabadi365@gmail.com',
+      copyValue: 'senjaabadi365@gmail.com',
+      href: 'mailto:senjaabadi365@gmail.com',
+      icon: 'email',
+    },
+    {
+      key: 'email-backup',
+      label: 'Email Backup',
+      value: 'lincici684@gmail.com',
+      copyValue: 'lincici684@gmail.com',
+      href: 'mailto:lincici684@gmail.com',
+      icon: 'email',
+    },
+    {
+      key: 'whatsapp-1',
+      label: 'WhatsApp 1',
+      value: '088242049163',
+      copyValue: '088242049163',
+      href: 'https://wa.me/6288242049163',
+      icon: 'whatsapp',
+    },
+    {
+      key: 'whatsapp-2',
+      label: 'WhatsApp 2',
+      value: '082322633452',
+      copyValue: '082322633452',
+      href: 'https://wa.me/6282322633452',
+      icon: 'whatsapp',
+    },
+    {
+      key: 'whatsapp-group',
+      label: 'Grup WhatsApp Store',
+      value: 'Gabung grup store',
+      copyValue: 'https://chat.whatsapp.com/Gpl3XMxuiVTGHbyEkaEoz6?mode=ems_copy_t',
+      href: 'https://chat.whatsapp.com/Gpl3XMxuiVTGHbyEkaEoz6?mode=ems_copy_t',
+      icon: 'whatsapp',
+    },
+  ] as const;
 
   const platformGroups = useMemo<PlatformGroup[]>(() => {
     const buckets = new Map<string, PlatformGroup>();
@@ -1682,9 +1994,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
   const filteredMonitoringItems = useMemo(() => {
     const filtered = sortedHistoryItems.filter((item) => {
-      const matchesStatus =
-        appliedMonitoringFilter.status === 'Semua' ||
-        String(item.orderStatus || '').toLowerCase() === appliedMonitoringFilter.status.toLowerCase();
+      const matchesStatus = matchesStatusFilter(item.orderStatus, appliedMonitoringFilter.status);
       const matchesCategory =
         appliedMonitoringFilter.category === 'Semua Kategori' || item.category === appliedMonitoringFilter.category;
       return matchesStatus && matchesCategory;
@@ -1697,9 +2007,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     const filtered = sortedAccountOrderItems.filter((item) => {
       const itemYear = String(new Date(item.createdAt).getFullYear());
       const matchesYear = !appliedStatusFilter.year || itemYear === appliedStatusFilter.year;
-      const matchesStatus =
-        appliedStatusFilter.status === 'Semua' ||
-        String(item.orderStatus || '').toLowerCase() === appliedStatusFilter.status.toLowerCase();
+      const matchesStatus = matchesStatusFilter(item.orderStatus, appliedStatusFilter.status);
       const haystack = [
         item.orderCode,
         item.providerOrderId,
@@ -2310,48 +2618,66 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
               <div className="apk-app-form-card">
                 <div className="smm-monitoring-filter-grid">
-                  <label className="apk-app-form-field">
+                  <div className="apk-app-form-field">
                     <span>Tampilkan Beberapa</span>
-                    <select
+                    <SearchableManualPicker
                       value={monitoringFilterDraft.limit}
-                      onChange={(event) => setMonitoringFilterDraft((current) => ({ ...current, limit: event.target.value }))}
-                      className="smm-select"
-                    >
-                      {['10', '25', '50', '100'].map((limit) => (
-                        <option key={limit} value={limit}>
-                          {limit}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="apk-app-form-field">
+                      placeholder="Pilih jumlah data"
+                      open={activeFilterPicker === 'monitoring-limit'}
+                      onToggle={() => toggleFilterPicker('monitoring-limit')}
+                      onSelect={(value) => {
+                        setMonitoringFilterDraft((current) => ({ ...current, limit: value }));
+                        updateFilterPickerQuery('monitoring-limit', '');
+                        setActiveFilterPicker(null);
+                      }}
+                      query={filterPickerQueries['monitoring-limit']}
+                      onQueryChange={(value) => updateFilterPickerQuery('monitoring-limit', value)}
+                      options={monitoringLimitOptions}
+                      searchPlaceholder="Cari jumlah data"
+                      emptyMessage="Jumlah data yang kamu cari belum tersedia."
+                      stackClassName="smm-select-stack smm-select-stack--compact"
+                    />
+                  </div>
+                  <div className="apk-app-form-field">
                     <span>Filter Status</span>
-                    <select
+                    <SearchableManualPicker
                       value={monitoringFilterDraft.status}
-                      onChange={(event) => setMonitoringFilterDraft((current) => ({ ...current, status: event.target.value }))}
-                      className="smm-select"
-                    >
-                      {availableStatuses.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="apk-app-form-field">
+                      placeholder="Pilih status"
+                      open={activeFilterPicker === 'monitoring-status'}
+                      onToggle={() => toggleFilterPicker('monitoring-status')}
+                      onSelect={(value) => {
+                        setMonitoringFilterDraft((current) => ({ ...current, status: value }));
+                        updateFilterPickerQuery('monitoring-status', '');
+                        setActiveFilterPicker(null);
+                      }}
+                      query={filterPickerQueries['monitoring-status']}
+                      onQueryChange={(value) => updateFilterPickerQuery('monitoring-status', value)}
+                      options={monitoringStatusOptions}
+                      searchPlaceholder="Cari status order"
+                      emptyMessage="Status yang kamu cari belum tersedia."
+                      stackClassName="smm-select-stack smm-select-stack--compact"
+                    />
+                  </div>
+                  <div className="apk-app-form-field">
                     <span>Filter Category</span>
-                    <select
+                    <SearchableManualPicker
                       value={monitoringFilterDraft.category}
-                      onChange={(event) => setMonitoringFilterDraft((current) => ({ ...current, category: event.target.value }))}
-                      className="smm-select"
-                    >
-                      {availableMonitoringCategories.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      placeholder="Pilih kategori"
+                      open={activeFilterPicker === 'monitoring-category'}
+                      onToggle={() => toggleFilterPicker('monitoring-category')}
+                      onSelect={(value) => {
+                        setMonitoringFilterDraft((current) => ({ ...current, category: value }));
+                        updateFilterPickerQuery('monitoring-category', '');
+                        setActiveFilterPicker(null);
+                      }}
+                      query={filterPickerQueries['monitoring-category']}
+                      onQueryChange={(value) => updateFilterPickerQuery('monitoring-category', value)}
+                      options={monitoringCategoryOptions}
+                      searchPlaceholder="Cari kategori monitoring"
+                      emptyMessage="Kategori yang kamu cari belum tersedia."
+                      stackClassName="smm-select-stack smm-select-stack--compact"
+                    />
+                  </div>
                   <div className="smm-monitoring-filter-actions">
                     <span>Submit</span>
                     <div className="smm-monitoring-filter-buttons">
@@ -2365,7 +2691,15 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                       >
                         Filter
                       </button>
-                      <button type="button" className="apk-app-ghost-button" onClick={refreshHistory} disabled={isRefreshingHistory}>
+                      <button
+                        type="button"
+                        className="apk-app-ghost-button"
+                        onClick={() => {
+                          setActiveFilterPicker(null);
+                          refreshHistory();
+                        }}
+                        disabled={isRefreshingHistory}
+                      >
                         {isRefreshingHistory ? 'Memuat...' : 'Refresh'}
                       </button>
                     </div>
@@ -2426,57 +2760,72 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                 <div>
                   <span className="apk-app-section-label">Status Order</span>
                 </div>
-                <span className="apk-app-count-pill">
-                  {pendingAccountOrderCount.toLocaleString('id-ID')} Pending
-                </span>
               </div>
 
               {accountProfile.loggedIn ? (
                 <>
                   <div className="apk-app-form-card">
                     <div className="smm-status-filter-grid">
-                      <label className="apk-app-form-field">
-                        <span>Tampilkan</span>
-                        <select
+                      <div className="apk-app-form-field">
+                        <span>Tampilkan Beberapa</span>
+                        <SearchableManualPicker
                           value={statusFilterDraft.limit}
-                          onChange={(event) => setStatusFilterDraft((current) => ({ ...current, limit: event.target.value }))}
-                          className="smm-select"
-                        >
-                          {['10', '25', '50', '100'].map((limit) => (
-                            <option key={limit} value={limit}>
-                              {limit}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="apk-app-form-field">
+                          placeholder="Pilih jumlah data"
+                          open={activeFilterPicker === 'status-limit'}
+                          onToggle={() => toggleFilterPicker('status-limit')}
+                          onSelect={(value) => {
+                            setStatusFilterDraft((current) => ({ ...current, limit: value }));
+                            updateFilterPickerQuery('status-limit', '');
+                            setActiveFilterPicker(null);
+                          }}
+                          query={filterPickerQueries['status-limit']}
+                          onQueryChange={(value) => updateFilterPickerQuery('status-limit', value)}
+                          options={statusLimitOptions}
+                          searchPlaceholder="Cari jumlah data"
+                          emptyMessage="Jumlah data yang kamu cari belum tersedia."
+                          stackClassName="smm-select-stack smm-select-stack--compact"
+                        />
+                      </div>
+                      <div className="apk-app-form-field">
                         <span>Filter Status</span>
-                        <select
+                        <SearchableManualPicker
                           value={statusFilterDraft.status}
-                          onChange={(event) => setStatusFilterDraft((current) => ({ ...current, status: event.target.value }))}
-                          className="smm-select"
-                        >
-                          {availableStatusOrderStatuses.map((status) => (
-                            <option key={status} value={status}>
-                              {status}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="apk-app-form-field">
+                          placeholder="Pilih status"
+                          open={activeFilterPicker === 'status-status'}
+                          onToggle={() => toggleFilterPicker('status-status')}
+                          onSelect={(value) => {
+                            setStatusFilterDraft((current) => ({ ...current, status: value }));
+                            updateFilterPickerQuery('status-status', '');
+                            setActiveFilterPicker(null);
+                          }}
+                          query={filterPickerQueries['status-status']}
+                          onQueryChange={(value) => updateFilterPickerQuery('status-status', value)}
+                          options={statusOrderStatusOptions}
+                          searchPlaceholder="Cari status pesanan"
+                          emptyMessage="Status yang kamu cari belum tersedia."
+                          stackClassName="smm-select-stack smm-select-stack--compact"
+                        />
+                      </div>
+                      <div className="apk-app-form-field">
                         <span>Filter Tahun</span>
-                        <select
+                        <SearchableManualPicker
                           value={statusFilterDraft.year}
-                          onChange={(event) => setStatusFilterDraft((current) => ({ ...current, year: event.target.value }))}
-                          className="smm-select"
-                        >
-                          {availableStatusYears.map((year) => (
-                            <option key={year} value={year}>
-                              {year}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                          placeholder="Pilih tahun"
+                          open={activeFilterPicker === 'status-year'}
+                          onToggle={() => toggleFilterPicker('status-year')}
+                          onSelect={(value) => {
+                            setStatusFilterDraft((current) => ({ ...current, year: value }));
+                            updateFilterPickerQuery('status-year', '');
+                            setActiveFilterPicker(null);
+                          }}
+                          query={filterPickerQueries['status-year']}
+                          onQueryChange={(value) => updateFilterPickerQuery('status-year', value)}
+                          options={statusYearOptions}
+                          searchPlaceholder="Cari tahun order"
+                          emptyMessage="Tahun yang kamu cari belum tersedia."
+                          stackClassName="smm-select-stack smm-select-stack--compact"
+                        />
+                      </div>
                       <label className="apk-app-form-field">
                         <span>Cari Order ID</span>
                         <input
@@ -2501,7 +2850,10 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                           <button
                             type="button"
                             className="apk-app-ghost-button"
-                            onClick={() => refreshAccountOrders(accountProfile.username)}
+                            onClick={() => {
+                              setActiveFilterPicker(null);
+                              refreshAccountOrders(accountProfile.username);
+                            }}
                             disabled={isRefreshingAccountOrders}
                           >
                             {isRefreshingAccountOrders ? 'Memuat...' : 'Refresh'}
@@ -2538,7 +2890,19 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                                 </td>
                                 <td><div className="smm-status-service-name">{item.serviceName || '-'}</div></td>
                                 <td>
-                                  <div className="smm-status-target">{item.targetData || '-'}</div>
+                                  <div className="smm-status-target">
+                                    <span className="smm-status-target__text">{item.targetData || '-'}</span>
+                                    {item.targetData ? (
+                                      <button
+                                        type="button"
+                                        className="smm-status-copy-button"
+                                        onClick={() => void copyToClipboard(item.targetData, 'Target berhasil disalin.')}
+                                        aria-label="Salin target pesanan"
+                                      >
+                                        <CopyGlyph />
+                                      </button>
+                                    ) : null}
+                                  </div>
                                 </td>
                                 <td className="smm-status-cell--nowrap">{item.quantity == null ? '-' : item.quantity.toLocaleString('id-ID')}</td>
                                 <td className="smm-status-cell--nowrap">Rp {(item.totalPrice || item.unitPrice || 0).toLocaleString('id-ID')}</td>
@@ -2693,9 +3057,50 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                   <div className="account-popup-stack">
                     <div className="account-popup-card">
                       {helperModalView === 'kontak' ? (
-                        <div className="smm-profile-lines">
-                          <p>Gunakan kontak admin store yang aktif untuk bantuan transaksi, deposit, atau kendala order.</p>
-                          <p>Jika kamu belum menampilkan kontak khusus di website, pastikan admin store selalu bisa dihubungi dari channel utama tokomu.</p>
+                        <div className="smm-contact-list">
+                          {contactEntries.map((item) => (
+                            <div key={item.key} className="smm-contact-item">
+                              <span
+                                className="smm-contact-icon"
+                                aria-hidden="true"
+                                style={{
+                                  color:
+                                    item.icon === 'instagram'
+                                      ? '#e4408b'
+                                      : item.icon === 'telegram'
+                                        ? '#27a7e7'
+                                        : item.icon === 'whatsapp'
+                                          ? '#25d366'
+                                          : '#1799f2',
+                                }}
+                              >
+                                {item.icon === 'email' ? <MailGlyph /> : <SocialPlatformIcon icon={item.icon} />}
+                              </span>
+                              <div className="smm-contact-copy">
+                                <strong>{item.label}</strong>
+                                <span>{item.value}</span>
+                              </div>
+                              <div className="smm-contact-actions">
+                                {item.href ? (
+                                  <a
+                                    href={item.href}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="smm-contact-action smm-contact-action--open"
+                                  >
+                                    Buka
+                                  </a>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className="smm-contact-action"
+                                  onClick={() => void copyToClipboard(item.copyValue, `${item.label} berhasil disalin.`)}
+                                >
+                                  Salin
+                                </button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ) : null}
 

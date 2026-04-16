@@ -432,15 +432,92 @@ async function upsertPaymentRow(input: {
   `;
 }
 
-async function placeProviderOrder(order: Pick<SmmOrderRow, 'service_id' | 'target_data' | 'quantity' | 'username' | 'comments'>) {
+async function resolveProviderMenuType(serviceId: string, fallbackMenuType?: string | null) {
+  const normalizedFallback = String(fallbackMenuType || '').trim();
+  if (normalizedFallback) {
+    return normalizedFallback;
+  }
+
+  const normalizedServiceId = String(serviceId || '').trim();
+  if (!normalizedServiceId) {
+    return '1';
+  }
+
+  const services = await fetchPusatPanelServices();
+  return services.find((item) => item.id === normalizedServiceId)?.menuType || '1';
+}
+
+async function placeProviderOrder(
+  order: Pick<SmmOrderRow, 'service_id' | 'target_data' | 'quantity' | 'username' | 'comments'> & {
+    menuType?: string | null;
+  },
+) {
+  const serviceId = String(order.service_id || '').trim();
+  const targetData = String(order.target_data || '').trim();
+  const quantity = Number(order.quantity || 0);
+  const username = String(order.username || '').trim();
+  const comments = String(order.comments || '').trim();
+  const menuType = await resolveProviderMenuType(serviceId, order.menuType);
+
   const payload: Record<string, string> = {
     action: 'order',
-    service: String(order.service_id || '').trim(),
+    service: serviceId,
   };
-  if (String(order.target_data || '').trim()) payload.data = String(order.target_data || '').trim();
-  if (order.quantity != null && Number(order.quantity) > 0) payload.quantity = String(order.quantity);
-  if (String(order.username || '').trim()) payload.username = String(order.username || '').trim();
-  if (String(order.comments || '').trim()) payload.komen = String(order.comments || '').trim();
+
+  if (!serviceId) {
+    throw new Error('Service provider belum valid.');
+  }
+
+  if (menuType === '2') {
+    if (!targetData) {
+      throw new Error('Data target wajib diisi untuk layanan Custom Comments.');
+    }
+    if (!comments) {
+      throw new Error('Komentar wajib diisi untuk layanan Custom Comments.');
+    }
+    payload.data = targetData;
+    payload.komen = comments;
+  } else if (menuType === '3') {
+    if (!targetData) {
+      throw new Error('Data target wajib diisi untuk layanan Comment Likes.');
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error('Jumlah order wajib diisi untuk layanan Comment Likes.');
+    }
+    if (!username) {
+      throw new Error('Username komentar wajib diisi untuk layanan Comment Likes.');
+    }
+    payload.data = targetData;
+    payload.quantity = String(quantity);
+    payload.username = username;
+  } else if (menuType === '4') {
+    if (!targetData) {
+      throw new Error('Data target wajib diisi untuk layanan Package.');
+    }
+    payload.data = targetData;
+  } else if (menuType === '5') {
+    if (!targetData) {
+      throw new Error('Data target wajib diisi untuk layanan SEO.');
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error('Jumlah order wajib diisi untuk layanan SEO.');
+    }
+    if (!comments) {
+      throw new Error('Keyword / komen wajib diisi untuk layanan SEO.');
+    }
+    payload.data = targetData;
+    payload.quantity = String(quantity);
+    payload.komen = comments;
+  } else {
+    if (!targetData) {
+      throw new Error('Data target wajib diisi untuk layanan ini.');
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error('Jumlah order wajib diisi untuk layanan ini.');
+    }
+    payload.data = targetData;
+    payload.quantity = String(quantity);
+  }
 
   const response = await requestPusatPanel<{ id: string }>({
     ...payload,
@@ -537,6 +614,7 @@ export async function submitSmmCheckoutOrder(input: CheckoutInput): Promise<SmmC
         quantity,
         username,
         comments,
+        menuType: selectedService.menuType,
       });
 
       await upsertOrderRow({
