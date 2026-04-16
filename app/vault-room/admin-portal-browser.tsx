@@ -58,6 +58,26 @@ function normalizeImagePreviewUrl(value: string) {
   }
 }
 
+function getAdminAccountStatusLabel(status: AdminApkAccountRow['deliveryStatus']) {
+  if (status === 'delivered') {
+    return 'Delivered';
+  }
+  if (status === 'reserved') {
+    return 'Reserved';
+  }
+  return 'Available';
+}
+
+function getAdminAccountStatusNote(status: AdminApkAccountRow['deliveryStatus']) {
+  if (status === 'delivered') {
+    return 'Akun sudah terkirim ke order. Data akun dan catatan masih bisa dirapikan, tetapi pindah varian dan hapus data dikunci.';
+  }
+  if (status === 'reserved') {
+    return 'Akun sedang dicadangkan untuk order aktif. Data akun dan catatan masih bisa diubah, tetapi pindah varian dan hapus data dikunci.';
+  }
+  return 'Akun masih available. Kamu bisa edit isi akun, pindah varian, atau hapus data akun ini.';
+}
+
 export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [activeTab, setActiveTab] = useState<AdminTab>('smm');
@@ -300,6 +320,9 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     () => variantAccounts.find((account) => account.id === selectedAccountId) || variantAccounts[0] || null,
     [selectedAccountId, variantAccounts],
   );
+  const selectedAccountCanMove = selectedAccount?.deliveryStatus === 'available';
+  const selectedAccountCanDelete = selectedAccount?.deliveryStatus === 'available';
+  const selectedAccountStatusNote = selectedAccount ? getAdminAccountStatusNote(selectedAccount.deliveryStatus) : '';
 
   useEffect(() => {
     if (!selectedAccount) {
@@ -1420,7 +1443,12 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                           className={selectedAccountId === account.id ? 'admin-portal-list-item admin-portal-list-item--active' : 'admin-portal-list-item'}
                           onClick={() => setSelectedAccountId(account.id)}
                         >
-                          <strong>#{account.id} • {account.deliveryStatus}</strong>
+                          <div className="admin-portal-status-row">
+                            <strong>#{account.id}</strong>
+                            <span className={`admin-portal-status-chip admin-portal-status-chip--${account.deliveryStatus}`}>
+                              {getAdminAccountStatusLabel(account.deliveryStatus)}
+                            </span>
+                          </div>
                           <span>{account.accountData}</span>
                           <small>{account.adminNote || 'Tanpa catatan admin'}</small>
                         </button>
@@ -1437,8 +1465,12 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                       <span className="smm-profile-title">Editor data akun</span>
                       <div className="smm-profile-lines">
                         <p>ID akun : #{selectedAccount.id}</p>
-                        <p>Status : {selectedAccount.deliveryStatus}</p>
+                        <p>Status : {getAdminAccountStatusLabel(selectedAccount.deliveryStatus)}</p>
                         <p>Assigned order : {selectedAccount.assignedOrderCode || '-'}</p>
+                      </div>
+
+                      <div className="admin-portal-preview-card">
+                        <p>{selectedAccountStatusNote}</p>
                       </div>
 
                       <div className="apk-app-form-grid smm-profile-form-grid">
@@ -1448,6 +1480,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                             value={accountEditForm.variantId}
                             onChange={(event) => setAccountEditForm((current) => ({ ...current, variantId: event.target.value }))}
                             className="smm-select"
+                            disabled={!selectedAccountCanMove}
                           >
                             {snapshot.apkVariants.map((variant) => (
                               <option key={variant.variantId} value={variant.variantId}>
@@ -1455,6 +1488,9 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                               </option>
                             ))}
                           </select>
+                          {!selectedAccountCanMove ? (
+                            <small className="admin-portal-lock-note">Pindah varian hanya tersedia untuk akun yang masih available.</small>
+                          ) : null}
                         </label>
                         <label className="apk-app-form-field apk-app-form-field--full">
                           <span>Data akun</span>
@@ -1524,6 +1560,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                         <button
                           type="button"
                           className="apk-app-secondary-button"
+                          disabled={!selectedAccountCanDelete}
                           onClick={() =>
                             runAction(async () => {
                               if (!window.confirm(`Hapus data akun #${selectedAccount.id}?`)) {
@@ -1564,6 +1601,11 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                           Hapus Data Akun
                         </button>
                       </div>
+                      {!selectedAccountCanDelete ? (
+                        <div className="admin-portal-preview-card">
+                          <p>Hapus data akun dikunci karena status akun ini bukan available.</p>
+                        </div>
+                      ) : null}
                     </>
                   ) : (
                     <div className="apk-app-empty">Pilih salah satu data akun untuk mulai mengedit.</div>
