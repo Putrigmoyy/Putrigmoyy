@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import {
   siApplepodcasts,
   siAudiomack,
@@ -950,6 +950,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const [isSubmittingDeposit, startDepositSubmit] = useTransition();
   const [isCheckingDepositStatus, setIsCheckingDepositStatus] = useState(false);
   const [isCheckingOrderStatus, setIsCheckingOrderStatus] = useState(false);
+  const checkoutStatusRequestRef = useRef(false);
   const sortedHistoryItems = useMemo(
     () =>
       [...historyItems].sort(
@@ -1275,10 +1276,11 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   };
 
   const refreshCheckoutStatus = (manual = true) => {
-    if (!activeCheckoutOrder?.orderCode) {
+    if (!activeCheckoutOrder?.orderCode || checkoutStatusRequestRef.current) {
       return;
     }
 
+    checkoutStatusRequestRef.current = true;
     if (manual) {
       setIsCheckingOrderStatus(true);
     }
@@ -1309,6 +1311,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
           text: error instanceof Error ? error.message : 'Status pembayaran belum bisa diperbarui.',
         });
       } finally {
+        checkoutStatusRequestRef.current = false;
         if (manual) {
           setIsCheckingOrderStatus(false);
         }

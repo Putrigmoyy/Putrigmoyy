@@ -99,6 +99,28 @@ function normalizePaidStatus(status: string) {
   return normalized || 'pending';
 }
 
+function normalizeProviderMultilineText(value: string) {
+  return String(value || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join('\r\n');
+}
+
+function countProviderMultilineEntries(value: string) {
+  return String(value || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean).length;
+}
+
+function normalizeProviderUsername(value: string) {
+  return String(value || '')
+    .trim()
+    .replace(/^@+/, '')
+    .replace(/\s+/g, '');
+}
+
 function buildOrderDetail(input: {
   serviceName: string;
   category: string;
@@ -471,6 +493,39 @@ async function resolveProviderMenuType(serviceId: string, fallbackMenuType?: str
   return services.find((item) => item.id === normalizedServiceId)?.menuType || '1';
 }
 
+async function claimPaidMidtransOrderForProvider(orderCode: string) {
+  const sql = getNeonClient('smm');
+  const rows = (await sql`
+    update smm_orders
+    set
+      payment_status = ${'paid'},
+      order_status = ${'provider-submitting'},
+      updated_at = now()
+    where order_code = ${orderCode}
+      and payment_method = ${'midtrans'}
+      and payment_status = ${'awaiting-payment'}
+      and coalesce(provider_order_id, '') = ''
+    returning
+      order_code,
+      provider_order_id,
+      account_contact,
+      service_id,
+      service_name,
+      category,
+      target_data,
+      quantity,
+      unit_price,
+      total_price,
+      username,
+      comments,
+      order_status,
+      payment_status,
+      payment_method
+  `) as SmmOrderRow[];
+
+  return rows[0] || null;
+}
+
 async function placeProviderOrder(
   order: Pick<SmmOrderRow, 'service_id' | 'target_data' | 'quantity' | 'username' | 'comments'> & {
     menuType?: string | null;
@@ -479,8 +534,8 @@ async function placeProviderOrder(
   const serviceId = String(order.service_id || '').trim();
   const targetData = String(order.target_data || '').trim();
   const quantity = Number(order.quantity || 0);
-  const username = String(order.username || '').trim();
-  const comments = String(order.comments || '').trim();
+  const username = normalizeProviderUsername(String(order.username || ''));
+  const comments = normalizeProviderMultilineText(String(order.comments || ''));
   const menuType = await resolveProviderMenuType(serviceId, order.menuType);
 
   const payload: Record<string, string> = {
@@ -562,9 +617,9 @@ export async function submitSmmCheckoutOrder(input: CheckoutInput): Promise<SmmC
   const customerName = String(input.customerName || '').trim() || 'Pelanggan Sosmed';
   const service = String(input.service || '').trim();
   const targetData = String(input.data || '').trim();
-  const username = String(input.username || '').trim();
-  const comments = String(input.comments || '').trim();
-  const quantity = input.quantity == null ? null : Math.max(0, Number(input.quantity || 0));
+  const username = normalizeProviderUsername(String(input.username || ''));
+  const comments = normalizeProviderMultilineText(String(input.comments || ''));
+  const requestedQuantity = input.quantity == null ? null : Math.max(0, Number(input.quantity || 0));
   const orderCode = createSmmOrderCode();
 
   if (!service) {
@@ -583,6 +638,7 @@ export async function submitSmmCheckoutOrder(input: CheckoutInput): Promise<SmmC
   const serviceName = selectedService.name;
   const category = selectedService.category || 'Tanpa Kategori';
   const unitPrice = Math.max(0, Math.round(Number(selectedService.price || 0)));
+  const quantity = selectedService.menuType === '2' ? countProviderMultilineEntries(comments) : requestedQuantity;
   const totalPrice = calculateSmmCheckoutTotal(selectedService, quantity);
   const detail = buildOrderDetail({
     serviceName,
@@ -781,31 +837,34 @@ export async function getSmmCheckoutOrderStatus(orderCode: string): Promise<SmmC
     `;
 
     if (normalizedPaymentStatus === 'paid') {
-      try {
-        const providerOrderId = await placeProviderOrder(order);
-        await sql`
-          update smm_orders
-          set
-            provider_order_id = ${providerOrderId},
-            order_status = ${'pending'},
-            payment_status = ${'paid'},
-            updated_at = now()
-          where order_code = ${normalizedOrderCode}
-        `;
-        if (String(order.account_contact || '').trim()) {
-          await updateCoreOrderHistoryStatusByReference({
-            reference: normalizedOrderCode,
-            statusLabel: 'Berhasil',
-            status: 'success',
-            methodLabel: 'QRIS',
-            detailAppend: 'Pembayaran QRIS berhasil dan order diteruskan ke provider.',
-          });
+      const claimedOrder = await claimPaidMidtransOrderForProvider(normalizedOrderCode);
+      if (claimedOrder) {
+        try {
+          const providerOrderId = await placeProviderOrder(claimedOrder);
+          await sql`
+            update smm_orders
+            set
+              provider_order_id = ${providerOrderId},
+              order_status = ${'pending'},
+              payment_status = ${'paid'},
+              updated_at = now()
+            where order_code = ${normalizedOrderCode}
+          `;
+          if (String(claimedOrder.account_contact || '').trim()) {
+            await updateCoreOrderHistoryStatusByReference({
+              reference: normalizedOrderCode,
+              statusLabel: 'Berhasil',
+              status: 'success',
+              methodLabel: 'QRIS',
+              detailAppend: 'Pembayaran QRIS berhasil dan order diteruskan ke provider.',
+            });
+          }
+        } catch (error) {
+          await markSmmOrderAsFailedAndRefund(
+            normalizedOrderCode,
+            error instanceof Error ? error.message : 'Provider error.',
+          );
         }
-      } catch (error) {
-        await markSmmOrderAsFailedAndRefund(
-          normalizedOrderCode,
-          error instanceof Error ? error.message : 'Provider error.',
-        );
       }
     } else if (normalizedPaymentStatus === 'expire' || normalizedPaymentStatus === 'cancel' || normalizedPaymentStatus === 'deny' || normalizedPaymentStatus === 'failed') {
       await sql`
