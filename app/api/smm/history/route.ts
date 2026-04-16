@@ -12,6 +12,20 @@ type HistoryResponseItem = HistoryItem & {
   statusSource: 'provider-live' | 'local';
 };
 
+function isTerminalStatus(status: string) {
+  const normalized = String(status || '').trim().toLowerCase();
+  return (
+    normalized.includes('success') ||
+    normalized.includes('complete') ||
+    normalized.includes('completed') ||
+    normalized.includes('cancel') ||
+    normalized.includes('error') ||
+    normalized.includes('fail') ||
+    normalized.includes('partial') ||
+    normalized.includes('expired')
+  );
+}
+
 function isFailureProviderStatus(status: string) {
   const normalized = String(status || '').trim().toLowerCase();
   return (
@@ -54,7 +68,7 @@ async function syncVisibleCheckoutStatuses(items: HistoryItem[]) {
   return hasUpdates;
 }
 
-async function buildLiveProviderHistory(items: HistoryItem[]): Promise<HistoryResponseItem[]> {
+async function buildLiveProviderHistory(items: HistoryItem[], liveMode: 'all' | 'active-only'): Promise<HistoryResponseItem[]> {
   if (!items.length) {
     return [];
   }
@@ -68,7 +82,11 @@ async function buildLiveProviderHistory(items: HistoryItem[]): Promise<HistoryRe
 
     const updatedAtMs = new Date(item.updatedAt).getTime();
     if (!Number.isFinite(updatedAtMs)) {
-      return true;
+      return liveMode === 'all' || !isTerminalStatus(item.orderStatus);
+    }
+
+    if (liveMode === 'active-only' && isTerminalStatus(item.orderStatus)) {
+      return false;
     }
 
     return Date.now() - updatedAtMs >= SYNC_COOLDOWN_MS;
@@ -124,6 +142,7 @@ export async function GET(request: Request) {
     const limit = Number(searchParams.get('limit') || 40);
     const contact = String(searchParams.get('contact') || '').trim();
     const sync = searchParams.get('sync') !== '0';
+    const liveMode = searchParams.get('liveMode') === 'active-only' ? 'active-only' : 'all';
     const providerOnly = !contact && searchParams.get('providerOnly') !== '0';
     let items = await getSmmOrderHistory(limit, {
       accountContact: contact,
@@ -140,7 +159,7 @@ export async function GET(request: Request) {
       }
     }
 
-    const liveItems = await buildLiveProviderHistory(items);
+    const liveItems = await buildLiveProviderHistory(items, liveMode);
 
     return NextResponse.json({
       status: true,

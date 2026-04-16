@@ -641,6 +641,11 @@ function mapStatusTone(status: string) {
   return 'pending';
 }
 
+function isRefreshingStatus(status: string) {
+  const normalized = String(status || '').trim().toLowerCase();
+  return normalized.includes('process') || normalized.includes('pending') || normalized.includes('waiting');
+}
+
 function formatStatusSourceLabel(source?: 'provider-live' | 'local') {
   return source === 'provider-live' ? 'Live Provider' : 'Cache Lokal';
 }
@@ -1031,6 +1036,46 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     () => availableStatusYears.map((year) => ({ value: year, label: year })),
     [availableStatusYears],
   );
+  const filteredMonitoringItems = useMemo(() => {
+    const filtered = sortedHistoryItems.filter((item) => {
+      const matchesStatus = matchesStatusFilter(item.orderStatus, appliedMonitoringFilter.status);
+      const matchesCategory =
+        appliedMonitoringFilter.category === 'Semua Kategori' || item.category === appliedMonitoringFilter.category;
+      return matchesStatus && matchesCategory;
+    });
+
+    return filtered.slice(0, appliedMonitoringFilter.limit);
+  }, [appliedMonitoringFilter, sortedHistoryItems]);
+  const hasRefreshingMonitoringItems = useMemo(
+    () => filteredMonitoringItems.some((item) => isRefreshingStatus(item.orderStatus)),
+    [filteredMonitoringItems],
+  );
+
+  const filteredStatusOrders = useMemo(() => {
+    const filtered = sortedAccountOrderItems.filter((item) => {
+      const itemYear = String(new Date(item.createdAt).getFullYear());
+      const matchesYear = !appliedStatusFilter.year || itemYear === appliedStatusFilter.year;
+      const matchesStatus = matchesStatusFilter(item.orderStatus, appliedStatusFilter.status);
+      const haystack = [
+        item.orderCode,
+        item.providerOrderId,
+        item.serviceName,
+        item.targetData,
+        item.category,
+        item.serviceId,
+      ]
+        .join(' ')
+        .toLowerCase();
+      const matchesSearch = !appliedStatusFilter.search || haystack.includes(appliedStatusFilter.search);
+      return matchesYear && matchesStatus && matchesSearch;
+    });
+
+    return filtered.slice(0, appliedStatusFilter.limit);
+  }, [appliedStatusFilter, sortedAccountOrderItems]);
+  const hasRefreshingStatusOrders = useMemo(
+    () => filteredStatusOrders.some((item) => isRefreshingStatus(item.orderStatus)),
+    [filteredStatusOrders],
+  );
 
   const applyCoreBundle = (bundle: CoreBundlePayload) => {
     const account = bundle.account || {};
@@ -1145,10 +1190,10 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const monitoringRequestLimit = Math.max(10, Math.min(25, Number(monitoringFilterDraft.limit || appliedMonitoringFilter.limit || 25)));
   const statusRequestLimit = Math.max(10, Math.min(25, Number(statusFilterDraft.limit || appliedStatusFilter.limit || 10)));
 
-  const refreshHistory = () => {
+  const refreshHistory = (liveMode: 'all' | 'active-only' = 'all') => {
     startHistoryRefresh(async () => {
       try {
-        const response = await fetch(`/api/smm/history?limit=${monitoringRequestLimit}`, {
+        const response = await fetch(`/api/smm/history?limit=${monitoringRequestLimit}&liveMode=${liveMode}`, {
           method: 'GET',
           cache: 'no-store',
         });
@@ -1169,7 +1214,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     });
   };
 
-  const refreshAccountOrders = (usernameOverride?: string) => {
+  const refreshAccountOrders = (usernameOverride?: string, liveMode: 'all' | 'active-only' = 'all') => {
     const normalizedUsername = String(usernameOverride || accountProfile.username || '').trim();
     if (!normalizedUsername) {
       setAccountOrderItems([]);
@@ -1180,7 +1225,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
     startAccountOrdersRefresh(async () => {
       try {
-        const response = await fetch(`/api/smm/history?limit=${statusRequestLimit}&contact=${encodeURIComponent(normalizedUsername)}`, {
+        const response = await fetch(`/api/smm/history?limit=${statusRequestLimit}&contact=${encodeURIComponent(normalizedUsername)}&liveMode=${liveMode}`, {
           method: 'GET',
           cache: 'no-store',
         });
@@ -1410,7 +1455,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
   useEffect(() => {
     if (accountProfile.loggedIn && accountProfile.username) {
-      refreshAccountOrders(accountProfile.username);
+      refreshAccountOrders(accountProfile.username, 'all');
       return;
     }
     setAccountOrderItems([]);
@@ -1423,30 +1468,38 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       return;
     }
 
-    refreshAccountOrders(accountProfile.username);
+    refreshAccountOrders(accountProfile.username, 'all');
+    if (!hasRefreshingStatusOrders) {
+      return;
+    }
+
     const intervalId = window.setInterval(() => {
-      refreshAccountOrders(accountProfile.username);
-    }, 30000);
+      refreshAccountOrders(accountProfile.username, 'active-only');
+    }, 20000);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [activeTab, accountProfile.loggedIn, accountProfile.username]);
+  }, [activeTab, accountProfile.loggedIn, accountProfile.username, hasRefreshingStatusOrders]);
 
   useEffect(() => {
     if (activeTab !== 'riwayat') {
       return;
     }
 
-    refreshHistory();
+    refreshHistory('all');
+    if (!hasRefreshingMonitoringItems) {
+      return;
+    }
+
     const intervalId = window.setInterval(() => {
-      refreshHistory();
-    }, 30000);
+      refreshHistory('active-only');
+    }, 20000);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [activeTab]);
+  }, [activeTab, hasRefreshingMonitoringItems]);
 
   useEffect(() => {
     if (!detailStatusOrder) {
@@ -2298,39 +2351,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     return calculateSmmTotal(selectedService, calculatedQuantity);
   }, [calculatedQuantity, selectedService]);
 
-  const filteredMonitoringItems = useMemo(() => {
-    const filtered = sortedHistoryItems.filter((item) => {
-      const matchesStatus = matchesStatusFilter(item.orderStatus, appliedMonitoringFilter.status);
-      const matchesCategory =
-        appliedMonitoringFilter.category === 'Semua Kategori' || item.category === appliedMonitoringFilter.category;
-      return matchesStatus && matchesCategory;
-    });
-
-    return filtered.slice(0, appliedMonitoringFilter.limit);
-  }, [appliedMonitoringFilter, sortedHistoryItems]);
-
-  const filteredStatusOrders = useMemo(() => {
-    const filtered = sortedAccountOrderItems.filter((item) => {
-      const itemYear = String(new Date(item.createdAt).getFullYear());
-      const matchesYear = !appliedStatusFilter.year || itemYear === appliedStatusFilter.year;
-      const matchesStatus = matchesStatusFilter(item.orderStatus, appliedStatusFilter.status);
-      const haystack = [
-        item.orderCode,
-        item.providerOrderId,
-        item.serviceName,
-        item.targetData,
-        item.category,
-        item.serviceId,
-      ]
-        .join(' ')
-        .toLowerCase();
-      const matchesSearch = !appliedStatusFilter.search || haystack.includes(appliedStatusFilter.search);
-      return matchesYear && matchesStatus && matchesSearch;
-    });
-
-    return filtered.slice(0, appliedStatusFilter.limit);
-  }, [appliedStatusFilter, sortedAccountOrderItems]);
-
   const pendingAccountOrderCount = useMemo(
     () => sortedAccountOrderItems.filter((item) => mapStatusTone(item.orderStatus) === 'pending').length,
     [sortedAccountOrderItems],
@@ -2946,6 +2966,11 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                   <span className="apk-app-section-label">Monitoring Sosmed</span>
                   <p className="smm-section-copy">Direkomendasikan untuk pantau monitoring sosmed terlebih dahulu, sebelum melakukan order untuk melihat layanan yang bagus dan lancar untuk saat ini, agar tidak ada kendala error atau proses lama saat pemesanan.</p>
                   <p className="smm-section-copy">Status, start, dan remains akan ditandai khusus saat berhasil dibaca live langsung dari provider.</p>
+                  <p className="smm-section-copy">
+                    {hasRefreshingMonitoringItems
+                      ? 'Auto refresh aktif tiap 20 detik untuk order monitoring yang masih pending atau processing.'
+                      : 'Auto refresh monitoring berhenti otomatis saat semua order yang tampil sudah selesai.'}
+                  </p>
                 </div>
               </div>
 
@@ -3097,6 +3122,11 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
               <div className="apk-app-panel-head smm-panel-head">
                 <div>
                   <span className="apk-app-section-label">Status Order</span>
+                  <p className="smm-section-copy">
+                    {hasRefreshingStatusOrders
+                      ? 'Auto refresh aktif tiap 20 detik untuk order akunmu yang masih pending atau processing.'
+                      : 'Auto refresh status order berhenti otomatis saat semua order yang tampil sudah selesai.'}
+                  </p>
                 </div>
               </div>
 
