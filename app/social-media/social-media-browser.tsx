@@ -3240,8 +3240,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                       : 'smm-detail-modal-body'
                   }
                 >
-                  <div className="account-popup-stack">
-                    <div className="account-popup-card">
+                  <div className="smm-helper-scroll-shell">
+                    <div className="smm-helper-scroll-card">
                       {helperModalView === 'kontak' ? (
                         <div className="smm-contact-list">
                           {contactEntries.map((item) => (
