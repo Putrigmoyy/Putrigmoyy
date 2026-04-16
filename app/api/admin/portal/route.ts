@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   deleteAdminApkAccount,
+  deleteAdminApkProduct,
+  deleteAdminApkVariant,
   deleteAdminUser,
   getAdminApkAccounts,
   getAdminPortalSnapshot,
@@ -289,6 +291,36 @@ export async function POST(request: NextRequest) {
         status: true,
         data: {
           msg: 'Data akun premium berhasil dihapus.',
+          deleted,
+          snapshot,
+        },
+      });
+    }
+
+    if (action === 'delete-apk-variant') {
+      const deleted = await deleteAdminApkVariant({
+        variantId: String(body.variantId || '').trim(),
+      });
+      const snapshot = await getAdminPortalSnapshot();
+      return NextResponse.json({
+        status: true,
+        data: {
+          msg: 'Varian App Premium berhasil dihapus.',
+          deleted,
+          snapshot,
+        },
+      });
+    }
+
+    if (action === 'delete-apk-product') {
+      const deleted = await deleteAdminApkProduct({
+        productId: String(body.productId || '').trim(),
+      });
+      const snapshot = await getAdminPortalSnapshot();
+      return NextResponse.json({
+        status: true,
+        data: {
+          msg: 'Produk App Premium berhasil dihapus.',
           deleted,
           snapshot,
         },

@@ -7,6 +7,8 @@ import {
   addAdminApkVariantAccounts,
   listAdminApkAccountsByVariant,
   adminDeleteApkAccount,
+  adminDeleteApkProduct,
+  adminDeleteApkVariant,
   adminUpdateApkAccount,
   adminUpdateApkProduct,
   adminUpdateApkVariant,
@@ -159,4 +161,12 @@ export async function saveAdminApkAccountEdit(input: {
 
 export async function deleteAdminApkAccount(input: { accountId: number }) {
   return adminDeleteApkAccount(input);
+}
+
+export async function deleteAdminApkVariant(input: { variantId: string }) {
+  return adminDeleteApkVariant(input);
+}
+
+export async function deleteAdminApkProduct(input: { productId: string }) {
+  return adminDeleteApkProduct(input);
 }

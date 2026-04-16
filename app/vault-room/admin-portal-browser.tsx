@@ -223,6 +223,8 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     () => snapshot.apkProducts.find((product) => product.productId === selectedProductId) || filteredProducts[0] || null,
     [filteredProducts, selectedProductId, snapshot.apkProducts],
   );
+  const selectedProductVariantCount = selectedProductEditor?.variantCount || 0;
+  const canDeleteSelectedProduct = Boolean(selectedProductEditor) && selectedProductVariantCount === 0;
   const productPreviewUrl = useMemo(() => normalizeAdminImagePreviewUrl(productForm.imageUrl), [productForm.imageUrl]);
 
   useEffect(() => {
@@ -277,6 +279,8 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     () => snapshot.apkVariants.find((variant) => variant.variantId === selectedVariantId) || filteredVariants[0] || null,
     [filteredVariants, selectedVariantId, snapshot.apkVariants],
   );
+  const selectedVariantTotalAccountCount = selectedVariant?.totalAccountCount || 0;
+  const canDeleteSelectedVariant = Boolean(selectedVariant) && selectedVariantTotalAccountCount === 0;
   const selectedProduct = useMemo<AdminApkProductRow | null>(
     () => snapshot.apkProducts.find((product) => product.productId === newVariantForm.productId) || snapshot.apkProducts[0] || null,
     [newVariantForm.productId, snapshot.apkProducts],
@@ -1234,7 +1238,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                           onClick={() => setSelectedProductId(product.productId)}
                         >
                           <strong>{product.title}</strong>
-                          <span>{product.category}</span>
+                          <span>{product.category} | {product.variantCount.toLocaleString('id-ID')} varian</span>
                           <small>Stok {product.stock.toLocaleString('id-ID')} • Terjual {product.sold.toLocaleString('id-ID')}</small>
                         </button>
                       ))
@@ -1250,6 +1254,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                       <span className="smm-profile-title">Editor produk</span>
                       <div className="smm-profile-lines">
                         <p>Produk aktif : {selectedProductEditor.title}</p>
+                        <p>Varian aktif : {selectedProductVariantCount.toLocaleString('id-ID')}</p>
                         <p>Stok real : {selectedProductEditor.stock.toLocaleString('id-ID')}</p>
                         <p>Terjual real : {selectedProductEditor.sold.toLocaleString('id-ID')}</p>
                       </div>
@@ -1318,6 +1323,13 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                       <div className="admin-portal-preview-card">
                         <p>Preview akan otomatis menyesuaikan link gambar yang kamu tempel, termasuk link share Google Drive, Dropbox, GitHub raw/blob, dan path lokal website.</p>
                       </div>
+                      <div className={canDeleteSelectedProduct ? 'admin-portal-preview-card admin-portal-preview-card--warning' : 'admin-portal-preview-card admin-portal-preview-card--danger'}>
+                        <p>
+                          {canDeleteSelectedProduct
+                            ? 'Produk ini sudah tidak punya varian aktif, jadi aman untuk dihapus dari katalog website.'
+                            : `Produk ini masih punya ${selectedProductVariantCount.toLocaleString('id-ID')} varian aktif. Hapus semua variannya dulu sebelum hapus produk.`}
+                        </p>
+                      </div>
                       {productPreviewUrl ? (
                         productPreviewFailed ? (
                           <div className="admin-portal-preview-card admin-portal-preview-card--warning">
@@ -1379,6 +1391,48 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                         >
                           Simpan Produk
                         </button>
+                        <button
+                          type="button"
+                          className="apk-app-secondary-button"
+                          disabled={!canDeleteSelectedProduct}
+                          onClick={() =>
+                            runAction(async () => {
+                              if (!window.confirm(`Hapus produk "${selectedProductEditor.title}" dari katalog website?`)) {
+                                return;
+                              }
+
+                              const response = await fetch('/api/admin/portal', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'x-admin-secret': secret,
+                                },
+                                body: JSON.stringify({
+                                  action: 'delete-apk-product',
+                                  productId: selectedProductEditor.productId,
+                                }),
+                              });
+                              const result = (await response.json()) as {
+                                status?: boolean;
+                                data?: {
+                                  msg?: string;
+                                  snapshot?: AdminPortalSnapshot;
+                                };
+                              };
+                              if (!response.ok || !result.status || !result.data?.snapshot) {
+                                throw new Error(result.data?.msg || 'Produk App Premium belum bisa dihapus.');
+                              }
+                              setSnapshot(result.data.snapshot);
+                              setSelectedProductId(result.data.snapshot.apkProducts[0]?.productId || '');
+                              setNotice({
+                                tone: 'success',
+                                text: result.data.msg || 'Produk App Premium berhasil dihapus.',
+                              });
+                            })
+                          }
+                        >
+                          Hapus Produk
+                        </button>
                       </div>
                     </>
                   ) : (
@@ -1427,6 +1481,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                         <p>Kategori : {selectedVariant.category}</p>
                         <p>Stok sekarang : {selectedVariant.stock.toLocaleString('id-ID')}</p>
                         <p>Akun siap kirim : {selectedVariant.availableAccountCount.toLocaleString('id-ID')}</p>
+                        <p>Total data akun : {selectedVariantTotalAccountCount.toLocaleString('id-ID')}</p>
                         <p>Update terakhir : {formatDateLabel(selectedVariant.productUpdatedAt)}</p>
                       </div>
 
@@ -1464,6 +1519,14 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                             placeholder="Opsional"
                           />
                         </label>
+                      </div>
+
+                      <div className={canDeleteSelectedVariant ? 'admin-portal-preview-card admin-portal-preview-card--warning' : 'admin-portal-preview-card admin-portal-preview-card--danger'}>
+                        <p>
+                          {canDeleteSelectedVariant
+                            ? 'Varian ini sudah tidak punya data akun, jadi aman untuk dihapus dari produk.'
+                            : `Varian ini masih punya ${selectedVariantTotalAccountCount.toLocaleString('id-ID')} data akun. Hapus atau pindahkan semua akun dulu sebelum hapus varian.`}
+                        </p>
                       </div>
 
                       <div className="apk-app-action-row apk-app-action-row--compact">
@@ -1506,6 +1569,48 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                           }
                         >
                           Simpan Varian
+                        </button>
+                        <button
+                          type="button"
+                          className="apk-app-secondary-button"
+                          disabled={!canDeleteSelectedVariant}
+                          onClick={() =>
+                            runAction(async () => {
+                              if (!window.confirm(`Hapus varian "${selectedVariant.variantTitle}" dari produk "${selectedVariant.productTitle}"?`)) {
+                                return;
+                              }
+
+                              const response = await fetch('/api/admin/portal', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'x-admin-secret': secret,
+                                },
+                                body: JSON.stringify({
+                                  action: 'delete-apk-variant',
+                                  variantId: selectedVariant.variantId,
+                                }),
+                              });
+                              const result = (await response.json()) as {
+                                status?: boolean;
+                                data?: {
+                                  msg?: string;
+                                  snapshot?: AdminPortalSnapshot;
+                                };
+                              };
+                              if (!response.ok || !result.status || !result.data?.snapshot) {
+                                throw new Error(result.data?.msg || 'Varian App Premium belum bisa dihapus.');
+                              }
+                              setSnapshot(result.data.snapshot);
+                              setSelectedVariantId(result.data.snapshot.apkVariants[0]?.variantId || '');
+                              setNotice({
+                                tone: 'success',
+                                text: result.data.msg || 'Varian App Premium berhasil dihapus.',
+                              });
+                            })
+                          }
+                        >
+                          Hapus Varian
                         </button>
                       </div>
                     </>

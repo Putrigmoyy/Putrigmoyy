@@ -13,6 +13,7 @@ export type AdminApkVariantRow = {
   price: number;
   stock: number;
   availableAccountCount: number;
+  totalAccountCount: number;
   badge: string;
   productUpdatedAt: string;
 };
@@ -28,6 +29,7 @@ export type AdminApkProductRow = {
   imageUrl: string;
   stock: number;
   sold: number;
+  variantCount: number;
   accent: ApkPremiumProduct['accent'];
 };
 
@@ -349,6 +351,7 @@ export async function listAdminApkVariants() {
         where account.delivery_status = 'available'
           and coalesce(account.assigned_order_code, '') = ''
       ) as available_account_count,
+      count(account.id) as total_account_count,
       coalesce(variant.badge, '') as badge,
       product.updated_at as product_updated_at
     from apk_product_variants variant
@@ -379,6 +382,7 @@ export async function listAdminApkVariants() {
     price: number | null;
     stock: number | null;
     available_account_count: number | string | null;
+    total_account_count: number | string | null;
     badge: string | null;
     product_updated_at: string;
   }>;
@@ -393,6 +397,7 @@ export async function listAdminApkVariants() {
     price: Math.max(0, Number(row.price || 0)),
     stock: Math.max(0, Number(row.stock || 0)),
     availableAccountCount: Math.max(0, Number(row.available_account_count || 0)),
+    totalAccountCount: Math.max(0, Number(row.total_account_count || 0)),
     badge: String(row.badge || ''),
     productUpdatedAt: row.product_updated_at,
   }));
@@ -416,6 +421,7 @@ export async function listAdminApkProducts() {
           and coalesce(account.assigned_order_code, '') = ''
       ) as stock,
       count(account.id) filter (where account.delivery_status = 'delivered') as sold,
+      count(distinct variant.id) as variant_count,
       product.accent
     from apk_products product
     left join apk_product_variants variant
@@ -447,6 +453,7 @@ export async function listAdminApkProducts() {
     image_url: string | null;
     stock: number | null;
     sold: number | null;
+    variant_count: number | string | null;
     accent: string | null;
   }>;
 
@@ -461,6 +468,7 @@ export async function listAdminApkProducts() {
     imageUrl: String(row.image_url || ''),
     stock: Math.max(0, Number(row.stock || 0)),
     sold: Math.max(0, Number(row.sold || 0)),
+    variantCount: Math.max(0, Number(row.variant_count || 0)),
     accent: ['cyan', 'amber', 'emerald', 'violet'].includes(String(row.accent || ''))
       ? (row.accent as ApkPremiumProduct['accent'])
       : 'cyan',
@@ -908,6 +916,104 @@ export async function adminDeleteApkAccount(input: { accountId: number }) {
   return {
     deletedId: accountId,
     variantId: current.variant_id,
+  };
+}
+
+export async function adminDeleteApkVariant(input: { variantId: string }) {
+  await ensureApkAdminTables();
+  const variantId = cleanText(input.variantId);
+  if (!variantId) {
+    throw new Error('Varian wajib dipilih.');
+  }
+
+  const sql = getNeonClient('apk');
+  const rows = (await sql`
+    select
+      variant.id,
+      variant.product_id,
+      count(account.id) as total_account_count
+    from apk_product_variants variant
+    left join apk_variant_accounts account
+      on account.variant_id = variant.id
+    where variant.id = ${variantId}
+      and variant.is_active = true
+    group by variant.id, variant.product_id
+    limit 1
+  `) as Array<{
+    id: string;
+    product_id: string;
+    total_account_count: number | string | null;
+  }>;
+  const current = rows[0];
+  if (!current) {
+    throw new Error('Varian App Premium tidak ditemukan.');
+  }
+
+  const totalAccountCount = Math.max(0, Number(current.total_account_count || 0));
+  if (totalAccountCount > 0) {
+    throw new Error(`Varian ini masih memiliki ${totalAccountCount.toLocaleString('id-ID')} data akun. Hapus atau pindahkan semua akun dulu sebelum hapus varian.`);
+  }
+
+  await sql`
+    update apk_product_variants
+    set
+      is_active = false,
+      updated_at = now()
+    where id = ${variantId}
+  `;
+
+  await syncProductStock(current.product_id);
+
+  return {
+    deletedVariantId: variantId,
+    productId: current.product_id,
+  };
+}
+
+export async function adminDeleteApkProduct(input: { productId: string }) {
+  await ensureApkAdminTables();
+  const productId = cleanText(input.productId);
+  if (!productId) {
+    throw new Error('Produk wajib dipilih.');
+  }
+
+  const sql = getNeonClient('apk');
+  const rows = (await sql`
+    select
+      product.id,
+      count(variant.id) as active_variant_count
+    from apk_products product
+    left join apk_product_variants variant
+      on variant.product_id = product.id
+      and variant.is_active = true
+    where product.id = ${productId}
+      and product.is_active = true
+    group by product.id
+    limit 1
+  `) as Array<{
+    id: string;
+    active_variant_count: number | string | null;
+  }>;
+  const current = rows[0];
+  if (!current) {
+    throw new Error('Produk App Premium tidak ditemukan.');
+  }
+
+  const activeVariantCount = Math.max(0, Number(current.active_variant_count || 0));
+  if (activeVariantCount > 0) {
+    throw new Error(`Produk ini masih memiliki ${activeVariantCount.toLocaleString('id-ID')} varian aktif. Hapus semua varian dulu sebelum hapus produk.`);
+  }
+
+  await sql`
+    update apk_products
+    set
+      is_active = false,
+      updated_at = now()
+    where id = ${productId}
+  `;
+
+  return {
+    deletedProductId: productId,
   };
 }
 

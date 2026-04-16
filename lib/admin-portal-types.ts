@@ -28,6 +28,7 @@ export type AdminApkVariantRow = {
   price: number;
   stock: number;
   availableAccountCount: number;
+  totalAccountCount: number;
   badge: string;
   productUpdatedAt: string;
 };
@@ -43,6 +44,7 @@ export type AdminApkProductRow = {
   imageUrl: string;
   stock: number;
   sold: number;
+  variantCount: number;
   accent: 'cyan' | 'amber' | 'emerald' | 'violet';
 };
 
