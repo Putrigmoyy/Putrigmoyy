@@ -2036,10 +2036,11 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     {
       title: 'Jasa Programming',
       items: [
-        'Jasa Pembuatan Website Panel SMM, Desktop : Nomor WhatsApp // Contoh : 081286444795',
+        'Jasa Pembuatan Website Panel SMM, Desktop : Nomor WhatsApp // Contoh : 082322633452',
       ],
     },
   ];
+  const siteApiBaseUrl = typeof window !== 'undefined' ? `${window.location.origin}/api` : '/api';
 
   const platformGroups = useMemo<PlatformGroup[]>(() => {
     const buckets = new Map<string, PlatformGroup>();
@@ -2066,7 +2067,13 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       .map((group) => ({
         ...group,
         categories: group.categories.sort((left, right) => left.localeCompare(right, 'id')),
-        services: group.services.sort((left, right) => left.name.localeCompare(right.name, 'id')),
+        services: group.services.sort((left, right) => {
+          const priceDelta = Number(left.price || 0) - Number(right.price || 0);
+          if (priceDelta !== 0) return priceDelta;
+          const nameDelta = left.name.localeCompare(right.name, 'id');
+          if (nameDelta !== 0) return nameDelta;
+          return left.id.localeCompare(right.id, 'id');
+        }),
       }))
       .sort((left, right) => left.label.localeCompare(right.label, 'id'));
   }, [services]);
@@ -2109,10 +2116,18 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const platformServices = useMemo(() => {
     if (!activePlatform) return [];
     if (!selectedCategory) return [];
-    return activePlatform.services.filter((service) => {
+    return activePlatform.services
+      .filter((service) => {
       const matchesCategory = service.category === selectedCategory;
       return matchesCategory;
-    });
+      })
+      .sort((left, right) => {
+        const priceDelta = Number(left.price || 0) - Number(right.price || 0);
+        if (priceDelta !== 0) return priceDelta;
+        const nameDelta = left.name.localeCompare(right.name, 'id');
+        if (nameDelta !== 0) return nameDelta;
+        return left.id.localeCompare(right.id, 'id');
+      });
   }, [activePlatform, selectedCategory]);
 
   const filteredServices = useMemo(() => {
@@ -3351,9 +3366,12 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
                       {helperModalView === 'api-docs' ? (
                         <div className="smm-profile-lines">
-                          <p>API aktif saat ini memakai endpoint provider langsung.</p>
-                          <p>API URL : {providerMeta.apiUrl}</p>
-                          <p>Aksi yang dipakai website ini meliputi profile, services, order, dan status.</p>
+                          <p>API website ini memakai jalur website kamu sendiri, bukan API URL provider luar.</p>
+                          <p>Base URL API : {siteApiBaseUrl}</p>
+                          <p>API Key website : gunakan token dari env `OWNER_APP_TOKEN` di Vercel.</p>
+                          <p>Header autentikasi : x-owner-token: YOUR_OWNER_APP_TOKEN</p>
+                          <p>GET katalog website : {siteApiBaseUrl}/apk-premium/admin/catalog</p>
+                          <p>POST sinkron katalog ke website : {siteApiBaseUrl}/apk-premium/admin/import-owner</p>
                         </div>
                       ) : null}
                     </div>
