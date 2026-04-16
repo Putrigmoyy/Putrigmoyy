@@ -735,6 +735,14 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
       setCheckoutFeedback({ tone: 'error', text: 'Pilih produk dan varian dulu.' });
       return;
     }
+    if (selectedVariant.stock <= 0) {
+      setCheckoutFeedback({ tone: 'error', text: 'Stok akun untuk varian ini sedang habis.' });
+      return;
+    }
+    if (selectedQuantity > selectedVariant.stock) {
+      setCheckoutFeedback({ tone: 'error', text: 'Jumlah order melebihi stok akun yang siap dikirim.' });
+      return;
+    }
 
     startOrderSubmit(async () => {
       setCheckoutFeedback({ tone: 'idle', text: 'Membuat order APK premium...' });
@@ -1151,6 +1159,12 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
       }
 
       setActiveDepositQris(nextState);
+      if (manual) {
+        setFloatingNotice({
+          tone: 'info',
+          text: 'Pembayaran belum terdeteksi. Jika kamu baru selesai bayar, tunggu beberapa detik lalu cek lagi.',
+        });
+      }
     } catch (error) {
       if (manual) {
         setFloatingNotice({
@@ -2034,6 +2048,11 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
 
                     <div className="account-popup-card">
                       <span className="smm-profile-title">Deposit</span>
+                      {!activeDepositQris && depositFeedback.tone !== 'idle' && depositFeedback.text ? (
+                        <div className={`apk-app-feedback apk-app-feedback--${depositFeedback.tone}`}>
+                          {depositFeedback.text}
+                        </div>
+                      ) : null}
                       {!activeDepositQris ? (
                         <>
                           <div className="apk-app-form-grid smm-profile-form-grid">

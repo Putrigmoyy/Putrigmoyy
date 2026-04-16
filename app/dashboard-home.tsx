@@ -55,18 +55,20 @@ export function DashboardHome({ items }: Props) {
 
   return (
     <main className="dashboard-shell">
-      <div className="dashboard-loading-layer">
-        <div className="dashboard-loading-card">
-          <Image
-            src="/loading-double-ring.svg"
-            alt="Loading"
-            width={110}
-            height={110}
-            priority
-            className="dashboard-loading-image"
-          />
+      {activeItem ? (
+        <div className="dashboard-loading-layer">
+          <div className="dashboard-loading-card">
+            <Image
+              src="/loading-double-ring.svg"
+              alt="Loading"
+              width={110}
+              height={110}
+              priority
+              className="dashboard-loading-image"
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <section className="dashboard-mobile">
         <div className="dashboard-grid">

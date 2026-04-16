@@ -99,7 +99,11 @@ async function buildCheckoutCore(input: CheckoutInput) {
     throw new Error('Jumlah order minimal 1.');
   }
 
-  if (variant.stock > 0 && quantity > variant.stock) {
+  if (variant.stock <= 0) {
+    throw new Error('Stock akun untuk varian ini sedang habis.');
+  }
+
+  if (quantity > variant.stock) {
     throw new Error('Jumlah order melebihi stock varian yang tersedia.');
   }
 
@@ -156,6 +160,72 @@ export async function buildApkPremiumCheckoutPreview(input: CheckoutInput): Prom
   };
 }
 
+async function reserveApkAccountsForOrder(input: { orderCode: string; variantId: string; quantity: number }) {
+  await ensureApkAdminTables();
+  const sql = getNeonClient('apk');
+  const quantity = Math.max(0, Math.trunc(Number(input.quantity || 0)));
+  if (!input.orderCode || !input.variantId || quantity <= 0) {
+    return;
+  }
+
+  const existingRows = (await sql`
+    select id
+    from apk_variant_accounts
+    where variant_id = ${input.variantId}
+      and assigned_order_code = ${input.orderCode}
+      and delivery_status in ('reserved', 'delivered')
+    order by id asc
+  `) as Array<{ id: number }>;
+
+  if (existingRows.length >= quantity) {
+    return;
+  }
+
+  const needed = quantity - existingRows.length;
+  const availableRows = (await sql`
+    select id
+    from apk_variant_accounts
+    where variant_id = ${input.variantId}
+      and delivery_status = 'available'
+      and assigned_order_code = ''
+    order by id asc
+    limit ${needed}
+  `) as Array<{ id: number }>;
+
+  if (availableRows.length < needed) {
+    throw new Error('Stock akun siap kirim tidak cukup untuk varian ini.');
+  }
+
+  const ids = availableRows.map((row) => Number(row.id));
+  await sql`
+    update apk_variant_accounts
+    set
+      delivery_status = 'reserved',
+      assigned_order_code = ${input.orderCode},
+      updated_at = now()
+    where id = any(${ids})
+  `;
+}
+
+async function releaseReservedApkAccounts(orderCode: string) {
+  const normalizedOrderCode = String(orderCode || '').trim();
+  if (!normalizedOrderCode) {
+    return;
+  }
+
+  await ensureApkAdminTables();
+  const sql = getNeonClient('apk');
+  await sql`
+    update apk_variant_accounts
+    set
+      delivery_status = 'available',
+      assigned_order_code = '',
+      updated_at = now()
+    where assigned_order_code = ${normalizedOrderCode}
+      and delivery_status = 'reserved'
+  `;
+}
+
 async function submitOrderToNeon(input: CheckoutInput): Promise<ApkSubmittedOrder> {
   await ensureApkAdminTables();
   const sql = getNeonClient('apk');
@@ -164,7 +234,7 @@ async function submitOrderToNeon(input: CheckoutInput): Promise<ApkSubmittedOrde
   const detailText = `Varian: ${result.variant.title}\nJumlah: ${result.quantity}\nKontak: ${result.customerContact || '-'}\nCatatan: ${result.note || '-'}`;
 
   let balanceDebited = false;
-  let inventoryAdjusted = false;
+  let accountsReserved = false;
   let orderInserted = false;
   let midtransCharge:
     | Awaited<ReturnType<typeof createMidtransQrisCharge>>
@@ -185,35 +255,19 @@ async function submitOrderToNeon(input: CheckoutInput): Promise<ApkSubmittedOrde
   }
 
   try {
-    if (usingBalance || isMidtransConfigured()) {
-      const variantRows = (await sql`
-        update apk_product_variants
-        set
-          stock = stock - ${result.quantity},
-          updated_at = now()
-        where id = ${result.variant.id}
-          and stock >= ${result.quantity}
-        returning stock
-      `) as Array<{ stock?: number }>;
-
-      if (!variantRows[0]) {
-        throw new Error('Stock varian berubah atau sudah habis. Coba sinkronkan lalu ulangi order.');
-      }
-      inventoryAdjusted = true;
-
-      await sql`
-        update apk_products
-        set
-          stock = greatest(stock - ${result.quantity}, 0),
-          sold = sold + ${result.quantity},
-          updated_at = now()
-        where id = ${result.product.id}
-      `;
-    }
     if (!usingBalance) {
       if (!isMidtransConfigured()) {
         throw new Error('MIDTRANS_SERVER_KEY belum diisi. QRIS website belum aktif.');
       }
+      await reserveApkAccountsForOrder({
+        orderCode: result.orderCode,
+        variantId: result.variant.id,
+        quantity: result.quantity,
+      });
+      accountsReserved = true;
+    }
+
+    if (!usingBalance) {
       midtransCharge = await createMidtransQrisCharge({
         orderId: result.orderCode,
         grossAmount: result.totalPrice,
@@ -405,7 +459,7 @@ async function submitOrderToNeon(input: CheckoutInput): Promise<ApkSubmittedOrde
       nextStep: usingBalance
         ? deliveredAccounts.length > 0
           ? 'Pembayaran berhasil dan data akun premium sudah siap.'
-          : 'Pembayaran berhasil, tetapi data akun premium masih menunggu sinkron stok.'
+          : 'Pembayaran berhasil, tetapi data akun premium masih menunggu sinkron data akun.'
         : 'QRIS siap ditampilkan langsung di website.',
     };
   } catch (error) {
@@ -420,22 +474,8 @@ async function submitOrderToNeon(input: CheckoutInput): Promise<ApkSubmittedOrde
         where order_code = ${result.orderCode}
       `;
     }
-    if (inventoryAdjusted) {
-      await sql`
-        update apk_product_variants
-        set
-          stock = stock + ${result.quantity},
-          updated_at = now()
-        where id = ${result.variant.id}
-      `;
-      await sql`
-        update apk_products
-        set
-          stock = stock + ${result.quantity},
-          sold = greatest(sold - ${result.quantity}, 0),
-          updated_at = now()
-        where id = ${result.product.id}
-      `;
+    if (accountsReserved) {
+      await releaseReservedApkAccounts(result.orderCode);
     }
     if (balanceDebited) {
       await refundCoreWalletBalanceOrder({
@@ -490,32 +530,7 @@ type PaymentRow = {
 };
 
 async function restoreReservedInventory(orderCode: string) {
-  const sql = getNeonClient('apk');
-  const rows = (await sql`
-    select product_id, variant_id, quantity
-    from apk_orders
-    where order_code = ${orderCode}
-    limit 1
-  `) as Array<{ product_id: string; variant_id: string; quantity: number }>;
-  const row = rows[0];
-  if (!row) return;
-  const quantity = Math.max(0, Number(row.quantity || 0));
-  if (quantity <= 0) return;
-
-  await sql`
-    update apk_product_variants
-    set
-      stock = stock + ${quantity},
-      updated_at = now()
-    where id = ${row.variant_id}
-  `;
-  await sql`
-    update apk_products
-    set
-      stock = stock + ${quantity},
-      updated_at = now()
-    where id = ${row.product_id}
-  `;
+  await releaseReservedApkAccounts(orderCode);
 }
 
 export async function getApkPremiumOrderStatus(orderCode: string): Promise<ApkOrderStatusSnapshot> {
@@ -648,8 +663,8 @@ export async function getApkPremiumOrderStatus(orderCode: string): Promise<ApkOr
         methodLabel: 'QRIS',
         detailAppend:
           normalizedStatus === 'expire'
-            ? 'Pembayaran QRIS expired dan stok dikembalikan.'
-            : 'Pembayaran QRIS tidak berhasil dan stok dikembalikan.',
+            ? 'Pembayaran QRIS expired dan slot akun dikembalikan.'
+            : 'Pembayaran QRIS tidak berhasil dan slot akun dikembalikan.',
       });
       order.order_status = normalizedStatus === 'expire' ? 'expired' : 'failed';
       order.payment_status = normalizedStatus;
@@ -712,7 +727,7 @@ export async function getApkPremiumOrderStatus(orderCode: string): Promise<ApkOr
       order.payment_status === 'paid'
         ? deliveredAccounts.length > 0
           ? 'Pembayaran berhasil dan data akun premium sudah siap.'
-          : 'Pembayaran berhasil, tetapi data akun premium masih menunggu sinkron stok.'
+          : 'Pembayaran berhasil, tetapi data akun premium masih menunggu sinkron data akun.'
         : order.payment_status === 'expire' || order.payment_status === 'cancel' || order.payment_status === 'deny'
           ? 'Pembayaran tidak aktif lagi. Silakan buat order baru.'
           : 'QRIS masih aktif. Silakan selesaikan pembayaran.',

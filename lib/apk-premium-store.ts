@@ -170,8 +170,8 @@ type ApkProductRow = {
   subtitle: string;
   image_url: string | null;
   category: string;
-  stock: number;
-  sold: number;
+  stock: number | string | null;
+  sold: number | string | null;
   rating: string;
   delivery: string;
   accent: ApkPremiumProduct['accent'];
@@ -185,7 +185,7 @@ type ApkVariantRow = {
   title: string;
   duration: string;
   price: number;
-  stock: number;
+  stock: number | string | null;
   badge: string | null;
 };
 
@@ -193,35 +193,68 @@ async function getApkPremiumCatalogFromNeon(): Promise<ApkPremiumCatalogPayload>
   const sql = getNeonClient('apk');
   const productRows = (await sql`
     select
-      id,
-      title,
-      subtitle,
-      image_url,
-      category,
-      stock,
-      sold,
-      rating,
-      delivery,
-      accent,
-      note,
-      guarantee
-    from apk_products
-    where is_active = true
-    order by sort_order asc, title asc
+      product.id,
+      product.title,
+      product.subtitle,
+      product.image_url,
+      product.category,
+      count(account.id) filter (
+        where account.delivery_status = 'available'
+          and coalesce(account.assigned_order_code, '') = ''
+      ) as stock,
+      count(account.id) filter (where account.delivery_status = 'delivered') as sold,
+      product.rating,
+      product.delivery,
+      product.accent,
+      product.note,
+      product.guarantee
+    from apk_products product
+    left join apk_product_variants variant
+      on variant.product_id = product.id
+      and variant.is_active = true
+    left join apk_variant_accounts account
+      on account.variant_id = variant.id
+    where product.is_active = true
+    group by
+      product.id,
+      product.title,
+      product.subtitle,
+      product.image_url,
+      product.category,
+      product.rating,
+      product.delivery,
+      product.accent,
+      product.note,
+      product.guarantee,
+      product.sort_order
+    order by product.sort_order asc, product.title asc
   `) as ApkProductRow[];
 
   const variantRows = (await sql`
     select
-      id,
-      product_id,
-      title,
-      duration,
-      price,
-      stock,
-      badge
-    from apk_product_variants
-    where is_active = true
-    order by sort_order asc, title asc
+      variant.id,
+      variant.product_id,
+      variant.title,
+      variant.duration,
+      variant.price,
+      count(account.id) filter (
+        where account.delivery_status = 'available'
+          and coalesce(account.assigned_order_code, '') = ''
+      ) as stock,
+      variant.badge
+    from apk_product_variants variant
+    left join apk_variant_accounts account
+      on account.variant_id = variant.id
+    where variant.is_active = true
+    group by
+      variant.id,
+      variant.product_id,
+      variant.title,
+      variant.duration,
+      variant.price,
+      variant.badge,
+      variant.sort_order
+    order by variant.sort_order asc, variant.title asc
   `) as ApkVariantRow[];
 
   const variantMap = new Map<string, ApkPremiumProduct['variants']>();

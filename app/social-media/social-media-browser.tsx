@@ -1806,6 +1806,12 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       }
 
       setActiveDepositQris(nextState);
+      if (manual) {
+        setFloatingNotice({
+          tone: 'info',
+          text: 'Pembayaran belum terdeteksi. Jika kamu baru selesai bayar, tunggu beberapa detik lalu cek lagi.',
+        });
+      }
     } catch (error) {
       if (manual) {
         setFloatingNotice({
@@ -3707,6 +3713,11 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
                     <div className="account-popup-card">
                       <span className="smm-profile-title">Deposit</span>
+                      {!activeDepositQris && depositFeedback.tone !== 'idle' && depositFeedback.text ? (
+                        <div className={`apk-app-feedback apk-app-feedback--${depositFeedback.tone}`}>
+                          {depositFeedback.text}
+                        </div>
+                      ) : null}
                       {!activeDepositQris ? (
                         <>
                           <div className="apk-app-form-grid smm-profile-form-grid">

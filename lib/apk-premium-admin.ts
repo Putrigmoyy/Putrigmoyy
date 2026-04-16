@@ -36,7 +36,7 @@ export type AdminApkAccountRow = {
   variantId: string;
   accountData: string;
   adminNote: string;
-  deliveryStatus: 'available' | 'delivered';
+  deliveryStatus: 'available' | 'reserved' | 'delivered';
   assignedOrderCode: string;
   createdAt: string;
 };
@@ -104,10 +104,23 @@ async function syncProductStock(productId: string) {
     update apk_products product
     set
       stock = coalesce((
-        select sum(variant.stock)
-        from apk_product_variants variant
+        select count(account.id)
+        from apk_variant_accounts account
+        inner join apk_product_variants variant
+          on variant.id = account.variant_id
         where variant.product_id = product.id
           and variant.is_active = true
+          and account.delivery_status = 'available'
+          and coalesce(account.assigned_order_code, '') = ''
+      ), 0),
+      sold = coalesce((
+        select count(account.id)
+        from apk_variant_accounts account
+        inner join apk_product_variants variant
+          on variant.id = account.variant_id
+        where variant.product_id = product.id
+          and variant.is_active = true
+          and account.delivery_status = 'delivered'
       ), 0),
       updated_at = now()
     where product.id = ${productId}
@@ -263,8 +276,14 @@ export async function listAdminApkVariants() {
       variant.title as variant_title,
       variant.duration as duration,
       variant.price as price,
-      variant.stock as stock,
-      count(account.id) filter (where account.delivery_status = 'available') as available_account_count,
+      count(account.id) filter (
+        where account.delivery_status = 'available'
+          and coalesce(account.assigned_order_code, '') = ''
+      ) as stock,
+      count(account.id) filter (
+        where account.delivery_status = 'available'
+          and coalesce(account.assigned_order_code, '') = ''
+      ) as available_account_count,
       coalesce(variant.badge, '') as badge,
       product.updated_at as product_updated_at
     from apk_product_variants variant
@@ -282,7 +301,6 @@ export async function listAdminApkVariants() {
       variant.title,
       variant.duration,
       variant.price,
-      variant.stock,
       variant.badge,
       product.updated_at
     order by product.sort_order asc, product.title asc, variant.sort_order asc, variant.title asc
@@ -320,20 +338,39 @@ export async function listAdminApkProducts() {
   const sql = getNeonClient('apk');
   const rows = (await sql`
     select
-      id,
-      title,
-      subtitle,
-      category,
-      delivery,
-      note,
-      guarantee,
-      image_url,
-      stock,
-      sold,
-      accent
-    from apk_products
-    where is_active = true
-    order by sort_order asc, title asc
+      product.id,
+      product.title,
+      product.subtitle,
+      product.category,
+      product.delivery,
+      product.note,
+      product.guarantee,
+      product.image_url,
+      count(account.id) filter (
+        where account.delivery_status = 'available'
+          and coalesce(account.assigned_order_code, '') = ''
+      ) as stock,
+      count(account.id) filter (where account.delivery_status = 'delivered') as sold,
+      product.accent
+    from apk_products product
+    left join apk_product_variants variant
+      on variant.product_id = product.id
+      and variant.is_active = true
+    left join apk_variant_accounts account
+      on account.variant_id = variant.id
+    where product.is_active = true
+    group by
+      product.id,
+      product.title,
+      product.subtitle,
+      product.category,
+      product.delivery,
+      product.note,
+      product.guarantee,
+      product.image_url,
+      product.accent,
+      product.sort_order
+    order by product.sort_order asc, product.title asc
   `) as Array<{
     id: string;
     title: string;
@@ -401,7 +438,8 @@ export async function listAdminApkAccountsByVariant(variantId: string) {
     variantId: row.variant_id,
     accountData: row.account_data,
     adminNote: row.admin_note,
-    deliveryStatus: row.delivery_status === 'delivered' ? 'delivered' : 'available',
+    deliveryStatus:
+      row.delivery_status === 'delivered' ? 'delivered' : row.delivery_status === 'reserved' ? 'reserved' : 'available',
     assignedOrderCode: String(row.assigned_order_code || ''),
     createdAt: row.created_at,
   }));
@@ -600,13 +638,6 @@ export async function addAdminApkVariantAccounts(input: {
     `;
   }
 
-  await sql`
-    update apk_product_variants
-    set
-      stock = stock + ${entries.length},
-      updated_at = now()
-    where id = ${variantId}
-  `;
   await syncProductStock(variant.product_id);
 
   return {
@@ -651,7 +682,8 @@ export async function getDeliveredApkAccounts(orderCode: string) {
     variantId: row.variant_id,
     accountData: row.account_data,
     adminNote: row.admin_note,
-    deliveryStatus: row.delivery_status === 'delivered' ? 'delivered' : 'available',
+    deliveryStatus:
+      row.delivery_status === 'delivered' ? 'delivered' : row.delivery_status === 'reserved' ? 'reserved' : 'available',
     assignedOrderCode: row.assigned_order_code,
     createdAt: row.created_at,
   }));
@@ -672,27 +704,53 @@ export async function assignApkAccountsToOrder(input: { orderCode: string; varia
   }
 
   const sql = getNeonClient('apk');
-  const needed = quantity - existing.length;
-  const availableRows = (await sql`
-    select id
-    from apk_variant_accounts
-    where variant_id = ${variantId}
-      and delivery_status = 'available'
-      and assigned_order_code = ''
-    order by id asc
-    limit ${needed}
-  `) as Array<{ id: number }>;
+  let needed = quantity - existing.length;
+  if (needed > 0) {
+    const reservedRows = (await sql`
+      select id
+      from apk_variant_accounts
+      where variant_id = ${variantId}
+        and delivery_status = 'reserved'
+        and assigned_order_code = ${orderCode}
+      order by id asc
+      limit ${needed}
+    `) as Array<{ id: number }>;
 
-  if (availableRows.length) {
-    const ids = availableRows.map((row) => Number(row.id));
-    await sql`
-      update apk_variant_accounts
-      set
-        delivery_status = 'delivered',
-        assigned_order_code = ${orderCode},
-        updated_at = now()
-      where id = any(${ids})
-    `;
+    if (reservedRows.length) {
+      const ids = reservedRows.map((row) => Number(row.id));
+      await sql`
+        update apk_variant_accounts
+        set
+          delivery_status = 'delivered',
+          updated_at = now()
+        where id = any(${ids})
+      `;
+      needed -= ids.length;
+    }
+  }
+
+  if (needed > 0) {
+    const availableRows = (await sql`
+      select id
+      from apk_variant_accounts
+      where variant_id = ${variantId}
+        and delivery_status = 'available'
+        and assigned_order_code = ''
+      order by id asc
+      limit ${needed}
+    `) as Array<{ id: number }>;
+
+    if (availableRows.length) {
+      const ids = availableRows.map((row) => Number(row.id));
+      await sql`
+        update apk_variant_accounts
+        set
+          delivery_status = 'delivered',
+          assigned_order_code = ${orderCode},
+          updated_at = now()
+        where id = any(${ids})
+      `;
+    }
   }
 
   return getDeliveredApkAccounts(orderCode);

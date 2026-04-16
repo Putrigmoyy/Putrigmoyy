@@ -47,7 +47,7 @@ export type AdminApkAccountRow = {
   variantId: string;
   accountData: string;
   adminNote: string;
-  deliveryStatus: 'available' | 'delivered';
+  deliveryStatus: 'available' | 'reserved' | 'delivered';
   assignedOrderCode: string;
   createdAt: string;
 };
