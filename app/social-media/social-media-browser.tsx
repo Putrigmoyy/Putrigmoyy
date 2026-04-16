@@ -3215,8 +3215,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
             <div className="smm-detail-modal-backdrop" onClick={() => setHelperModalView(null)}>
               <div
                 className={
-                  helperModalView === 'target' || helperModalView === 'status-info'
-                    ? 'smm-detail-modal smm-detail-modal--wide'
+                  helperModalView === 'target' || helperModalView === 'status-info' || helperModalView === 'kontak'
+                    ? 'smm-detail-modal smm-detail-modal--guide'
                     : 'smm-detail-modal'
                 }
                 onClick={(event) => event.stopPropagation()}
@@ -3233,14 +3233,20 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                   </button>
                 </div>
 
-                <div className="smm-detail-modal-body">
+                <div
+                  className={
+                    helperModalView === 'target' || helperModalView === 'status-info' || helperModalView === 'kontak'
+                      ? 'smm-detail-modal-body smm-detail-modal-body--guide'
+                      : 'smm-detail-modal-body'
+                  }
+                >
                   <div className="account-popup-stack">
                     <div className="account-popup-card">
                       {helperModalView === 'kontak' ? (
                         <div className="smm-contact-list">
-                          {contactEntries.map((item, index) => (
-                            <details key={item.key} className="smm-guide-accordion smm-guide-accordion--contact" open={index === 0}>
-                              <summary className="smm-guide-summary">
+                          {contactEntries.map((item) => (
+                            <div key={item.key} className="smm-contact-item">
+                              <div className="smm-guide-summary">
                                 <span
                                   className="smm-contact-icon"
                                   aria-hidden="true"
@@ -3261,9 +3267,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                                   <strong>{item.label}</strong>
                                   <span>{item.value}</span>
                                 </span>
-                                <span className="smm-guide-summary__arrow" aria-hidden="true" />
-                              </summary>
-                              <div className="smm-guide-content">
+                              </div>
+                              <div className="smm-guide-content smm-guide-content--static">
                                 <div className="smm-contact-actions">
                                   {item.href ? (
                                     <a
@@ -3284,7 +3289,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                                   </button>
                                 </div>
                               </div>
-                            </details>
+                            </div>
                           ))}
                         </div>
                       ) : null}
@@ -3305,45 +3310,41 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
                       {helperModalView === 'status-info' ? (
                         <div className="smm-status-guide-grid">
-                          {statusGuideItems.map((item, index) => (
-                            <details key={item.label} className="smm-guide-accordion" open={index === 0}>
-                              <summary className="smm-guide-summary smm-guide-summary--status">
+                          {statusGuideItems.map((item) => (
+                            <div key={item.label} className="smm-status-guide-card">
+                              <div className="smm-guide-summary smm-guide-summary--status">
                                 <span className={`smm-status-guide-badge smm-status-guide-badge--${item.tone}`}>{item.label}</span>
                                 <span className="smm-guide-summary__copy">
                                   <strong>{item.label}</strong>
                                 </span>
-                                <span className="smm-guide-summary__arrow" aria-hidden="true" />
-                              </summary>
-                              <div className="smm-guide-content">
+                              </div>
+                              <div className="smm-guide-content smm-guide-content--static">
                                 <div className="smm-status-guide-copy">
                                   <p>{item.description}</p>
                                 </div>
                               </div>
-                            </details>
+                            </div>
                           ))}
                         </div>
                       ) : null}
 
                       {helperModalView === 'target' ? (
                         <div className="smm-target-guide">
-                          {targetGuideSections.map((section, index) => (
-                            <details key={section.title} className="smm-guide-accordion" open={index === 0}>
-                              <summary className="smm-guide-summary">
+                          {targetGuideSections.map((section) => (
+                            <section key={section.title} className="smm-target-guide-section">
+                              <div className="smm-guide-summary smm-guide-summary--static">
                                 <span className="smm-guide-summary__copy">
                                   <strong>{section.title}</strong>
                                 </span>
-                                <span className="smm-guide-summary__arrow" aria-hidden="true" />
-                              </summary>
-                              <div className="smm-guide-content">
-                                <section className="smm-target-guide-section">
-                                  <ul>
-                                    {section.items.map((item) => (
-                                      <li key={item}>{item}</li>
-                                    ))}
-                                  </ul>
-                                </section>
                               </div>
-                            </details>
+                              <div className="smm-guide-content smm-guide-content--static">
+                                <ul>
+                                  {section.items.map((item) => (
+                                    <li key={item}>{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </section>
                           ))}
                         </div>
                       ) : null}

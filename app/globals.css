@@ -2734,6 +2734,11 @@ a {
   width: min(100%, 900px);
 }
 
+.smm-detail-modal--guide {
+  width: min(100%, 980px);
+  max-height: calc(100dvh - 18px);
+}
+
 .smm-detail-modal-head {
   display: flex;
   align-items: center;
@@ -2773,6 +2778,11 @@ a {
   padding: 16px 20px 18px;
   overscroll-behavior: contain;
   scrollbar-gutter: stable both-edges;
+  min-height: 0;
+}
+
+.smm-detail-modal-body--guide {
+  padding: 16px 18px 20px;
 }
 
 .smm-detail-table {
@@ -2795,6 +2805,13 @@ a {
   gap: 12px;
 }
 
+.smm-contact-item {
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.04), rgba(210, 9, 209, 0.04));
+  overflow: hidden;
+}
+
 .smm-guide-accordion {
   border: 1px solid rgba(23, 153, 242, 0.12);
   border-radius: 18px;
@@ -2814,6 +2831,11 @@ a {
   padding: 14px;
   list-style: none;
   cursor: pointer;
+}
+
+.smm-guide-summary--static {
+  grid-template-columns: minmax(0, 1fr);
+  cursor: default;
 }
 
 .smm-guide-summary::-webkit-details-marker {
@@ -2859,6 +2881,10 @@ a {
 
 .smm-guide-content {
   padding: 0 14px 14px;
+}
+
+.smm-guide-content--static {
+  padding-top: 0;
 }
 
 .smm-contact-icon {
@@ -2915,6 +2941,13 @@ a {
   gap: 14px;
 }
 
+.smm-status-guide-card {
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.04), rgba(210, 9, 209, 0.04));
+  overflow: hidden;
+}
+
 .smm-status-guide-copy {
   display: grid;
   gap: 8px;
@@ -2969,6 +3002,10 @@ a {
 .smm-target-guide-section {
   display: grid;
   gap: 8px;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.04), rgba(210, 9, 209, 0.04));
+  overflow: hidden;
 }
 
 .smm-target-guide-section ul {
