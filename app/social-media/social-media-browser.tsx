@@ -152,6 +152,9 @@ type HistoryItem = {
   orderStatus: string;
   paymentStatus: string;
   paymentMethod: string;
+  startCount?: number | null;
+  remains?: number | null;
+  statusSource?: 'provider-live' | 'local';
   createdAt: string;
   updatedAt: string;
 };
@@ -168,6 +171,7 @@ type SocialCheckoutState = {
   unitPriceLabel: string;
   totalPrice: number;
   totalPriceLabel: string;
+  notificationEmail: string;
   paymentStatus: string;
   orderStatus: string;
   paymentMethod: 'midtrans' | 'balance';
@@ -268,7 +272,6 @@ function createInitialOrderForm(service?: NormalizedPusatPanelService | null) {
     quantity: service ? String(Math.max(0, service.min || 0)) : '',
     username: '',
     comments: '',
-    emailNotification: '',
   };
 }
 
@@ -1131,10 +1134,19 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     };
   }, [floatingNotice]);
 
+  const monitoringRequestLimit = Math.max(
+    25,
+    Math.min(60, Number(monitoringFilterDraft.limit || appliedMonitoringFilter.limit || 25) * 2),
+  );
+  const statusRequestLimit = Math.max(
+    25,
+    Math.min(80, Number(statusFilterDraft.limit || appliedStatusFilter.limit || 10) * 4),
+  );
+
   const refreshHistory = () => {
     startHistoryRefresh(async () => {
       try {
-        const response = await fetch('/api/smm/history?limit=150', {
+        const response = await fetch(`/api/smm/history?limit=${monitoringRequestLimit}`, {
           method: 'GET',
           cache: 'no-store',
         });
@@ -1166,7 +1178,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
     startAccountOrdersRefresh(async () => {
       try {
-        const response = await fetch(`/api/smm/history?limit=150&contact=${encodeURIComponent(normalizedUsername)}`, {
+        const response = await fetch(`/api/smm/history?limit=${statusRequestLimit}&contact=${encodeURIComponent(normalizedUsername)}`, {
           method: 'GET',
           cache: 'no-store',
         });
@@ -1498,8 +1510,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     setDetailStatusOrder(item);
     setDetailProviderStatus({
       status: item.orderStatus || '-',
-      startCount: null,
-      remains: null,
+      startCount: item.startCount == null ? null : Number(item.startCount),
+      remains: item.remains == null ? null : Number(item.remains),
     });
 
     const providerOrderId = String(item.providerOrderId || '').trim();
@@ -2373,6 +2385,10 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       setOrderFeedback({ tone: 'error', text: 'Login akun dulu agar order sosial media bisa dibayar memakai saldo akun.' });
       return;
     }
+    if (!accountProfile.email) {
+      setOrderFeedback({ tone: 'error', text: 'Isi email akun dulu di menu profil agar email notifikasi order otomatis bisa dipakai.' });
+      return;
+    }
     if (accountProfile.balance < liveTotal) {
       setOrderFeedback({
         tone: 'error',
@@ -2812,6 +2828,12 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                         : 'Login akun dulu agar order sosial media bisa dibayar memakai saldo akun.'}
                     </div>
 
+                    <div className="apk-app-inline-helper">
+                      {accountProfile.loggedIn && accountProfile.email
+                        ? `Email notifikasi order otomatis memakai email akun ini: ${accountProfile.email}.`
+                        : 'Email notifikasi order akan otomatis mengikuti email yang tersimpan di akun website kamu.'}
+                    </div>
+
                     {showPendingQris ? (
                       <div className="apk-app-qris-shell">
                         <div className="apk-app-qris-head">
@@ -2860,6 +2882,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                           <p>Kategori : {activeCheckoutOrder.category}</p>
                           <p>Target : {activeCheckoutOrder.targetData}</p>
                           <p>Jumlah : {activeCheckoutOrder.quantity == null ? '-' : String(activeCheckoutOrder.quantity)}</p>
+                          <p>Email : {activeCheckoutOrder.notificationEmail || accountProfile.email || '-'}</p>
                           <p>Total : Rp {activeCheckoutOrder.totalPriceLabel}</p>
                         </div>
 
@@ -2882,6 +2905,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                         <p>Kategori : {activeCheckoutOrder.category}</p>
                         <p>Target : {activeCheckoutOrder.targetData}</p>
                         <p>Jumlah : {activeCheckoutOrder.quantity == null ? '-' : String(activeCheckoutOrder.quantity)}</p>
+                        <p>Email : {activeCheckoutOrder.notificationEmail || accountProfile.email || '-'}</p>
                         <p>Total : Rp {activeCheckoutOrder.totalPriceLabel}</p>
                       </div>
                     ) : null}
@@ -3430,7 +3454,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                       {helperModalView === 'mulai' ? (
                         <div className="smm-profile-lines">
                           <p>Pilih platform yang sesuai dulu, lalu pilih kategori layanan dan layanan yang paling stabil.</p>
-                          <p>Setelah itu isi target, jumlah, dan email notifikasi, lalu lanjutkan pembayaran untuk membuat order.</p>
+                          <p>Setelah itu isi target dan jumlah, lalu lanjutkan order. Email notifikasi akan otomatis mengikuti email akun yang kamu pakai login.</p>
                         </div>
                       ) : null}
 

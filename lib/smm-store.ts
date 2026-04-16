@@ -50,6 +50,7 @@ export async function ensureSmmTables() {
       quantity integer,
       unit_price integer not null default 0,
       total_price integer not null default 0,
+      notification_email text not null default '',
       username text not null default '',
       comments text not null default '',
       order_status text not null default 'pending',
@@ -64,6 +65,7 @@ export async function ensureSmmTables() {
   await sql`alter table smm_orders add column if not exists account_contact text not null default ''`;
   await sql`alter table smm_orders add column if not exists unit_price integer not null default 0`;
   await sql`alter table smm_orders add column if not exists total_price integer not null default 0`;
+  await sql`alter table smm_orders add column if not exists notification_email text not null default ''`;
   await sql`alter table smm_orders add column if not exists payment_status text not null default 'paid'`;
   await sql`alter table smm_orders add column if not exists payment_method text not null default 'direct'`;
   await sql`create unique index if not exists smm_orders_order_code_idx on smm_orders(order_code) where order_code <> ''`;

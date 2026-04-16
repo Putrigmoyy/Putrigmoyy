@@ -51,6 +51,12 @@ export type NormalizedPusatPanelService = {
   speed: string;
 };
 
+export type NormalizedPusatPanelOrderStatus = {
+  status: string;
+  startCount: number | null;
+  remains: number | null;
+};
+
 const DEFAULT_API_URL = 'https://pusatpanelsmm.com/api/json.php';
 
 function getProviderConfig() {
@@ -181,4 +187,36 @@ export async function fetchPusatPanelServices() {
         priceLabel: adjustedPrice.toLocaleString('id-ID'),
       };
     });
+}
+
+export async function fetchPusatPanelOrderStatus(orderId: string): Promise<NormalizedPusatPanelOrderStatus> {
+  const normalizedOrderId = cleanProviderText(orderId);
+  if (!normalizedOrderId) {
+    throw new Error('ID order provider wajib diisi.');
+  }
+
+  const response = await requestPusatPanel<{
+    status?: string;
+    start_count?: string | number;
+    remains?: string | number;
+  }>({
+    action: 'status',
+    id: normalizedOrderId,
+  });
+
+  if (!response.status || !response.data || !('status' in response.data) || !response.data.status) {
+    const message =
+      'msg' in (response.data || {})
+        ? String((response.data as { msg?: string }).msg || 'Status order provider tidak tersedia.')
+        : 'Status order provider tidak tersedia.';
+    throw new Error(message);
+  }
+
+  return {
+    status: cleanProviderText(response.data.status),
+    startCount:
+      response.data.start_count == null ? null : Math.max(0, normalizeProviderNumber(response.data.start_count)),
+    remains:
+      response.data.remains == null ? null : Math.max(0, normalizeProviderNumber(response.data.remains)),
+  };
 }

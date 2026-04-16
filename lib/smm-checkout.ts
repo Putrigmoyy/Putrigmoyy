@@ -15,6 +15,7 @@ import { ensureSmmTables, markSmmOrderAsFailedAndRefund } from '@/lib/smm-store'
 type CheckoutInput = {
   accountContact?: string;
   customerName?: string;
+  notificationEmail?: string;
   service: string;
   serviceName: string;
   category: string;
@@ -37,6 +38,7 @@ type SmmOrderRow = {
   quantity: number | null;
   unit_price: number | null;
   total_price: number | null;
+  notification_email: string | null;
   username: string | null;
   comments: string | null;
   order_status: string;
@@ -65,6 +67,7 @@ export type SmmCheckoutSnapshot = {
   unitPriceLabel: string;
   totalPrice: number;
   totalPriceLabel: string;
+  notificationEmail: string;
   paymentStatus: string;
   orderStatus: string;
   paymentMethod: 'midtrans' | 'balance';
@@ -120,6 +123,10 @@ function normalizeProviderUsername(value: string) {
     .replace(/\s+/g, '');
 }
 
+function isValidNotificationEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim().toLowerCase());
+}
+
 function buildOrderDetail(input: {
   serviceName: string;
   category: string;
@@ -127,12 +134,14 @@ function buildOrderDetail(input: {
   quantity: number | null;
   comments: string;
   username: string;
+  notificationEmail: string;
 }) {
   return [
     `Layanan: ${input.serviceName}`,
     `Kategori: ${input.category || '-'}`,
     `Target: ${input.targetData || '-'}`,
     `Jumlah: ${input.quantity == null ? '-' : input.quantity}`,
+    `Email notifikasi: ${input.notificationEmail || '-'}`,
     `Username: ${input.username || '-'}`,
     `Komentar: ${input.comments || '-'}`,
   ].join('\n');
@@ -200,6 +209,7 @@ function buildSnapshot(order: SmmOrderRow, payment: SmmPaymentRow | null, fallba
     unitPriceLabel: formatRupiah(Math.max(0, Number(order.unit_price || 0))),
     totalPrice: Math.max(0, Number(order.total_price || 0)),
     totalPriceLabel: formatRupiah(Math.max(0, Number(order.total_price || 0))),
+    notificationEmail: String(order.notification_email || '').trim().toLowerCase(),
     paymentStatus,
     orderStatus,
     paymentMethod,
@@ -316,6 +326,7 @@ async function getOrderRow(orderCode: string) {
       quantity,
       unit_price,
       total_price,
+      notification_email,
       username,
       comments,
       order_status,
@@ -356,6 +367,7 @@ async function upsertOrderRow(input: {
   quantity: number | null;
   unitPrice: number;
   totalPrice: number;
+  notificationEmail: string;
   username: string;
   comments: string;
   orderStatus: string;
@@ -375,6 +387,7 @@ async function upsertOrderRow(input: {
       quantity,
       unit_price,
       total_price,
+      notification_email,
       username,
       comments,
       order_status,
@@ -391,6 +404,7 @@ async function upsertOrderRow(input: {
       ${input.quantity},
       ${input.unitPrice},
       ${input.totalPrice},
+      ${input.notificationEmail},
       ${input.username},
       ${input.comments},
       ${input.orderStatus},
@@ -408,6 +422,7 @@ async function upsertOrderRow(input: {
       quantity = excluded.quantity,
       unit_price = excluded.unit_price,
       total_price = excluded.total_price,
+      notification_email = excluded.notification_email,
       username = excluded.username,
       comments = excluded.comments,
       order_status = excluded.order_status,
@@ -515,6 +530,7 @@ async function claimPaidMidtransOrderForProvider(orderCode: string) {
       quantity,
       unit_price,
       total_price,
+      notification_email,
       username,
       comments,
       order_status,
@@ -639,14 +655,6 @@ export async function submitSmmCheckoutOrder(input: CheckoutInput): Promise<SmmC
   const unitPrice = Math.max(0, Math.round(Number(selectedService.price || 0)));
   const quantity = selectedService.menuType === '2' ? countProviderMultilineEntries(comments) : requestedQuantity;
   const totalPrice = calculateSmmCheckoutTotal(selectedService, quantity);
-  const detail = buildOrderDetail({
-    serviceName,
-    category,
-    targetData,
-    quantity,
-    comments,
-    username,
-  });
 
   if (selectedService.menuType !== '4' && (!quantity || quantity <= 0)) {
     throw new Error('Jumlah order belum valid.');
@@ -669,9 +677,26 @@ export async function submitSmmCheckoutOrder(input: CheckoutInput): Promise<SmmC
   if (!bundle?.account.loggedIn) {
     throw new Error('Akun saldo belum aktif. Login akun dulu sebelum order sosial media.');
   }
+  const notificationEmail = String(bundle.account.email || input.notificationEmail || '').trim().toLowerCase();
+  if (!notificationEmail) {
+    throw new Error('Isi email akun dulu di menu profil agar email notifikasi order otomatis mengikuti akun ini.');
+  }
+  if (!isValidNotificationEmail(notificationEmail)) {
+    throw new Error('Email akun belum valid. Perbarui email akun dulu sebelum order sosial media.');
+  }
   if (Number(bundle.account.balance || 0) < totalPrice) {
     throw new Error(`Saldo akun tidak cukup. Total order ini Rp ${formatRupiah(totalPrice)}. Deposit dulu lalu ulangi order.`);
   }
+
+  const detail = buildOrderDetail({
+    serviceName,
+    category,
+    targetData,
+    quantity,
+    comments,
+    username,
+    notificationEmail,
+  });
 
   try {
     await spendCoreWalletBalanceForOrder({
@@ -703,6 +728,7 @@ export async function submitSmmCheckoutOrder(input: CheckoutInput): Promise<SmmC
       quantity,
       unitPrice,
       totalPrice,
+      notificationEmail,
       username,
       comments,
       orderStatus: 'pending',

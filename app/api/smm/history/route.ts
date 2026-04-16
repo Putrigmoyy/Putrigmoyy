@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
 import { getSmmCheckoutOrderStatus } from '@/lib/smm-checkout';
-import { requestPusatPanel } from '@/lib/pusatpanel';
+import { fetchPusatPanelOrderStatus } from '@/lib/pusatpanel';
 import { getSmmOrderHistory, updateSmmOrderStatus } from '@/lib/smm-store';
 
 const MAX_SYNC_ITEMS = 8;
 const SYNC_COOLDOWN_MS = 20_000;
+const PROVIDER_LIVE_BATCH_SIZE = 6;
 
 type HistoryItem = Awaited<ReturnType<typeof getSmmOrderHistory>>[number];
+type HistoryResponseItem = HistoryItem & {
+  startCount: number | null;
+  remains: number | null;
+  statusSource: 'provider-live' | 'local';
+};
 
 function isTerminalStatus(status: string) {
   const normalized = String(status || '').trim().toLowerCase();
@@ -22,50 +28,14 @@ function isTerminalStatus(status: string) {
   );
 }
 
-function shouldSyncHistoryItem(item: HistoryItem) {
-  if (!item?.providerOrderId) {
-    return false;
-  }
-  if (isTerminalStatus(item.orderStatus)) {
-    return false;
-  }
-
-  const updatedAtMs = new Date(item.updatedAt).getTime();
-  if (!Number.isFinite(updatedAtMs)) {
-    return true;
-  }
-
-  return Date.now() - updatedAtMs >= SYNC_COOLDOWN_MS;
-}
-
-async function syncVisibleOrderStatuses(items: HistoryItem[]) {
-  const candidates = items.filter(shouldSyncHistoryItem).slice(0, MAX_SYNC_ITEMS);
-  if (!candidates.length) {
-    return false;
-  }
-
-  let hasUpdates = false;
-  for (const item of candidates) {
-    try {
-      const response = await requestPusatPanel<{
-        status: string;
-        start_count?: number;
-        remains?: number;
-      }>({
-        action: 'status',
-        id: item.providerOrderId,
-      });
-
-      if (response.status && response.data && 'status' in response.data && response.data.status) {
-        await updateSmmOrderStatus(item.providerOrderId, String(response.data.status));
-        hasUpdates = true;
-      }
-    } catch {
-      // keep current local status if provider check fails
-    }
-  }
-
-  return hasUpdates;
+function isFailureProviderStatus(status: string) {
+  const normalized = String(status || '').trim().toLowerCase();
+  return (
+    normalized.includes('error') ||
+    normalized.includes('fail') ||
+    normalized.includes('cancel') ||
+    normalized.includes('deny')
+  );
 }
 
 function shouldSyncCheckoutItem(item: HistoryItem) {
@@ -100,6 +70,75 @@ async function syncVisibleCheckoutStatuses(items: HistoryItem[]) {
   return hasUpdates;
 }
 
+async function buildLiveProviderHistory(items: HistoryItem[]): Promise<HistoryResponseItem[]> {
+  if (!items.length) {
+    return [];
+  }
+
+  const snapshots = new Map<string, Awaited<ReturnType<typeof fetchPusatPanelOrderStatus>>>();
+  const candidates = items.filter((item) => {
+    const providerOrderId = String(item.providerOrderId || '').trim();
+    if (!providerOrderId) {
+      return false;
+    }
+
+    const updatedAtMs = new Date(item.updatedAt).getTime();
+    if (!Number.isFinite(updatedAtMs)) {
+      return true;
+    }
+
+    return !isTerminalStatus(item.orderStatus) || Date.now() - updatedAtMs >= SYNC_COOLDOWN_MS;
+  });
+
+  for (let index = 0; index < candidates.length; index += PROVIDER_LIVE_BATCH_SIZE) {
+    const batch = candidates.slice(index, index + PROVIDER_LIVE_BATCH_SIZE);
+    await Promise.all(
+      batch.map(async (item) => {
+        const providerOrderId = String(item.providerOrderId || '').trim();
+        if (!providerOrderId) {
+          return;
+        }
+
+        try {
+          const snapshot = await fetchPusatPanelOrderStatus(providerOrderId);
+          snapshots.set(providerOrderId, snapshot);
+
+          if (isFailureProviderStatus(snapshot.status) && snapshot.status !== item.orderStatus) {
+            await updateSmmOrderStatus(providerOrderId, snapshot.status);
+          }
+        } catch {
+          // keep local history visible if provider live check fails
+        }
+      }),
+    );
+  }
+
+  return items.map((item) => {
+    const providerOrderId = String(item.providerOrderId || '').trim();
+    const snapshot = providerOrderId ? snapshots.get(providerOrderId) : null;
+    if (!snapshot) {
+      return {
+        ...item,
+        startCount: null,
+        remains: null,
+        statusSource: 'local',
+      };
+    }
+
+    return {
+      ...item,
+      orderStatus: snapshot.status || item.orderStatus,
+      paymentStatus:
+        isFailureProviderStatus(snapshot.status) && String(item.paymentStatus || '').trim().toLowerCase() === 'paid'
+          ? 'refunded'
+          : item.paymentStatus,
+      startCount: snapshot.startCount,
+      remains: snapshot.remains,
+      statusSource: 'provider-live',
+    };
+  });
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -112,13 +151,9 @@ export async function GET(request: Request) {
       providerOnly,
     });
 
-    if (sync && items.length) {
-      const [updatedProvider, updatedCheckout] = await Promise.all([
-        syncVisibleOrderStatuses(items),
-        contact ? syncVisibleCheckoutStatuses(items) : Promise.resolve(false),
-      ]);
-      const updated = updatedProvider || updatedCheckout;
-      if (updated) {
+    if (sync && items.length && contact) {
+      const updatedCheckout = await syncVisibleCheckoutStatuses(items);
+      if (updatedCheckout) {
         items = await getSmmOrderHistory(limit, {
           accountContact: contact,
           providerOnly,
@@ -126,11 +161,13 @@ export async function GET(request: Request) {
       }
     }
 
+    const liveItems = await buildLiveProviderHistory(items);
+
     return NextResponse.json({
       status: true,
       data: {
-        count: items.length,
-        items,
+        count: liveItems.length,
+        items: liveItems,
       },
     });
   } catch (error) {
