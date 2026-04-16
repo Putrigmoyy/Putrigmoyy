@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { PusatPanelService } from '@/lib/pusatpanel';
 import { isBlockedPusatPanelService, normalizePusatPanelService, requestPusatPanel } from '@/lib/pusatpanel';
-import { syncSmmServicesCache } from '@/lib/smm-store';
+import { getCachedSmmServices, syncSmmServicesCache } from '@/lib/smm-store';
 
 export async function POST() {
   try {
@@ -30,8 +30,30 @@ export async function POST() {
       });
     }
 
+    const cachedServices = await getCachedSmmServices();
+    if (cachedServices.length) {
+      return NextResponse.json({
+        status: true,
+        data: cachedServices,
+        source: 'cache-fallback',
+      });
+    }
+
     return NextResponse.json(response);
   } catch (error) {
+    try {
+      const cachedServices = await getCachedSmmServices();
+      if (cachedServices.length) {
+        return NextResponse.json({
+          status: true,
+          data: cachedServices,
+          source: 'cache-fallback',
+        });
+      }
+    } catch {
+      // ignore cache fallback error
+    }
+
     return NextResponse.json(
       {
         status: false,

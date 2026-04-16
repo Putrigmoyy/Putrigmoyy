@@ -1134,14 +1134,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     };
   }, [floatingNotice]);
 
-  const monitoringRequestLimit = Math.max(
-    25,
-    Math.min(60, Number(monitoringFilterDraft.limit || appliedMonitoringFilter.limit || 25) * 2),
-  );
-  const statusRequestLimit = Math.max(
-    25,
-    Math.min(80, Number(statusFilterDraft.limit || appliedStatusFilter.limit || 10) * 4),
-  );
+  const monitoringRequestLimit = Math.max(10, Math.min(25, Number(monitoringFilterDraft.limit || appliedMonitoringFilter.limit || 25)));
+  const statusRequestLimit = Math.max(10, Math.min(25, Number(statusFilterDraft.limit || appliedStatusFilter.limit || 10)));
 
   const refreshHistory = () => {
     startHistoryRefresh(async () => {

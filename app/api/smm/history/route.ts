@@ -5,28 +5,12 @@ import { getSmmOrderHistory, updateSmmOrderStatus } from '@/lib/smm-store';
 
 const MAX_SYNC_ITEMS = 8;
 const SYNC_COOLDOWN_MS = 20_000;
-const PROVIDER_LIVE_BATCH_SIZE = 6;
-
 type HistoryItem = Awaited<ReturnType<typeof getSmmOrderHistory>>[number];
 type HistoryResponseItem = HistoryItem & {
   startCount: number | null;
   remains: number | null;
   statusSource: 'provider-live' | 'local';
 };
-
-function isTerminalStatus(status: string) {
-  const normalized = String(status || '').trim().toLowerCase();
-  return (
-    normalized.includes('success') ||
-    normalized.includes('complete') ||
-    normalized.includes('completed') ||
-    normalized.includes('cancel') ||
-    normalized.includes('error') ||
-    normalized.includes('fail') ||
-    normalized.includes('partial') ||
-    normalized.includes('expired')
-  );
-}
 
 function isFailureProviderStatus(status: string) {
   const normalized = String(status || '').trim().toLowerCase();
@@ -87,30 +71,25 @@ async function buildLiveProviderHistory(items: HistoryItem[]): Promise<HistoryRe
       return true;
     }
 
-    return !isTerminalStatus(item.orderStatus) || Date.now() - updatedAtMs >= SYNC_COOLDOWN_MS;
+    return Date.now() - updatedAtMs >= SYNC_COOLDOWN_MS;
   });
 
-  for (let index = 0; index < candidates.length; index += PROVIDER_LIVE_BATCH_SIZE) {
-    const batch = candidates.slice(index, index + PROVIDER_LIVE_BATCH_SIZE);
-    await Promise.all(
-      batch.map(async (item) => {
-        const providerOrderId = String(item.providerOrderId || '').trim();
-        if (!providerOrderId) {
-          return;
-        }
+  for (const item of candidates) {
+    const providerOrderId = String(item.providerOrderId || '').trim();
+    if (!providerOrderId) {
+      continue;
+    }
 
-        try {
-          const snapshot = await fetchPusatPanelOrderStatus(providerOrderId);
-          snapshots.set(providerOrderId, snapshot);
+    try {
+      const snapshot = await fetchPusatPanelOrderStatus(providerOrderId);
+      snapshots.set(providerOrderId, snapshot);
 
-          if (isFailureProviderStatus(snapshot.status) && snapshot.status !== item.orderStatus) {
-            await updateSmmOrderStatus(providerOrderId, snapshot.status);
-          }
-        } catch {
-          // keep local history visible if provider live check fails
-        }
-      }),
-    );
+      if (isFailureProviderStatus(snapshot.status) && snapshot.status !== item.orderStatus) {
+        await updateSmmOrderStatus(providerOrderId, snapshot.status);
+      }
+    } catch {
+      // keep local history visible if provider live check fails
+    }
   }
 
   return items.map((item) => {

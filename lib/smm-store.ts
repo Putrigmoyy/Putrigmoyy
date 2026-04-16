@@ -410,6 +410,57 @@ export async function syncSmmServicesCache(services: NormalizedPusatPanelService
   }
 }
 
+export async function getCachedSmmServices(limit = 5000): Promise<NormalizedPusatPanelService[]> {
+  if (!isSmmConfigured()) {
+    return [];
+  }
+
+  await ensureSmmTables();
+  const sql = getNeonClient('smm');
+  const queryLimit = Math.max(1, Math.min(limit, 10000));
+  const rows = (await sql`
+    select
+      id,
+      category,
+      name,
+      note,
+      min,
+      max,
+      price,
+      menu_type,
+      logo_type,
+      speed
+    from smm_services_cache
+    order by category asc, price asc, name asc, id asc
+    limit ${queryLimit}
+  `) as Array<{
+    id: string | null;
+    category: string | null;
+    name: string | null;
+    note: string | null;
+    min: number | null;
+    max: number | null;
+    price: number | null;
+    menu_type: string | null;
+    logo_type: string | null;
+    speed: string | null;
+  }>;
+
+  return rows.map((row) => ({
+    id: String(row.id || '').trim(),
+    category: String(row.category || '').trim(),
+    name: String(row.name || '').trim(),
+    note: String(row.note || '').trim(),
+    min: Math.max(0, Number(row.min || 0)),
+    max: Math.max(0, Number(row.max || 0)),
+    price: Math.max(0, Number(row.price || 0)),
+    priceLabel: Math.max(0, Number(row.price || 0)).toLocaleString('id-ID'),
+    menuType: String(row.menu_type || '1').trim() || '1',
+    logoType: String(row.logo_type || '').trim(),
+    speed: String(row.speed || '').trim(),
+  }));
+}
+
 export type SmmOrderHistoryItem = {
   id: number;
   orderCode: string;
