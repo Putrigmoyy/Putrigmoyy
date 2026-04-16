@@ -239,6 +239,16 @@ function SuccessCheckGlyph() {
   );
 }
 
+function DownloadGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 5.3v8.6" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.9" />
+      <path d="m8.7 10.9 3.3 3.4 3.3-3.4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.9" />
+      <path d="M6 16.9h12" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.9" />
+    </svg>
+  );
+}
+
 function AccountPopupGlyph({ type }: { type: 'deposit' | 'profil' }) {
   if (type === 'deposit') {
     return (
@@ -1438,11 +1448,23 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
                           </div>
                         </div>
                         <div className="apk-app-qris-card smm-qris-card">
-                          {activeQrisOrder?.qris?.qrUrl ? (
-                            <img src={activeQrisOrder.qris.qrUrl} alt={`QRIS ${activeQrisOrder.orderCode}`} className="apk-app-qris-image" />
-                          ) : (
-                            <div className="apk-app-qris-fallback">QRIS siap, tetapi gambar belum tersedia.</div>
-                          )}
+                          <div className="apk-app-qris-card-media">
+                            {activeQrisOrder?.qris?.qrUrl ? (
+                              <a
+                                href={buildQrisDownloadLink(activeQrisOrder.qris.qrUrl, `${activeQrisOrder.orderCode || 'apk-order'}-qris.png`)}
+                                className="apk-app-qris-download-icon"
+                                aria-label="Download QRIS"
+                                title="Download QRIS"
+                              >
+                                <DownloadGlyph />
+                              </a>
+                            ) : null}
+                            {activeQrisOrder?.qris?.qrUrl ? (
+                              <img src={activeQrisOrder.qris.qrUrl} alt={`QRIS ${activeQrisOrder.orderCode}`} className="apk-app-qris-image" />
+                            ) : (
+                              <div className="apk-app-qris-fallback">QRIS siap, tetapi gambar belum tersedia.</div>
+                            )}
+                          </div>
                         </div>
 
                         <div className="apk-app-live-total-card apk-app-live-total-card--compact smm-qris-total-card">
@@ -1466,14 +1488,6 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
                         </div>
 
                         <div className="apk-app-action-row smm-qris-status-row">
-                          {activeQrisOrder?.qris?.qrUrl ? (
-                            <a
-                              href={buildQrisDownloadLink(activeQrisOrder.qris.qrUrl, `${activeQrisOrder.orderCode || 'apk-order'}-qris.png`)}
-                              className="apk-app-ghost-button"
-                            >
-                              Download QRIS
-                            </a>
-                          ) : null}
                           <button type="button" className="apk-app-primary-button" onClick={() => refreshQrisStatus()} disabled={isCheckingOrderStatus}>
                             {isCheckingOrderStatus ? 'Memuat...' : 'Cek Status'}
                           </button>
@@ -2061,11 +2075,23 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
                       ) : (
                         <div className="apk-app-qris-shell">
                           <div className="apk-app-qris-card smm-qris-card">
-                            {activeDepositQris.qris?.qrUrl ? (
-                              <img src={activeDepositQris.qris.qrUrl} alt={`QRIS deposit ${activeDepositQris.reference}`} className="apk-app-qris-image" />
-                            ) : (
-                              <div className="apk-app-qris-fallback">QRIS siap, tetapi gambar belum tersedia.</div>
-                            )}
+                            <div className="apk-app-qris-card-media">
+                              {activeDepositQris.qris?.qrUrl ? (
+                                <a
+                                  href={buildQrisDownloadLink(activeDepositQris.qris.qrUrl, `${activeDepositQris.reference}-deposit-qris.png`)}
+                                  className="apk-app-qris-download-icon"
+                                  aria-label="Download QRIS"
+                                  title="Download QRIS"
+                                >
+                                  <DownloadGlyph />
+                                </a>
+                              ) : null}
+                              {activeDepositQris.qris?.qrUrl ? (
+                                <img src={activeDepositQris.qris.qrUrl} alt={`QRIS deposit ${activeDepositQris.reference}`} className="apk-app-qris-image" />
+                              ) : (
+                                <div className="apk-app-qris-fallback">QRIS siap, tetapi gambar belum tersedia.</div>
+                              )}
+                            </div>
                           </div>
 
                           <div className="apk-app-live-total-card apk-app-live-total-card--compact smm-qris-total-card">
@@ -2086,14 +2112,6 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
                           </div>
 
                           <div className="apk-app-action-row smm-qris-status-row">
-                            {activeDepositQris.qris?.qrUrl ? (
-                              <a
-                                href={buildQrisDownloadLink(activeDepositQris.qris.qrUrl, `${activeDepositQris.reference}-deposit-qris.png`)}
-                                className="apk-app-ghost-button"
-                              >
-                                Download QRIS
-                              </a>
-                            ) : null}
                             <button type="button" className="apk-app-primary-button" onClick={() => void refreshDepositStatus(true)} disabled={isCheckingDepositStatus}>
                               {isCheckingDepositStatus ? 'Memuat...' : 'Cek Status'}
                             </button>
