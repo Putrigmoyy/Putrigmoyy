@@ -27,7 +27,7 @@ body {
   min-height: 100%;
   background: #ffffff;
   color: var(--text);
-  font-family: inherit;
+  font-family: Roboto, "Segoe UI", Helvetica, Arial, sans-serif;
   overflow-x: hidden;
 }
 
