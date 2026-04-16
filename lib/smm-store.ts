@@ -1,10 +1,34 @@
 import type { NormalizedPusatPanelService } from '@/lib/pusatpanel';
 import { getAppDataSourceConfig } from '@/lib/data-sources';
 import { getNeonClient } from '@/lib/neon-clients';
+import { refundCoreWalletBalanceOrder, updateCoreOrderHistoryStatusByReference } from '@/lib/core-store';
 
 function isSmmConfigured() {
   const config = getAppDataSourceConfig();
   return config.smm.databaseConfigured;
+}
+
+type SmmOrderStatusRow = {
+  order_code: string | null;
+  account_contact: string | null;
+  service_name: string | null;
+  total_price: number | null;
+  payment_status: string | null;
+  payment_method: string | null;
+};
+
+function isProviderFailureStatus(status: string) {
+  const normalized = String(status || '').trim().toLowerCase();
+  return (
+    normalized.includes('error') ||
+    normalized.includes('fail') ||
+    normalized.includes('cancel') ||
+    normalized.includes('deny')
+  );
+}
+
+function resolveCoreMethodLabel(paymentMethod: string) {
+  return String(paymentMethod || '').trim().toLowerCase() === 'balance' ? 'Saldo akun' : 'QRIS';
 }
 
 export async function ensureSmmTables() {
@@ -193,13 +217,147 @@ export async function updateSmmOrderStatus(providerOrderId: string, status: stri
 
   await ensureSmmTables();
   const sql = getNeonClient('smm');
+  const normalizedProviderOrderId = String(providerOrderId || '').trim();
+  const nextStatus = String(status || '').trim();
+  if (!normalizedProviderOrderId || !nextStatus) {
+    return;
+  }
+
+  const rows = (await sql`
+    select
+      order_code,
+      account_contact,
+      service_name,
+      total_price,
+      payment_status,
+      payment_method
+    from smm_orders
+    where provider_order_id = ${normalizedProviderOrderId}
+    limit 1
+  `) as SmmOrderStatusRow[];
+  const currentOrder = rows[0] || null;
+
+  if (!currentOrder) {
+    await sql`
+      update smm_orders
+      set
+        order_status = ${nextStatus},
+        updated_at = now()
+      where provider_order_id = ${normalizedProviderOrderId}
+    `;
+    return;
+  }
+
+  const accountContact = String(currentOrder.account_contact || '').trim();
+  const shouldRefund =
+    isProviderFailureStatus(nextStatus) &&
+    String(currentOrder.payment_status || '').trim().toLowerCase() === 'paid' &&
+    Math.max(0, Number(currentOrder.total_price || 0)) > 0 &&
+    Boolean(accountContact);
+
+  if (shouldRefund) {
+    await sql`
+      update smm_orders
+      set
+        order_status = ${nextStatus},
+        payment_status = ${'refunded'},
+        updated_at = now()
+      where provider_order_id = ${normalizedProviderOrderId}
+    `;
+
+    const reference = String(currentOrder.order_code || '').trim() || normalizedProviderOrderId;
+    await refundCoreWalletBalanceOrder({
+      accountContact,
+      amount: Math.max(0, Number(currentOrder.total_price || 0)),
+      subjectName: String(currentOrder.service_name || '').trim() || accountContact,
+      reference,
+      reason: `Status provider: ${nextStatus}`,
+    });
+
+    await updateCoreOrderHistoryStatusByReference({
+      reference,
+      statusLabel: 'Error',
+      status: 'failed',
+      methodLabel: resolveCoreMethodLabel(String(currentOrder.payment_method || '')),
+      detailAppend: 'Order provider error dan dana order otomatis masuk ke saldo akun.',
+    });
+    return;
+  }
+
   await sql`
     update smm_orders
     set
-      order_status = ${status},
+      order_status = ${nextStatus},
       updated_at = now()
-    where provider_order_id = ${providerOrderId}
+    where provider_order_id = ${normalizedProviderOrderId}
   `;
+}
+
+export async function markSmmOrderAsFailedAndRefund(orderCode: string, reason: string) {
+  if (!isSmmConfigured()) {
+    return;
+  }
+
+  await ensureSmmTables();
+  const sql = getNeonClient('smm');
+  const normalizedOrderCode = String(orderCode || '').trim();
+  if (!normalizedOrderCode) {
+    return;
+  }
+
+  const rows = (await sql`
+    select
+      order_code,
+      account_contact,
+      service_name,
+      total_price,
+      payment_status,
+      payment_method
+    from smm_orders
+    where order_code = ${normalizedOrderCode}
+    limit 1
+  `) as SmmOrderStatusRow[];
+  const currentOrder = rows[0] || null;
+
+  if (!currentOrder) {
+    return;
+  }
+
+  const currentPaymentStatus = String(currentOrder.payment_status || '').trim().toLowerCase();
+  const accountContact = String(currentOrder.account_contact || '').trim();
+  const shouldRefund =
+    currentPaymentStatus === 'paid' &&
+    Math.max(0, Number(currentOrder.total_price || 0)) > 0 &&
+    Boolean(accountContact);
+
+  await sql`
+    update smm_orders
+    set
+      order_status = ${'failed'},
+      payment_status = ${shouldRefund ? 'refunded' : String(currentOrder.payment_status || '')},
+      updated_at = now()
+    where order_code = ${normalizedOrderCode}
+  `;
+
+  if (shouldRefund && accountContact) {
+    await refundCoreWalletBalanceOrder({
+      accountContact,
+      amount: Math.max(0, Number(currentOrder.total_price || 0)),
+      subjectName: String(currentOrder.service_name || '').trim() || accountContact,
+      reference: normalizedOrderCode,
+      reason,
+    });
+  }
+
+  await updateCoreOrderHistoryStatusByReference({
+    reference: normalizedOrderCode,
+    statusLabel: 'Error',
+    status: 'failed',
+    methodLabel: resolveCoreMethodLabel(String(currentOrder.payment_method || '')),
+    detailAppend: shouldRefund
+      ? 'Order provider gagal dibuat dan dana order otomatis masuk ke saldo akun.'
+      : 'Order provider gagal dibuat.',
+  });
 }
 
 export async function syncSmmServicesCache(services: NormalizedPusatPanelService[]) {

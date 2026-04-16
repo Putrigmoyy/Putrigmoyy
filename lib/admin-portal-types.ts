@@ -54,6 +54,7 @@ export type AdminApkAccountRow = {
 
 export type AdminPortalSnapshot = {
   smmPricing: AdminSmmPricingSettings;
+  minimumDeposit: number;
   users: AdminCoreWalletUser[];
   apkProducts: AdminApkProductRow[];
   apkVariants: AdminApkVariantRow[];

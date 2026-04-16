@@ -39,6 +39,7 @@ type Props = {
   };
   services: NormalizedPusatPanelService[];
   categories: string[];
+  minimumDeposit: number;
   requestedTab?: string | null;
 };
 
@@ -597,10 +598,16 @@ function calculateSmmTotal(service: NormalizedPusatPanelService | null, quantity
   return Math.max(0, Math.ceil((service.price * units) / 1000));
 }
 
+function buildQuickDepositAmounts(minimumDeposit: number) {
+  const base = Math.max(1000, Number(minimumDeposit || 0));
+  return Array.from(new Set([base, base * 2, Math.max(base * 5, 50000), Math.max(base * 10, 100000)])).sort((left, right) => left - right);
+}
+
 function formatPaymentStatusLabel(status: string) {
   const normalized = String(status || '').trim().toLowerCase();
   if (normalized === 'awaiting-payment') return 'menunggu pembayaran';
   if (normalized === 'paid') return 'paid';
+  if (normalized === 'refunded') return 'refund saldo';
   if (normalized === 'expire' || normalized === 'expired') return 'expired';
   if (normalized === 'cancel') return 'cancel';
   if (normalized === 'deny') return 'deny';
@@ -830,9 +837,9 @@ function normalizeAccountModalTab(value: string | null) {
   return null;
 }
 
-export function SocialMediaBrowser({ profile, providerMeta, services, categories, requestedTab }: Props) {
+export function SocialMediaBrowser({ profile, providerMeta, services, categories, minimumDeposit, requestedTab }: Props) {
   const [activeTab, setActiveTab] = useState<SocialTab>('sosmed');
-  const quickDepositAmounts = [10000, 20000, 50000, 100000];
+  const quickDepositAmounts = useMemo(() => buildQuickDepositAmounts(minimumDeposit), [minimumDeposit]);
   const [accountProfile, setAccountProfile] = useState({
     registered: false,
     loggedIn: false,
@@ -858,7 +865,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   });
   const [profileAccessMode, setProfileAccessMode] = useState<'register' | 'login'>('register');
   const [walletHistoryEntries, setWalletHistoryEntries] = useState<WalletHistoryEntry[]>([]);
-  const [depositAmount, setDepositAmount] = useState('10000');
+  const [depositAmount, setDepositAmount] = useState(String(minimumDeposit));
   const [activeDepositQris, setActiveDepositQris] = useState<CoreDepositQrisState | null>(null);
   const [depositFeedback, setDepositFeedback] = useState<{ tone: 'idle' | 'success' | 'error'; text: string }>({
     tone: 'idle',
@@ -1212,6 +1219,23 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       return;
     }
 
+    if (payload.paymentStatus === 'refunded') {
+      setOrderFeedback({
+        tone: 'success',
+        text: payload.nextStep,
+      });
+      refreshHistory();
+      if (accountProfile.username) {
+        refreshAccountOrders(accountProfile.username);
+        try {
+          await syncAccountBundle(accountProfile.username);
+        } catch {
+          // keep current account banner if refresh fails
+        }
+      }
+      return;
+    }
+
     if (payload.paymentStatus === 'expire' || payload.paymentStatus === 'cancel' || payload.paymentStatus === 'deny' || payload.paymentStatus === 'failed') {
       setOrderFeedback({
         tone: 'error',
@@ -1395,6 +1419,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     }
     if (
       activeCheckoutOrder.paymentStatus === 'paid' ||
+      activeCheckoutOrder.paymentStatus === 'refunded' ||
       activeCheckoutOrder.paymentStatus === 'expire' ||
       activeCheckoutOrder.paymentStatus === 'cancel' ||
       activeCheckoutOrder.paymentStatus === 'deny' ||
@@ -1639,10 +1664,10 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
         });
         return;
       }
-      if (normalizedDepositAmount < 10000) {
+      if (normalizedDepositAmount < minimumDeposit) {
         setDepositFeedback({
           tone: 'error',
-          text: 'Deposit minimal Rp 10.000.',
+          text: `Deposit minimal Rp ${formatRupiah(minimumDeposit)}.`,
         });
         return;
       }
@@ -1725,7 +1750,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       const nextState = result.data.depositState;
       if (nextState.paymentStatus === 'paid') {
         setActiveDepositQris(null);
-        setDepositAmount('10000');
+        setDepositAmount(String(minimumDeposit));
         setDepositFeedback({
           tone: 'success',
           text: `Deposit Rp ${nextState.amountLabel} berhasil dan saldo akun sudah bertambah.`,
@@ -2040,7 +2065,6 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
       ],
     },
   ];
-  const siteApiBaseUrl = typeof window !== 'undefined' ? `${window.location.origin}/api` : '/api';
 
   const platformGroups = useMemo<PlatformGroup[]>(() => {
     const buckets = new Map<string, PlatformGroup>();
@@ -2131,11 +2155,34 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   }, [activePlatform, selectedCategory]);
 
   const filteredServices = useMemo(() => {
-    const query = serviceQuery.trim().toLowerCase();
+    const queryTokens = serviceQuery
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
     return platformServices.filter((service) => {
-      if (!query) return true;
-      const haystack = `${service.name} ${service.category} ${service.note}`.toLowerCase();
-      return haystack.includes(query);
+      if (!queryTokens.length) return true;
+
+      const richHaystack = [
+        service.id,
+        service.name,
+        service.category,
+        service.note,
+        service.menuType,
+        service.logoType,
+        String(service.price),
+        service.priceLabel,
+        `rp ${service.priceLabel}`,
+        `rp${service.priceLabel}`,
+      ]
+        .join(' ')
+        .toLowerCase();
+      const compactHaystack = richHaystack.replace(/[^a-z0-9]+/g, '');
+
+      return queryTokens.every((token) => {
+        const compactToken = token.replace(/[^a-z0-9]+/g, '');
+        return richHaystack.includes(token) || (!!compactToken && compactHaystack.includes(compactToken));
+      });
     });
   }, [platformServices, serviceQuery]);
 
@@ -3214,8 +3261,8 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                       <tr>
                         <th>Via API</th>
                         <td>
-                          <span className="smm-detail-flag smm-detail-flag--success">
-                            <SuccessCheckGlyph />
+                          <span className="smm-detail-flag smm-detail-flag--failed">
+                            <ModalCloseGlyph />
                           </span>
                         </td>
                       </tr>
@@ -3318,7 +3365,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
                       {helperModalView === 'cara-deposit' ? (
                         <div className="smm-profile-lines">
-                          <p>Buka menu deposit, isi nominal minimal Rp 10.000, lalu tekan tombol deposit untuk memunculkan QRIS.</p>
+                          <p>Buka menu deposit, isi nominal minimal Rp {formatRupiah(minimumDeposit)}, lalu tekan tombol deposit untuk memunculkan QRIS.</p>
                           <p>Setelah pembayaran berhasil, saldo akun akan otomatis bertambah dan bisa dipakai di mode website yang memakai akun yang sama.</p>
                         </div>
                       ) : null}
@@ -3366,12 +3413,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
                       {helperModalView === 'api-docs' ? (
                         <div className="smm-profile-lines">
-                          <p>API website ini memakai jalur website kamu sendiri, bukan API URL provider luar.</p>
-                          <p>Base URL API : {siteApiBaseUrl}</p>
-                          <p>API Key website : gunakan token dari env `OWNER_APP_TOKEN` di Vercel.</p>
-                          <p>Header autentikasi : x-owner-token: YOUR_OWNER_APP_TOKEN</p>
-                          <p>GET katalog website : {siteApiBaseUrl}/apk-premium/admin/catalog</p>
-                          <p>POST sinkron katalog ke website : {siteApiBaseUrl}/apk-premium/admin/import-owner</p>
+                          <p>COMING SOON....</p>
                         </div>
                       ) : null}
                     </div>
@@ -3623,7 +3665,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                               <input
                                 value={depositAmount}
                                 onChange={(event) => setDepositAmount(event.target.value.replace(/[^\d]/g, ''))}
-                                placeholder="Minimal 10000"
+                                placeholder={`Minimal ${minimumDeposit.toLocaleString('id-ID')}`}
                                 inputMode="numeric"
                               />
                             </label>

@@ -70,6 +70,15 @@ type DepositPaymentRow = {
   credited_at: string | null;
 };
 
+type CoreAdminSettingRow = {
+  value_json?: {
+    minimumDeposit?: number;
+  } | null;
+};
+
+const DEFAULT_CORE_MINIMUM_DEPOSIT = 10000;
+const CORE_MINIMUM_DEPOSIT_SETTING_KEY = 'core_minimum_deposit';
+
 export type CoreDepositPaymentState = {
   reference: string;
   amount: number;
@@ -135,6 +144,14 @@ function formatHistoryDate(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function normalizeMinimumDeposit(value: unknown) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return DEFAULT_CORE_MINIMUM_DEPOSIT;
+  }
+  return Math.max(1000, Math.round(numeric));
 }
 
 function createCoreDepositReference() {
@@ -282,6 +299,61 @@ export async function ensureCoreTables() {
   await sql`create unique index if not exists core_wallet_accounts_username_idx on core_wallet_accounts(username) where username <> ''`;
   await sql`create index if not exists core_transaction_history_account_idx on core_transaction_history(account_contact)`;
   await sql`create index if not exists core_deposit_payments_account_idx on core_deposit_payments(account_contact)`;
+}
+
+async function ensureCoreAdminSettingsTable() {
+  await ensureCoreTables();
+  const sql = getNeonClient('core');
+  await sql`
+    create table if not exists core_admin_settings (
+      setting_key text primary key,
+      value_json jsonb not null default '{}'::jsonb,
+      updated_at timestamptz not null default now()
+    )
+  `;
+}
+
+export async function getCoreMinimumDeposit() {
+  if (!isCoreConfigured()) {
+    return DEFAULT_CORE_MINIMUM_DEPOSIT;
+  }
+
+  await ensureCoreAdminSettingsTable();
+  const sql = getNeonClient('core');
+  const rows = (await sql`
+    select value_json
+    from core_admin_settings
+    where setting_key = ${CORE_MINIMUM_DEPOSIT_SETTING_KEY}
+    limit 1
+  `) as CoreAdminSettingRow[];
+
+  return normalizeMinimumDeposit(rows[0]?.value_json?.minimumDeposit);
+}
+
+export async function updateCoreMinimumDeposit(input: { minimumDeposit: number }) {
+  if (!isCoreConfigured()) {
+    throw new Error('DATABASE_URL_CORE belum diisi.');
+  }
+
+  await ensureCoreAdminSettingsTable();
+  const minimumDeposit = normalizeMinimumDeposit(input.minimumDeposit);
+  const sql = getNeonClient('core');
+  await sql`
+    insert into core_admin_settings (
+      setting_key,
+      value_json,
+      updated_at
+    ) values (
+      ${CORE_MINIMUM_DEPOSIT_SETTING_KEY},
+      ${JSON.stringify({ minimumDeposit })}::jsonb,
+      now()
+    )
+    on conflict (setting_key) do update set
+      value_json = excluded.value_json,
+      updated_at = now()
+  `;
+
+  return minimumDeposit;
 }
 
 async function getWalletRow(identifier: string) {
@@ -610,6 +682,7 @@ export async function submitCoreDeposit(input: {
   const accountContact = normalizeUsername(input.accountContact);
   const amount = Math.max(0, Number(input.amount || 0));
   const method = 'midtrans';
+  const minimumDeposit = await getCoreMinimumDeposit();
 
   if (!accountContact) {
     throw new Error('Username akun wajib diisi.');
@@ -617,8 +690,8 @@ export async function submitCoreDeposit(input: {
   if (amount <= 0) {
     throw new Error('Jumlah deposit belum valid.');
   }
-  if (amount < 10000) {
-    throw new Error('Deposit minimal Rp 10.000.');
+  if (amount < minimumDeposit) {
+    throw new Error(`Deposit minimal Rp ${formatRupiah(minimumDeposit)}.`);
   }
 
   const row = await getWalletRow(accountContact);

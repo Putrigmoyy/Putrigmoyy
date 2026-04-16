@@ -48,6 +48,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
   const [isPending, startTransition] = useTransition();
 
   const [profitPercentDraft, setProfitPercentDraft] = useState(String(initialSnapshot.smmPricing.profitPercent));
+  const [minimumDepositDraft, setMinimumDepositDraft] = useState(String(initialSnapshot.minimumDeposit));
   const [userQuery, setUserQuery] = useState('');
   const [selectedUsername, setSelectedUsername] = useState(initialSnapshot.users[0]?.username || '');
   const [userForm, setUserForm] = useState({
@@ -205,6 +206,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
 
     setSnapshot(result.data);
     setProfitPercentDraft(String(result.data.smmPricing.profitPercent));
+    setMinimumDepositDraft(String(result.data.minimumDeposit));
   }
 
   function runAction(task: () => Promise<void>) {
@@ -349,6 +351,64 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                       }
                     >
                       Simpan Profit
+                    </button>
+                  </div>
+                </article>
+
+                <article className="account-popup-card">
+                  <span className="smm-profile-title">Minimal deposit</span>
+                  <div className="apk-app-form-grid smm-profile-form-grid">
+                    <label className="apk-app-form-field">
+                      <span>Minimal deposit website</span>
+                      <input
+                        value={minimumDepositDraft}
+                        onChange={(event) => setMinimumDepositDraft(event.target.value.replace(/[^\d]/g, ''))}
+                        inputMode="numeric"
+                        placeholder="contoh: 10000"
+                      />
+                    </label>
+                  </div>
+                  <div className="admin-portal-preview-card">
+                    <p>Minimal aktif sekarang : Rp {formatRupiah(snapshot.minimumDeposit)}</p>
+                    <p>Aturan ini dipakai bersama oleh mode sosial media dan aplikasi premium.</p>
+                  </div>
+                  <div className="apk-app-action-row apk-app-action-row--compact">
+                    <button
+                      type="button"
+                      className="apk-app-primary-button"
+                      onClick={() =>
+                        runAction(async () => {
+                          const response = await fetch('/api/admin/portal', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'x-admin-secret': secret,
+                            },
+                            body: JSON.stringify({
+                              action: 'save-minimum-deposit',
+                              minimumDeposit: Number(minimumDepositDraft || 0),
+                            }),
+                          });
+                          const result = (await response.json()) as {
+                            status?: boolean;
+                            data?: {
+                              msg?: string;
+                              snapshot?: AdminPortalSnapshot;
+                            };
+                          };
+                          if (!response.ok || !result.status || !result.data?.snapshot) {
+                            throw new Error(result.data?.msg || 'Minimal deposit belum bisa disimpan.');
+                          }
+                          setSnapshot(result.data.snapshot);
+                          setMinimumDepositDraft(String(result.data.snapshot.minimumDeposit));
+                          setNotice({
+                            tone: 'success',
+                            text: result.data.msg || 'Minimal deposit berhasil disimpan.',
+                          });
+                        })
+                      }
+                    >
+                      Simpan Minimal Deposit
                     </button>
                   </div>
                 </article>

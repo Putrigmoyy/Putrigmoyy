@@ -10,7 +10,7 @@ import {
   listAdminApkProducts,
   listAdminApkVariants,
 } from '@/lib/apk-premium-admin';
-import { adminUpdateCoreWalletUser, listAdminCoreWalletUsers } from '@/lib/core-store';
+import { adminUpdateCoreWalletUser, getCoreMinimumDeposit, listAdminCoreWalletUsers, updateCoreMinimumDeposit } from '@/lib/core-store';
 import { getSmmPricingSettings, updateSmmPricingSettings } from '@/lib/smm-pricing';
 
 export function resolveAdminPortalSecret() {
@@ -34,8 +34,9 @@ export function verifyAdminPortalSecret(candidate: string) {
 }
 
 export async function getAdminPortalSnapshot(): Promise<AdminPortalSnapshot> {
-  const [smmPricing, users, apkProducts, apkVariants] = await Promise.all([
+  const [smmPricing, minimumDeposit, users, apkProducts, apkVariants] = await Promise.all([
     getSmmPricingSettings(),
+    getCoreMinimumDeposit(),
     listAdminCoreWalletUsers(),
     listAdminApkProducts(),
     listAdminApkVariants(),
@@ -43,6 +44,7 @@ export async function getAdminPortalSnapshot(): Promise<AdminPortalSnapshot> {
 
   return {
     smmPricing,
+    minimumDeposit,
     users,
     apkProducts,
     apkVariants,
@@ -57,6 +59,10 @@ export async function getAdminPortalSnapshot(): Promise<AdminPortalSnapshot> {
 
 export async function saveAdminSmmPricing(input: { profitPercent: number }) {
   return updateSmmPricingSettings(input);
+}
+
+export async function saveAdminMinimumDeposit(input: { minimumDeposit: number }) {
+  return updateCoreMinimumDeposit(input);
 }
 
 export async function saveAdminUser(input: {

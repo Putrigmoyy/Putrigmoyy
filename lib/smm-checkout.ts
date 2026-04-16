@@ -11,7 +11,7 @@ import {
 import { createMidtransQrisCharge, getMidtransPublicConfig, getMidtransTransactionStatus, isMidtransConfigured } from '@/lib/midtrans';
 import { getNeonClient } from '@/lib/neon-clients';
 import { fetchPusatPanelServices, requestPusatPanel } from '@/lib/pusatpanel';
-import { ensureSmmTables } from '@/lib/smm-store';
+import { ensureSmmTables, markSmmOrderAsFailedAndRefund } from '@/lib/smm-store';
 
 type CheckoutInput = {
   accountContact?: string;
@@ -134,9 +134,20 @@ function buildSnapshot(order: SmmOrderRow, payment: SmmPaymentRow | null, fallba
   const paymentMethod = order.payment_method === 'balance' ? 'balance' : 'midtrans';
   const paymentStatus = String(order.payment_status || '').trim() || (paymentMethod === 'balance' ? 'paid' : 'awaiting-payment');
   const orderStatus = String(order.order_status || '').trim() || 'pending';
+  const normalizedOrderStatus = orderStatus.toLowerCase();
   let nextStep = 'Order sosial media sedang diproses.';
 
-  if (paymentMethod === 'balance') {
+  if (
+    normalizedOrderStatus.includes('error') ||
+    normalizedOrderStatus.includes('fail') ||
+    normalizedOrderStatus.includes('cancel') ||
+    normalizedOrderStatus.includes('deny')
+  ) {
+    nextStep =
+      paymentStatus === 'refunded'
+        ? 'Order gagal dan dana order otomatis masuk ke saldo akun.'
+        : 'Order gagal diproses oleh provider. Silakan hubungi admin store.';
+  } else if (paymentMethod === 'balance') {
     nextStep = order.provider_order_id
       ? 'Saldo akun berhasil dipakai dan order langsung diteruskan ke provider.'
       : 'Saldo akun berhasil dipakai. Order sedang disiapkan.';
@@ -148,6 +159,8 @@ function buildSnapshot(order: SmmOrderRow, payment: SmmPaymentRow | null, fallba
         : 'Pembayaran berhasil dan order sedang disiapkan.';
   } else if (paymentStatus === 'expire' || paymentStatus === 'cancel' || paymentStatus === 'deny' || paymentStatus === 'failed') {
     nextStep = 'Pembayaran sudah tidak aktif. Silakan buat order baru.';
+  } else if (paymentStatus === 'refunded') {
+    nextStep = 'Order gagal dan dana order otomatis masuk ke saldo akun.';
   } else if (fallbackNotice) {
     nextStep = `${fallbackNotice} QRIS siap digunakan untuk menyelesaikan pembayaran.`;
   } else {
@@ -228,6 +241,17 @@ async function syncCoreHistoryForSmmOrder(order: SmmOrderRow) {
           paymentStatus === 'expire'
             ? 'Pembayaran QRIS expired sebelum diselesaikan.'
             : 'Pembayaran QRIS tidak berhasil dikonfirmasi.',
+      });
+      return;
+    }
+
+    if (paymentStatus === 'refunded') {
+      await updateCoreOrderHistoryStatusByReference({
+        reference: order.order_code,
+        statusLabel: 'Error',
+        status: 'failed',
+        methodLabel: 'QRIS',
+        detailAppend: 'Order provider gagal dan dana order otomatis masuk ke saldo akun.',
       });
       return;
     }
@@ -778,23 +802,10 @@ export async function getSmmCheckoutOrderStatus(orderCode: string): Promise<SmmC
           });
         }
       } catch (error) {
-        await sql`
-          update smm_orders
-          set
-            order_status = ${'paid-review'},
-            payment_status = ${'paid'},
-            updated_at = now()
-          where order_code = ${normalizedOrderCode}
-        `;
-        if (String(order.account_contact || '').trim()) {
-          await updateCoreOrderHistoryStatusByReference({
-            reference: normalizedOrderCode,
-            statusLabel: 'Pembayaran berhasil',
-            status: 'pending',
-            methodLabel: 'QRIS',
-            detailAppend: `Pembayaran berhasil, tetapi order provider perlu dicek manual: ${error instanceof Error ? error.message : 'Provider error.'}`,
-          });
-        }
+        await markSmmOrderAsFailedAndRefund(
+          normalizedOrderCode,
+          error instanceof Error ? error.message : 'Provider error.',
+        );
       }
     } else if (normalizedPaymentStatus === 'expire' || normalizedPaymentStatus === 'cancel' || normalizedPaymentStatus === 'deny' || normalizedPaymentStatus === 'failed') {
       await sql`

@@ -5,6 +5,7 @@ import {
   saveAdminApkCreateVariant,
   saveAdminApkProduct,
   saveAdminApkVariant,
+  saveAdminMinimumDeposit,
   saveAdminSmmPricing,
   saveAdminUser,
   verifyAdminPortalSecret,
@@ -71,6 +72,21 @@ export async function POST(request: NextRequest) {
         data: {
           msg: 'Persentase keuntungan sosial media berhasil disimpan.',
           pricing,
+          snapshot,
+        },
+      });
+    }
+
+    if (action === 'save-minimum-deposit') {
+      const minimumDeposit = await saveAdminMinimumDeposit({
+        minimumDeposit: Number(body.minimumDeposit || 0),
+      });
+      const snapshot = await getAdminPortalSnapshot();
+      return NextResponse.json({
+        status: true,
+        data: {
+          msg: 'Minimal deposit berhasil disimpan.',
+          minimumDeposit,
           snapshot,
         },
       });

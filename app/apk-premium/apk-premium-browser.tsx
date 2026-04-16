@@ -10,6 +10,7 @@ import { TopAccountMenu } from '@/app/components/top-account-menu';
 type Props = {
   products: ApkPremiumProduct[];
   categories: string[];
+  minimumDeposit: number;
   requestedTab?: string | null;
 };
 
@@ -112,6 +113,11 @@ function normalizePremiumTab(value: string | null): PremiumTab | null {
     return value;
   }
   return null;
+}
+
+function buildQuickDepositAmounts(minimumDeposit: number) {
+  const base = Math.max(1000, Number(minimumDeposit || 0));
+  return Array.from(new Set([base, base * 2, Math.max(base * 5, 50000), Math.max(base * 10, 100000)])).sort((left, right) => left - right);
 }
 
 const productArtwork: Record<string, string> = {
@@ -311,8 +317,8 @@ function NavGlyph({ type }: { type: PremiumTab }) {
   );
 }
 
-export function ApkPremiumBrowser({ products, categories, requestedTab }: Props) {
-  const quickDepositAmounts = [10000, 20000, 50000, 100000];
+export function ApkPremiumBrowser({ products, categories, minimumDeposit, requestedTab }: Props) {
+  const quickDepositAmounts = buildQuickDepositAmounts(minimumDeposit);
   const [activeTab, setActiveTab] = useState<PremiumTab>('apprem');
   const [query, setQuery] = useState('');
   const [selectedProductId, setSelectedProductId] = useState(products[0]?.id || '');
@@ -326,7 +332,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
   });
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
-  const [depositAmount, setDepositAmount] = useState('10000');
+  const [depositAmount, setDepositAmount] = useState(String(minimumDeposit));
   const [walletProfile, setWalletProfile] = useState({
     registered: false,
     loggedIn: false,
@@ -1010,10 +1016,10 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
         });
         return;
       }
-      if (normalizedDepositAmount < 10000) {
+      if (normalizedDepositAmount < minimumDeposit) {
         setDepositFeedback({
           tone: 'error',
-          text: 'Deposit minimal Rp 10.000.',
+          text: `Deposit minimal Rp ${formatRupiah(minimumDeposit)}.`,
         });
         return;
       }
@@ -1096,7 +1102,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
       const nextState = result.data.depositState;
       if (nextState.paymentStatus === 'paid') {
         setActiveDepositQris(null);
-        setDepositAmount('10000');
+        setDepositAmount(String(minimumDeposit));
         setDepositFeedback({
           tone: 'success',
           text: `Deposit Rp ${nextState.amountLabel} berhasil dan saldo akun sudah bertambah.`,
@@ -1520,7 +1526,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
                       <input
                         value={depositAmount}
                         onChange={(event) => setDepositAmount(event.target.value.replace(/[^\d]/g, ''))}
-                        placeholder="Contoh: 10000"
+                        placeholder={`Contoh: ${minimumDeposit.toLocaleString('id-ID')}`}
                         disabled={depositLocked}
                       />
                     </label>
@@ -1548,7 +1554,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
 
                 <article className="apk-app-form-card">
                   <span className="apk-app-section-label">Deposit</span>
-                  <p className="smm-section-copy">Masukkan nominal minimal Rp 10.000 lalu tekan tombol deposit untuk membuka QRIS pembayaran.</p>
+                  <p className="smm-section-copy">Masukkan nominal minimal Rp {formatRupiah(minimumDeposit)} lalu tekan tombol deposit untuk membuka QRIS pembayaran.</p>
 
                   <div className="apk-app-action-row">
                     <button
@@ -1976,7 +1982,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
                               <input
                                 value={depositAmount}
                                 onChange={(event) => setDepositAmount(event.target.value.replace(/[^\d]/g, ''))}
-                                placeholder="Minimal 10000"
+                                placeholder={`Minimal ${minimumDeposit.toLocaleString('id-ID')}`}
                                 inputMode="numeric"
                               />
                             </label>
@@ -2266,9 +2272,7 @@ export function ApkPremiumBrowser({ products, categories, requestedTab }: Props)
                 <div className="account-popup-stack">
                   <div className="account-popup-card">
                     <div className="smm-profile-lines">
-                      <p>Mode aplikasi premium memakai API internal website untuk katalog, checkout, status order, dan saldo akun umum.</p>
-                      <p>Route utama : `/api/apk-premium/catalog`, `/api/apk-premium/order`, `/api/apk-premium/order-status`, dan `/api/core/deposit`.</p>
-                      <p>Saldo akun di menu ini sama dengan saldo umum yang dipakai bersama dengan mode sosial media.</p>
+                      <p>COMING SOON....</p>
                     </div>
                   </div>
                 </div>
