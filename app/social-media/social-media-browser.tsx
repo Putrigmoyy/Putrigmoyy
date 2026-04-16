@@ -603,6 +603,14 @@ function buildQuickDepositAmounts(minimumDeposit: number) {
   return Array.from(new Set([base, base * 2, Math.max(base * 5, 50000), Math.max(base * 10, 100000)])).sort((left, right) => left - right);
 }
 
+function buildQrisDownloadLink(qrUrl: string, filename: string) {
+  const normalizedUrl = String(qrUrl || '').trim();
+  if (!normalizedUrl) {
+    return '';
+  }
+  return `/api/qris-download?url=${encodeURIComponent(normalizedUrl)}&filename=${encodeURIComponent(filename)}`;
+}
+
 function formatPaymentStatusLabel(status: string) {
   const normalized = String(status || '').trim().toLowerCase();
   if (normalized === 'awaiting-payment') return 'menunggu pembayaran';
@@ -927,10 +935,11 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const [isOrdering, startOrdering] = useTransition();
   const [isRefreshingHistory, startHistoryRefresh] = useTransition();
   const [isRefreshingAccountOrders, startAccountOrdersRefresh] = useTransition();
-  const [isRefreshingCheckoutStatus, startCheckoutStatusRefresh] = useTransition();
+  const [, startCheckoutStatusRefresh] = useTransition();
   const [isSubmittingProfile, startProfileSubmit] = useTransition();
   const [isSubmittingDeposit, startDepositSubmit] = useTransition();
   const [isCheckingDepositStatus, setIsCheckingDepositStatus] = useState(false);
+  const [isCheckingOrderStatus, setIsCheckingOrderStatus] = useState(false);
   const sortedHistoryItems = useMemo(
     () =>
       [...historyItems].sort(
@@ -1207,6 +1216,10 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
         tone: 'success',
         text: payload.nextStep,
       });
+      setFloatingNotice({
+        tone: 'success',
+        text: payload.nextStep,
+      });
       refreshHistory();
       if (accountProfile.username) {
         refreshAccountOrders(accountProfile.username);
@@ -1221,6 +1234,10 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
 
     if (payload.paymentStatus === 'refunded') {
       setOrderFeedback({
+        tone: 'success',
+        text: payload.nextStep,
+      });
+      setFloatingNotice({
         tone: 'success',
         text: payload.nextStep,
       });
@@ -1247,11 +1264,14 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     }
   };
 
-  const refreshCheckoutStatus = () => {
+  const refreshCheckoutStatus = (manual = true) => {
     if (!activeCheckoutOrder?.orderCode) {
       return;
     }
 
+    if (manual) {
+      setIsCheckingOrderStatus(true);
+    }
     startCheckoutStatusRefresh(async () => {
       try {
         const response = await fetch(`/api/smm/order-status?orderCode=${encodeURIComponent(activeCheckoutOrder.orderCode)}`, {
@@ -1278,6 +1298,10 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
           tone: 'error',
           text: error instanceof Error ? error.message : 'Status pembayaran belum bisa diperbarui.',
         });
+      } finally {
+        if (manual) {
+          setIsCheckingOrderStatus(false);
+        }
       }
     });
   };
@@ -1429,7 +1453,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
     }
 
     const intervalId = window.setInterval(() => {
-      refreshCheckoutStatus();
+      refreshCheckoutStatus(false);
     }, 12000);
 
     return () => {
@@ -1752,6 +1776,10 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
         setActiveDepositQris(null);
         setDepositAmount(String(minimumDeposit));
         setDepositFeedback({
+          tone: 'success',
+          text: `Deposit Rp ${nextState.amountLabel} berhasil dan saldo akun sudah bertambah.`,
+        });
+        setFloatingNotice({
           tone: 'success',
           text: `Deposit Rp ${nextState.amountLabel} berhasil dan saldo akun sudah bertambah.`,
         });
@@ -2272,7 +2300,7 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
   const showPaidCheckoutResult =
     activeCheckoutOrder?.paymentMethod === 'midtrans' && activeCheckoutOrder.paymentStatus === 'paid';
   const activeCheckoutProviderId = String(activeCheckoutOrder?.providerOrderId || '').trim();
-  const isActionLoading = isOrdering || isSubmittingProfile || isSubmittingDeposit;
+  const isActionLoading = isOrdering || isSubmittingProfile || isSubmittingDeposit || isCheckingDepositStatus || isCheckingOrderStatus;
 
   const submitOrder = () => {
     if (!selectedService) {
@@ -2793,8 +2821,16 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                         </div>
 
                         <div className="apk-app-action-row smm-qris-status-row">
-                          <button type="button" className="apk-app-primary-button" onClick={refreshCheckoutStatus} disabled={isRefreshingCheckoutStatus}>
-                            {isRefreshingCheckoutStatus ? 'Memuat...' : 'Cek Status'}
+                          {activeCheckoutOrder.qris?.qrUrl ? (
+                            <a
+                              href={buildQrisDownloadLink(activeCheckoutOrder.qris.qrUrl, `${activeCheckoutOrder.orderCode || 'smm-order'}-qris.png`)}
+                              className="apk-app-ghost-button"
+                            >
+                              Download QRIS
+                            </a>
+                          ) : null}
+                          <button type="button" className="apk-app-primary-button" onClick={() => refreshCheckoutStatus()} disabled={isCheckingOrderStatus}>
+                            {isCheckingOrderStatus ? 'Memuat...' : 'Cek Status'}
                           </button>
                         </div>
                       </div>
@@ -3723,6 +3759,14 @@ export function SocialMediaBrowser({ profile, providerMeta, services, categories
                           </div>
 
                           <div className="apk-app-action-row smm-qris-status-row">
+                            {activeDepositQris.qris?.qrUrl ? (
+                              <a
+                                href={buildQrisDownloadLink(activeDepositQris.qris.qrUrl, `${activeDepositQris.reference}-deposit-qris.png`)}
+                                className="apk-app-ghost-button"
+                              >
+                                Download QRIS
+                              </a>
+                            ) : null}
                             <button type="button" className="apk-app-primary-button" onClick={() => void refreshDepositStatus(true)} disabled={isCheckingDepositStatus}>
                               {isCheckingDepositStatus ? 'Memuat...' : 'Cek Status'}
                             </button>

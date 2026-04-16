@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useDeferredValue, useEffect, useState, useTransition } from 'react';
 import type { ApkPremiumProduct, ApkPremiumVariant } from '@/lib/apk-premium';
 import { formatRupiah } from '@/lib/apk-premium';
+import { ActionLoadingOverlay } from '@/app/components/action-loading-overlay';
 import { FloatingNotice } from '@/app/components/floating-notice';
 import { TopAccountMenu } from '@/app/components/top-account-menu';
 
@@ -118,6 +119,14 @@ function normalizePremiumTab(value: string | null): PremiumTab | null {
 function buildQuickDepositAmounts(minimumDeposit: number) {
   const base = Math.max(1000, Number(minimumDeposit || 0));
   return Array.from(new Set([base, base * 2, Math.max(base * 5, 50000), Math.max(base * 10, 100000)])).sort((left, right) => left - right);
+}
+
+function buildQrisDownloadLink(qrUrl: string, filename: string) {
+  const normalizedUrl = String(qrUrl || '').trim();
+  if (!normalizedUrl) {
+    return '';
+  }
+  return `/api/qris-download?url=${encodeURIComponent(normalizedUrl)}&filename=${encodeURIComponent(filename)}`;
 }
 
 const productArtwork: Record<string, string> = {
@@ -388,8 +397,9 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
   const [isSubmittingOrder, startOrderSubmit] = useTransition();
   const [isSubmittingProfile, startProfileSubmit] = useTransition();
   const [isSubmittingDeposit, startDepositSubmit] = useTransition();
-  const [isRefreshingQris, startRefreshQris] = useTransition();
+  const [, startRefreshQris] = useTransition();
   const [isCheckingDepositStatus, setIsCheckingDepositStatus] = useState(false);
+  const [isCheckingOrderStatus, setIsCheckingOrderStatus] = useState(false);
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
   useEffect(() => {
@@ -637,6 +647,13 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
                   result.data.deliveredAccounts && result.data.deliveredAccounts.length > 0
                     ? `Pembayaran ${result.data.orderCode} berhasil dan data akun premium sudah siap.`
                     : `Pembayaran ${result.data.orderCode} berhasil. ${result.data.nextStep || ''}`.trim(),
+              });
+              setFloatingNotice({
+                tone: 'success',
+                text:
+                  result.data.deliveredAccounts && result.data.deliveredAccounts.length > 0
+                    ? `Pembayaran ${result.data.orderCode} berhasil dan data akun premium sudah siap.`
+                    : `Pembayaran ${result.data.orderCode} berhasil.`,
               });
               if (walletProfile.loggedIn && walletProfile.username) {
                 try {
@@ -1107,6 +1124,10 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
           tone: 'success',
           text: `Deposit Rp ${nextState.amountLabel} berhasil dan saldo akun sudah bertambah.`,
         });
+        setFloatingNotice({
+          tone: 'success',
+          text: `Deposit Rp ${nextState.amountLabel} berhasil dan saldo akun sudah bertambah.`,
+        });
         return;
       }
 
@@ -1134,9 +1155,12 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
     }
   };
 
-  const refreshQrisStatus = () => {
+  const refreshQrisStatus = (manual = true) => {
     if (!activeQrisOrder?.orderCode) {
       return;
+    }
+    if (manual) {
+      setIsCheckingOrderStatus(true);
     }
     startRefreshQris(async () => {
       try {
@@ -1166,6 +1190,15 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
                 : `Pembayaran ${result.data.orderCode} berhasil. ${result.data.nextStep || ''}`.trim()
               : `Status ${result.data.orderCode} masih ${result.data.paymentStatus}.`,
         });
+        if (result.data.paymentStatus === 'paid') {
+          setFloatingNotice({
+            tone: 'success',
+            text:
+              result.data.deliveredAccounts && result.data.deliveredAccounts.length > 0
+                ? `Pembayaran ${result.data.orderCode} berhasil dan data akun premium sudah siap.`
+                : `Pembayaran ${result.data.orderCode} berhasil.`,
+          });
+        }
         if (result.data.paymentStatus === 'paid' && walletProfile.loggedIn && walletProfile.username) {
           try {
             await syncAccountBundle(walletProfile.username);
@@ -1178,12 +1211,17 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
           tone: 'error',
           text: error instanceof Error ? error.message : 'Status pembayaran belum bisa dimuat.',
         });
+      } finally {
+        if (manual) {
+          setIsCheckingOrderStatus(false);
+        }
       }
     });
   };
 
   return (
     <div className="apk-app-shell">
+      <ActionLoadingOverlay visible={isSubmittingOrder || isSubmittingProfile || isSubmittingDeposit || isCheckingOrderStatus || isCheckingDepositStatus} label="Memuat..." />
       <div className="apk-app-phone">
         <FloatingNotice notice={floatingNotice} />
         <div className="apk-app-top-strip apk-app-top-strip--with-menu">
@@ -1428,8 +1466,16 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
                         </div>
 
                         <div className="apk-app-action-row smm-qris-status-row">
-                          <button type="button" className="apk-app-primary-button" onClick={refreshQrisStatus} disabled={isRefreshingQris}>
-                            {isRefreshingQris ? 'Memuat...' : 'Cek Status'}
+                          {activeQrisOrder?.qris?.qrUrl ? (
+                            <a
+                              href={buildQrisDownloadLink(activeQrisOrder.qris.qrUrl, `${activeQrisOrder.orderCode || 'apk-order'}-qris.png`)}
+                              className="apk-app-ghost-button"
+                            >
+                              Download QRIS
+                            </a>
+                          ) : null}
+                          <button type="button" className="apk-app-primary-button" onClick={() => refreshQrisStatus()} disabled={isCheckingOrderStatus}>
+                            {isCheckingOrderStatus ? 'Memuat...' : 'Cek Status'}
                           </button>
                         </div>
                       </div>
@@ -2040,6 +2086,14 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
                           </div>
 
                           <div className="apk-app-action-row smm-qris-status-row">
+                            {activeDepositQris.qris?.qrUrl ? (
+                              <a
+                                href={buildQrisDownloadLink(activeDepositQris.qris.qrUrl, `${activeDepositQris.reference}-deposit-qris.png`)}
+                                className="apk-app-ghost-button"
+                              >
+                                Download QRIS
+                              </a>
+                            ) : null}
                             <button type="button" className="apk-app-primary-button" onClick={() => void refreshDepositStatus(true)} disabled={isCheckingDepositStatus}>
                               {isCheckingDepositStatus ? 'Memuat...' : 'Cek Status'}
                             </button>
