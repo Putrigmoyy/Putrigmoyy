@@ -2,15 +2,20 @@ import 'server-only';
 
 import { timingSafeEqual } from 'node:crypto';
 import type { AdminPortalSnapshot } from '@/lib/admin-portal-types';
+import { getApkPremiumPricingSettings, updateApkPremiumPricingSettings } from '@/lib/apk-premium-pricing';
 import {
   addAdminApkVariantAccounts,
+  listAdminApkAccountsByVariant,
+  adminDeleteApkAccount,
+  adminUpdateApkAccount,
+  adminUpdateApkProduct,
   adminUpdateApkVariant,
   createAdminApkProduct,
   createAdminApkVariant,
   listAdminApkProducts,
   listAdminApkVariants,
 } from '@/lib/apk-premium-admin';
-import { adminUpdateCoreWalletUser, getCoreMinimumDeposit, listAdminCoreWalletUsers, updateCoreMinimumDeposit } from '@/lib/core-store';
+import { adminDeleteCoreWalletUser, adminUpdateCoreWalletUser, getCoreMinimumDeposit, listAdminCoreWalletUsers, updateCoreMinimumDeposit } from '@/lib/core-store';
 import { getSmmPricingSettings, updateSmmPricingSettings } from '@/lib/smm-pricing';
 
 export function resolveAdminPortalSecret() {
@@ -34,8 +39,9 @@ export function verifyAdminPortalSecret(candidate: string) {
 }
 
 export async function getAdminPortalSnapshot(): Promise<AdminPortalSnapshot> {
-  const [smmPricing, minimumDeposit, users, apkProducts, apkVariants] = await Promise.all([
+  const [smmPricing, apkPricing, minimumDeposit, users, apkProducts, apkVariants] = await Promise.all([
     getSmmPricingSettings(),
+    getApkPremiumPricingSettings(),
     getCoreMinimumDeposit(),
     listAdminCoreWalletUsers(),
     listAdminApkProducts(),
@@ -44,6 +50,7 @@ export async function getAdminPortalSnapshot(): Promise<AdminPortalSnapshot> {
 
   return {
     smmPricing,
+    apkPricing,
     minimumDeposit,
     users,
     apkProducts,
@@ -61,6 +68,10 @@ export async function saveAdminSmmPricing(input: { profitPercent: number }) {
   return updateSmmPricingSettings(input);
 }
 
+export async function saveAdminApkPricing(input: { adminFee: number }) {
+  return updateApkPremiumPricingSettings(input);
+}
+
 export async function saveAdminMinimumDeposit(input: { minimumDeposit: number }) {
   return updateCoreMinimumDeposit(input);
 }
@@ -75,6 +86,10 @@ export async function saveAdminUser(input: {
   return adminUpdateCoreWalletUser(input);
 }
 
+export async function deleteAdminUser(input: { currentUsername: string }) {
+  return adminDeleteCoreWalletUser(input);
+}
+
 export async function saveAdminApkVariant(input: {
   variantId: string;
   variantTitle?: string;
@@ -84,6 +99,19 @@ export async function saveAdminApkVariant(input: {
   badge?: string;
 }) {
   return adminUpdateApkVariant(input);
+}
+
+export async function saveAdminApkProductEdit(input: {
+  productId: string;
+  title?: string;
+  subtitle?: string;
+  category?: string;
+  delivery?: string;
+  note?: string;
+  guarantee?: string;
+  imageUrl?: string;
+}) {
+  return adminUpdateApkProduct(input);
 }
 
 export async function saveAdminApkProduct(input: {
@@ -114,4 +142,21 @@ export async function saveAdminApkAccounts(input: {
   adminNote?: string;
 }) {
   return addAdminApkVariantAccounts(input);
+}
+
+export async function getAdminApkAccounts(input: { variantId: string }) {
+  return listAdminApkAccountsByVariant(input.variantId);
+}
+
+export async function saveAdminApkAccountEdit(input: {
+  accountId: number;
+  accountData?: string;
+  adminNote?: string;
+  variantId?: string;
+}) {
+  return adminUpdateApkAccount(input);
+}
+
+export async function deleteAdminApkAccount(input: { accountId: number }) {
+  return adminDeleteApkAccount(input);
 }

@@ -1,6 +1,7 @@
 import { getAppDataSourceConfig } from '@/lib/data-sources';
 import { getNeonClient } from '@/lib/neon-clients';
 import { formatRupiah } from '@/lib/apk-premium';
+import { applyApkPremiumAdminFee, getApkPremiumPricingSettings } from '@/lib/apk-premium-pricing';
 import { getApkPremiumProductById } from '@/lib/apk-premium-store';
 import { assignApkAccountsToOrder, ensureApkAdminTables, getDeliveredApkAccounts } from '@/lib/apk-premium-admin';
 import type { AdminApkAccountRow } from '@/lib/admin-portal-types';
@@ -27,6 +28,8 @@ type ApkCheckoutBase = {
   quantity: number;
   unitPrice: number;
   unitPriceLabel: string;
+  adminFee: number;
+  adminFeeLabel: string;
   totalPrice: number;
   totalPriceLabel: string;
   paymentStatus: 'awaiting-payment' | 'paid';
@@ -61,6 +64,8 @@ type ApkOrderStatusSnapshot = {
   orderStatus: string;
   paymentStatus: string;
   paymentMethod: 'midtrans' | 'balance';
+  adminFee: number;
+  adminFeeLabel: string;
   totalPrice: number;
   totalPriceLabel: string;
   deliveredAccounts: AdminApkAccountRow[];
@@ -121,7 +126,10 @@ async function buildCheckoutCore(input: CheckoutInput) {
   }
 
   const unitPrice = variant.price;
-  const totalPrice = unitPrice * quantity;
+  const subtotal = unitPrice * quantity;
+  const pricing = await getApkPremiumPricingSettings();
+  const adminFee = pricing.adminFee;
+  const totalPrice = applyApkPremiumAdminFee(subtotal, adminFee);
   const orderCode = createOrderCode();
 
   return {
@@ -135,6 +143,7 @@ async function buildCheckoutCore(input: CheckoutInput) {
     paymentMethod,
     note,
     unitPrice,
+    adminFee,
     totalPrice,
   };
 }
@@ -152,6 +161,8 @@ export async function buildApkPremiumCheckoutPreview(input: CheckoutInput): Prom
     quantity: result.quantity,
     unitPrice: result.unitPrice,
     unitPriceLabel: formatRupiah(result.unitPrice),
+    adminFee: result.adminFee,
+    adminFeeLabel: formatRupiah(result.adminFee),
     totalPrice: result.totalPrice,
     totalPriceLabel: formatRupiah(result.totalPrice),
     paymentStatus: 'awaiting-payment',
@@ -229,6 +240,7 @@ async function releaseReservedApkAccounts(orderCode: string) {
 async function submitOrderToNeon(input: CheckoutInput): Promise<ApkSubmittedOrder> {
   await ensureApkAdminTables();
   const sql = getNeonClient('apk');
+  await sql`alter table apk_orders add column if not exists admin_fee integer not null default 0`;
   const result = await buildCheckoutCore(input);
   const usingBalance = result.paymentMethod === 'balance';
   const detailText = `Varian: ${result.variant.title}\nJumlah: ${result.quantity}\nKontak: ${result.customerContact || '-'}\nCatatan: ${result.note || '-'}`;
@@ -287,6 +299,7 @@ async function submitOrderToNeon(input: CheckoutInput): Promise<ApkSubmittedOrde
         customer_contact,
         quantity,
         unit_price,
+        admin_fee,
         total_price,
         order_note,
         order_status,
@@ -301,6 +314,7 @@ async function submitOrderToNeon(input: CheckoutInput): Promise<ApkSubmittedOrde
         ${result.customerContact},
         ${result.quantity},
         ${result.unitPrice},
+        ${result.adminFee},
         ${result.totalPrice},
         ${result.note},
         ${usingBalance ? 'paid' : 'pending'},
@@ -438,6 +452,8 @@ async function submitOrderToNeon(input: CheckoutInput): Promise<ApkSubmittedOrde
       quantity: result.quantity,
       unitPrice: result.unitPrice,
       unitPriceLabel: formatRupiah(result.unitPrice),
+      adminFee: result.adminFee,
+      adminFeeLabel: formatRupiah(result.adminFee),
       totalPrice: result.totalPrice,
       totalPriceLabel: formatRupiah(result.totalPrice),
       paymentStatus: usingBalance ? 'paid' : 'awaiting-payment',
@@ -517,6 +533,7 @@ type OrderRow = {
   quantity: number;
   order_status: string;
   payment_status: string;
+  admin_fee: number;
   total_price: number;
 };
 
@@ -546,6 +563,7 @@ export async function getApkPremiumOrderStatus(orderCode: string): Promise<ApkOr
   }
 
   const sql = getNeonClient('apk');
+  await sql`alter table apk_orders add column if not exists admin_fee integer not null default 0`;
   await sql`
     create table if not exists apk_order_payments (
       order_code text primary key references apk_orders(order_code) on delete cascade,
@@ -568,6 +586,7 @@ export async function getApkPremiumOrderStatus(orderCode: string): Promise<ApkOr
 
   const orderRows = (await sql`
     select order_code, product_title, variant_title, variant_id, quantity, order_status, payment_status, total_price
+      , admin_fee
     from apk_orders
     where order_code = ${normalizedOrderCode}
     limit 1
@@ -712,6 +731,8 @@ export async function getApkPremiumOrderStatus(orderCode: string): Promise<ApkOr
     paymentStatus: order.payment_status,
     paymentMethod: 'midtrans',
     totalPrice: Math.max(0, Number(order.total_price || 0)),
+    adminFee: Math.max(0, Number(order.admin_fee || 0)),
+    adminFeeLabel: formatRupiah(Math.max(0, Number(order.admin_fee || 0))),
     totalPriceLabel: formatRupiah(Math.max(0, Number(order.total_price || 0))),
     deliveredAccounts,
     qris: refreshedPayment

@@ -80,6 +80,26 @@ function cleanText(value: unknown, fallback = '') {
   return text || fallback;
 }
 
+function normalizeImageUrlInput(value: unknown) {
+  const raw = String(value || '')
+    .trim()
+    .replace(/^[\s"'“”‘’]+|[\s"'“”‘’]+$/g, '');
+
+  if (!raw) {
+    return '';
+  }
+
+  if (raw.startsWith('/')) {
+    return raw;
+  }
+
+  try {
+    return encodeURI(raw);
+  } catch {
+    return raw.replace(/\s+/g, '%20');
+  }
+}
+
 function normalizeAccent(value: unknown, index: number) {
   const source = String(value || '').trim();
   if (source === 'cyan' || source === 'amber' || source === 'emerald' || source === 'violet') {
@@ -479,7 +499,7 @@ export async function createAdminApkProduct(input: {
       id,
       title,
       subtitle,
-      image_url,
+      ${normalizeImageUrlInput(input.imageUrl)},
       category,
       stock,
       sold,
@@ -506,6 +526,70 @@ export async function createAdminApkProduct(input: {
       ${nextSort},
       ${true}
     )
+  `;
+
+  const products = await listAdminApkProducts();
+  return products.find((product) => product.productId === productId) || null;
+}
+
+export async function adminUpdateApkProduct(input: {
+  productId: string;
+  title?: string;
+  subtitle?: string;
+  category?: string;
+  delivery?: string;
+  note?: string;
+  guarantee?: string;
+  imageUrl?: string;
+}) {
+  await ensureApkAdminTables();
+  const productId = cleanText(input.productId);
+  if (!productId) {
+    throw new Error('Produk wajib dipilih.');
+  }
+
+  const sql = getNeonClient('apk');
+  const rows = (await sql`
+    select
+      id,
+      title,
+      subtitle,
+      category,
+      delivery,
+      note,
+      guarantee,
+      image_url
+    from apk_products
+    where id = ${productId}
+      and is_active = true
+    limit 1
+  `) as Array<{
+    id: string;
+    title: string;
+    subtitle: string;
+    category: string;
+    delivery: string;
+    note: string;
+    guarantee: string;
+    image_url: string | null;
+  }>;
+  const current = rows[0];
+  if (!current) {
+    throw new Error('Produk App Premium tidak ditemukan.');
+  }
+
+  await sql`
+    update apk_products
+    set
+      title = ${cleanText(input.title, current.title)},
+      subtitle = ${cleanText(input.subtitle, current.subtitle || 'Aplikasi premium siap order cepat.')},
+      category = ${cleanText(input.category, current.category || 'App Premium')},
+      delivery = ${cleanText(input.delivery, current.delivery || 'Auto kirim akun')},
+      note = ${cleanText(input.note, current.note || 'Detail produk mengikuti varian yang dipilih.')},
+      guarantee = ${cleanText(input.guarantee, current.guarantee || 'Garansi mengikuti ketentuan toko dan durasi varian.')},
+      image_url = ${normalizeImageUrlInput(input.imageUrl || current.image_url || '')},
+      updated_at = now()
+    where id = ${productId}
   `;
 
   const products = await listAdminApkProducts();
@@ -644,6 +728,141 @@ export async function addAdminApkVariantAccounts(input: {
     added: entries.length,
     accounts: await listAdminApkAccountsByVariant(variantId),
     variant: (await listAdminApkVariants()).find((item) => item.variantId === variantId) || null,
+  };
+}
+
+export async function adminUpdateApkAccount(input: {
+  accountId: number;
+  accountData?: string;
+  adminNote?: string;
+  variantId?: string;
+}) {
+  await ensureApkAdminTables();
+  const accountId = Math.trunc(Number(input.accountId || 0));
+  if (accountId <= 0) {
+    throw new Error('Data akun wajib dipilih.');
+  }
+
+  const sql = getNeonClient('apk');
+  const currentRows = (await sql`
+    select
+      account.id,
+      account.variant_id,
+      account.account_data,
+      account.admin_note,
+      account.delivery_status,
+      variant.product_id
+    from apk_variant_accounts account
+    inner join apk_product_variants variant
+      on variant.id = account.variant_id
+    where account.id = ${accountId}
+    limit 1
+  `) as Array<{
+    id: number;
+    variant_id: string;
+    account_data: string;
+    admin_note: string;
+    delivery_status: string;
+    product_id: string;
+  }>;
+  const current = currentRows[0];
+  if (!current) {
+    throw new Error('Data akun premium tidak ditemukan.');
+  }
+
+  const nextVariantId = cleanText(input.variantId, current.variant_id);
+  const nextAccountData = cleanText(input.accountData, current.account_data);
+  const nextAdminNote = cleanText(input.adminNote, current.admin_note);
+
+  if (!nextAccountData) {
+    throw new Error('Isi data akun tidak boleh kosong.');
+  }
+
+  let nextProductId = current.product_id;
+  if (nextVariantId !== current.variant_id) {
+    if (current.delivery_status !== 'available') {
+      throw new Error('Data akun yang sudah reserved atau delivered tidak bisa dipindahkan varian.');
+    }
+
+    const variantRows = (await sql`
+      select id, product_id
+      from apk_product_variants
+      where id = ${nextVariantId}
+        and is_active = true
+      limit 1
+    `) as Array<{
+      id: string;
+      product_id: string;
+    }>;
+    const targetVariant = variantRows[0];
+    if (!targetVariant) {
+      throw new Error('Varian tujuan tidak ditemukan.');
+    }
+    nextProductId = targetVariant.product_id;
+  }
+
+  await sql`
+    update apk_variant_accounts
+    set
+      variant_id = ${nextVariantId},
+      account_data = ${nextAccountData},
+      admin_note = ${nextAdminNote},
+      updated_at = now()
+    where id = ${accountId}
+  `;
+
+  await syncProductStock(current.product_id);
+  if (nextProductId !== current.product_id) {
+    await syncProductStock(nextProductId);
+  }
+
+  const accounts = await listAdminApkAccountsByVariant(nextVariantId);
+  return accounts.find((account) => account.id === accountId) || null;
+}
+
+export async function adminDeleteApkAccount(input: { accountId: number }) {
+  await ensureApkAdminTables();
+  const accountId = Math.trunc(Number(input.accountId || 0));
+  if (accountId <= 0) {
+    throw new Error('Data akun wajib dipilih.');
+  }
+
+  const sql = getNeonClient('apk');
+  const rows = (await sql`
+    select
+      account.id,
+      account.variant_id,
+      account.delivery_status,
+      variant.product_id
+    from apk_variant_accounts account
+    inner join apk_product_variants variant
+      on variant.id = account.variant_id
+    where account.id = ${accountId}
+    limit 1
+  `) as Array<{
+    id: number;
+    variant_id: string;
+    delivery_status: string;
+    product_id: string;
+  }>;
+  const current = rows[0];
+  if (!current) {
+    throw new Error('Data akun premium tidak ditemukan.');
+  }
+
+  if (current.delivery_status !== 'available') {
+    throw new Error('Data akun yang sudah reserved atau delivered tidak bisa dihapus.');
+  }
+
+  await sql`
+    delete from apk_variant_accounts
+    where id = ${accountId}
+  `;
+  await syncProductStock(current.product_id);
+
+  return {
+    deletedId: accountId,
+    variantId: current.variant_id,
   };
 }
 

@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  deleteAdminApkAccount,
+  deleteAdminUser,
+  getAdminApkAccounts,
   getAdminPortalSnapshot,
+  saveAdminApkAccountEdit,
+  saveAdminApkPricing,
   saveAdminApkAccounts,
   saveAdminApkCreateVariant,
+  saveAdminApkProductEdit,
   saveAdminApkProduct,
   saveAdminApkVariant,
   saveAdminMinimumDeposit,
@@ -77,6 +83,21 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    if (action === 'save-apk-pricing') {
+      const pricing = await saveAdminApkPricing({
+        adminFee: Number(body.adminFee || 0),
+      });
+      const snapshot = await getAdminPortalSnapshot();
+      return NextResponse.json({
+        status: true,
+        data: {
+          msg: 'Fee admin aplikasi premium berhasil disimpan.',
+          pricing,
+          snapshot,
+        },
+      });
+    }
+
     if (action === 'save-minimum-deposit') {
       const minimumDeposit = await saveAdminMinimumDeposit({
         minimumDeposit: Number(body.minimumDeposit || 0),
@@ -106,6 +127,43 @@ export async function POST(request: NextRequest) {
         data: {
           msg: 'Data user berhasil diperbarui.',
           user,
+          snapshot,
+        },
+      });
+    }
+
+    if (action === 'delete-user') {
+      const deleted = await deleteAdminUser({
+        currentUsername: String(body.currentUsername || '').trim(),
+      });
+      const snapshot = await getAdminPortalSnapshot();
+      return NextResponse.json({
+        status: true,
+        data: {
+          msg: 'Akun user berhasil dihapus.',
+          deleted,
+          snapshot,
+        },
+      });
+    }
+
+    if (action === 'save-apk-product') {
+      const product = await saveAdminApkProductEdit({
+        productId: String(body.productId || '').trim(),
+        title: String(body.title || '').trim(),
+        subtitle: String(body.subtitle || '').trim(),
+        category: String(body.category || '').trim(),
+        delivery: String(body.delivery || '').trim(),
+        note: String(body.note || '').trim(),
+        guarantee: String(body.guarantee || '').trim(),
+        imageUrl: String(body.imageUrl || '').trim(),
+      });
+      const snapshot = await getAdminPortalSnapshot();
+      return NextResponse.json({
+        status: true,
+        data: {
+          msg: 'Produk App Premium berhasil diperbarui.',
+          product,
           snapshot,
         },
       });
@@ -187,6 +245,51 @@ export async function POST(request: NextRequest) {
         data: {
           msg: 'Data akun berhasil ditambahkan ke stok App Premium.',
           accountStock,
+          snapshot,
+        },
+      });
+    }
+
+    if (action === 'get-apk-accounts') {
+      const accounts = await getAdminApkAccounts({
+        variantId: String(body.variantId || '').trim(),
+      });
+      return NextResponse.json({
+        status: true,
+        data: {
+          accounts,
+        },
+      });
+    }
+
+    if (action === 'save-apk-account') {
+      const account = await saveAdminApkAccountEdit({
+        accountId: Number(body.accountId || 0),
+        accountData: String(body.accountData || '').trim(),
+        adminNote: String(body.adminNote || '').trim(),
+        variantId: String(body.variantId || '').trim(),
+      });
+      const snapshot = await getAdminPortalSnapshot();
+      return NextResponse.json({
+        status: true,
+        data: {
+          msg: 'Data akun premium berhasil diperbarui.',
+          account,
+          snapshot,
+        },
+      });
+    }
+
+    if (action === 'delete-apk-account') {
+      const deleted = await deleteAdminApkAccount({
+        accountId: Number(body.accountId || 0),
+      });
+      const snapshot = await getAdminPortalSnapshot();
+      return NextResponse.json({
+        status: true,
+        data: {
+          msg: 'Data akun premium berhasil dihapus.',
+          deleted,
           snapshot,
         },
       });

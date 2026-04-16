@@ -2,6 +2,10 @@ export type AdminSmmPricingSettings = {
   profitPercent: number;
 };
 
+export type AdminApkPricingSettings = {
+  adminFee: number;
+};
+
 export type AdminCoreWalletUser = {
   id: number;
   name: string;
@@ -54,6 +58,7 @@ export type AdminApkAccountRow = {
 
 export type AdminPortalSnapshot = {
   smmPricing: AdminSmmPricingSettings;
+  apkPricing: AdminApkPricingSettings;
   minimumDeposit: number;
   users: AdminCoreWalletUser[];
   apkProducts: AdminApkProductRow[];

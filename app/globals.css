@@ -2420,6 +2420,21 @@ a {
   line-height: 1.55;
 }
 
+.admin-portal-image-preview {
+  overflow: hidden;
+  border: 1px solid rgba(23, 153, 242, 0.12);
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.admin-portal-image-preview img {
+  display: block;
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  background: linear-gradient(135deg, rgba(23, 153, 242, 0.08), rgba(210, 9, 209, 0.08));
+}
+
 .admin-portal-list {
   display: grid;
   gap: 10px;

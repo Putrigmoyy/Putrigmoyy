@@ -1296,3 +1296,41 @@ export async function adminUpdateCoreWalletUser(input: {
   const users = await listAdminCoreWalletUsers();
   return users.find((user) => user.username === finalUsername) || null;
 }
+
+export async function adminDeleteCoreWalletUser(input: { currentUsername: string }) {
+  if (!isCoreConfigured()) {
+    throw new Error('DATABASE_URL_CORE belum diisi.');
+  }
+
+  await ensureCoreTables();
+  const currentUsername = normalizeUsername(input.currentUsername);
+  if (!currentUsername) {
+    throw new Error('Username akun wajib dipilih.');
+  }
+
+  const row = await getWalletRow(currentUsername);
+  if (!row) {
+    throw new Error('Akun user tidak ditemukan.');
+  }
+
+  const resolvedCurrentUsername = resolveAccountKey(row) || currentUsername;
+  const sql = getNeonClient('core');
+
+  await sql`
+    delete from core_deposit_payments
+    where account_contact = ${resolvedCurrentUsername}
+  `;
+  await sql`
+    delete from core_transaction_history
+    where account_contact = ${resolvedCurrentUsername}
+  `;
+  await sql`
+    delete from core_wallet_accounts
+    where lower(username) = ${resolvedCurrentUsername}
+      or lower(contact) = ${resolvedCurrentUsername}
+  `;
+
+  return {
+    deletedUsername: resolvedCurrentUsername,
+  };
+}

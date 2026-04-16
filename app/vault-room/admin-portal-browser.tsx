@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { formatRupiah } from '@/lib/apk-premium';
-import type { AdminApkProductRow, AdminApkVariantRow, AdminPortalSnapshot } from '@/lib/admin-portal-types';
+import type { AdminApkAccountRow, AdminApkProductRow, AdminApkVariantRow, AdminPortalSnapshot } from '@/lib/admin-portal-types';
 import { ActionLoadingOverlay } from '@/app/components/action-loading-overlay';
 import { FloatingNotice } from '@/app/components/floating-notice';
 
@@ -41,6 +41,23 @@ function formatDateLabel(value: string) {
     .replace(/\./g, ':');
 }
 
+function normalizeImagePreviewUrl(value: string) {
+  const raw = String(value || '')
+    .trim()
+    .replace(/^[\s"'“”‘’]+|[\s"'“”‘’]+$/g, '');
+  if (!raw) {
+    return '';
+  }
+  if (raw.startsWith('/')) {
+    return raw;
+  }
+  try {
+    return encodeURI(raw);
+  } catch {
+    return raw.replace(/\s+/g, '%20');
+  }
+}
+
 export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [activeTab, setActiveTab] = useState<AdminTab>('smm');
@@ -48,6 +65,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
   const [isPending, startTransition] = useTransition();
 
   const [profitPercentDraft, setProfitPercentDraft] = useState(String(initialSnapshot.smmPricing.profitPercent));
+  const [apkAdminFeeDraft, setApkAdminFeeDraft] = useState(String(initialSnapshot.apkPricing.adminFee));
   const [minimumDepositDraft, setMinimumDepositDraft] = useState(String(initialSnapshot.minimumDeposit));
   const [userQuery, setUserQuery] = useState('');
   const [selectedUsername, setSelectedUsername] = useState(initialSnapshot.users[0]?.username || '');
@@ -58,6 +76,17 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     balanceDelta: '0',
   });
 
+  const [productQuery, setProductQuery] = useState('');
+  const [selectedProductId, setSelectedProductId] = useState(initialSnapshot.apkProducts[0]?.productId || '');
+  const [productForm, setProductForm] = useState({
+    title: initialSnapshot.apkProducts[0]?.title || '',
+    subtitle: initialSnapshot.apkProducts[0]?.subtitle || '',
+    category: initialSnapshot.apkProducts[0]?.category || 'App Premium',
+    delivery: initialSnapshot.apkProducts[0]?.delivery || 'Auto kirim akun',
+    note: initialSnapshot.apkProducts[0]?.note || '',
+    guarantee: initialSnapshot.apkProducts[0]?.guarantee || '',
+    imageUrl: initialSnapshot.apkProducts[0]?.imageUrl || '',
+  });
   const [variantQuery, setVariantQuery] = useState('');
   const [selectedVariantId, setSelectedVariantId] = useState(initialSnapshot.apkVariants[0]?.variantId || '');
   const [variantForm, setVariantForm] = useState({
@@ -85,6 +114,13 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     accountBatch: '',
     adminNote: '',
   });
+  const [variantAccounts, setVariantAccounts] = useState<AdminApkAccountRow[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState(0);
+  const [accountEditForm, setAccountEditForm] = useState({
+    variantId: initialSnapshot.apkVariants[0]?.variantId || '',
+    accountData: '',
+    adminNote: '',
+  });
 
   useEffect(() => {
     if (!notice?.text) {
@@ -110,6 +146,22 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     [filteredUsers, selectedUsername, snapshot.users],
   );
 
+  const filteredProducts = useMemo(() => {
+    const normalizedQuery = productQuery.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return snapshot.apkProducts;
+    }
+    return snapshot.apkProducts.filter((product) => {
+      const haystack = `${product.title} ${product.subtitle} ${product.category}`.toLowerCase();
+      return haystack.includes(normalizedQuery);
+    });
+  }, [productQuery, snapshot.apkProducts]);
+
+  const selectedProductEditor = useMemo<AdminApkProductRow | null>(
+    () => snapshot.apkProducts.find((product) => product.productId === selectedProductId) || filteredProducts[0] || null,
+    [filteredProducts, selectedProductId, snapshot.apkProducts],
+  );
+
   useEffect(() => {
     if (!selectedUser) {
       return;
@@ -122,6 +174,22 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
       balanceDelta: '0',
     });
   }, [selectedUser]);
+
+  useEffect(() => {
+    if (!selectedProductEditor) {
+      return;
+    }
+    setSelectedProductId(selectedProductEditor.productId);
+    setProductForm({
+      title: selectedProductEditor.title,
+      subtitle: selectedProductEditor.subtitle,
+      category: selectedProductEditor.category,
+      delivery: selectedProductEditor.delivery,
+      note: selectedProductEditor.note,
+      guarantee: selectedProductEditor.guarantee,
+      imageUrl: selectedProductEditor.imageUrl,
+    });
+  }, [selectedProductEditor]);
 
   const filteredVariants = useMemo(() => {
     const normalizedQuery = variantQuery.trim().toLowerCase();
@@ -185,6 +253,74 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
     }));
   }, [snapshot.apkVariants]);
 
+  async function fetchVariantAccounts(variantId: string) {
+    const response = await fetch('/api/admin/portal', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-secret': secret,
+      },
+      body: JSON.stringify({
+        action: 'get-apk-accounts',
+        variantId,
+      }),
+    });
+    const result = (await response.json()) as {
+      status?: boolean;
+      data?: {
+        accounts?: AdminApkAccountRow[];
+        msg?: string;
+      };
+    };
+
+    if (!response.ok || !result.status || !result.data?.accounts) {
+      throw new Error(result.data?.msg || 'Daftar akun premium belum bisa dimuat.');
+    }
+
+    setVariantAccounts(result.data.accounts);
+  }
+
+  useEffect(() => {
+    if (!accountStockForm.variantId) {
+      setVariantAccounts([]);
+      return;
+    }
+
+    startTransition(() => {
+      void fetchVariantAccounts(accountStockForm.variantId).catch((error) => {
+        setNotice({
+          tone: 'error',
+          text: error instanceof Error ? error.message : 'Daftar akun premium belum bisa dimuat.',
+        });
+      });
+    });
+  }, [accountStockForm.variantId, secret]);
+
+  const selectedAccount = useMemo(
+    () => variantAccounts.find((account) => account.id === selectedAccountId) || variantAccounts[0] || null,
+    [selectedAccountId, variantAccounts],
+  );
+
+  useEffect(() => {
+    if (!selectedAccount) {
+      setSelectedAccountId(0);
+      setAccountEditForm((current) => ({
+        ...current,
+        variantId: accountStockForm.variantId,
+        accountData: '',
+        adminNote: '',
+      }));
+      return;
+    }
+
+    setSelectedAccountId(selectedAccount.id);
+    setAccountEditForm({
+      variantId: selectedAccount.variantId,
+      accountData: selectedAccount.accountData,
+      adminNote: selectedAccount.adminNote,
+    });
+  }, [accountStockForm.variantId, selectedAccount]);
+
   async function fetchSnapshot() {
     const response = await fetch('/api/admin/portal', {
       method: 'GET',
@@ -206,6 +342,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
 
     setSnapshot(result.data);
     setProfitPercentDraft(String(result.data.smmPricing.profitPercent));
+    setApkAdminFeeDraft(String(result.data.apkPricing.adminFee));
     setMinimumDepositDraft(String(result.data.minimumDeposit));
   }
 
@@ -414,11 +551,70 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                 </article>
 
                 <article className="account-popup-card">
+                  <span className="smm-profile-title">Fee admin App Premium</span>
+                  <div className="apk-app-form-grid smm-profile-form-grid">
+                    <label className="apk-app-form-field">
+                      <span>Fee admin QRIS premium</span>
+                      <input
+                        value={apkAdminFeeDraft}
+                        onChange={(event) => setApkAdminFeeDraft(event.target.value.replace(/[^\d]/g, ''))}
+                        inputMode="numeric"
+                        placeholder="contoh: 1000"
+                      />
+                    </label>
+                  </div>
+                  <div className="admin-portal-preview-card">
+                    <p>Fee aktif sekarang : Rp {formatRupiah(snapshot.apkPricing.adminFee)}</p>
+                    <p>Fee ini otomatis ditambahkan ke total order aplikasi premium di website.</p>
+                  </div>
+                  <div className="apk-app-action-row apk-app-action-row--compact">
+                    <button
+                      type="button"
+                      className="apk-app-primary-button"
+                      onClick={() =>
+                        runAction(async () => {
+                          const response = await fetch('/api/admin/portal', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'x-admin-secret': secret,
+                            },
+                            body: JSON.stringify({
+                              action: 'save-apk-pricing',
+                              adminFee: Number(apkAdminFeeDraft || 0),
+                            }),
+                          });
+                          const result = (await response.json()) as {
+                            status?: boolean;
+                            data?: {
+                              msg?: string;
+                              snapshot?: AdminPortalSnapshot;
+                            };
+                          };
+                          if (!response.ok || !result.status || !result.data?.snapshot) {
+                            throw new Error(result.data?.msg || 'Fee admin aplikasi premium belum bisa disimpan.');
+                          }
+                          setSnapshot(result.data.snapshot);
+                          setApkAdminFeeDraft(String(result.data.snapshot.apkPricing.adminFee));
+                          setNotice({
+                            tone: 'success',
+                            text: result.data.msg || 'Fee admin aplikasi premium berhasil disimpan.',
+                          });
+                        })
+                      }
+                    >
+                      Simpan Fee Premium
+                    </button>
+                  </div>
+                </article>
+
+                <article className="account-popup-card">
                   <span className="smm-profile-title">Keterangan</span>
                   <div className="smm-profile-lines">
                     <p>Perubahan ini langsung memengaruhi harga yang tampil di menu sosial media website.</p>
                     <p>Profit disimpan sebagai persentase di atas harga provider, lalu total order dihitung ulang otomatis saat checkout.</p>
                     <p>Backend checkout juga ikut memvalidasi ulang harga supaya tidak bisa dimanipulasi dari luar.</p>
+                    <p>Fee admin premium dipakai khusus di mode aplikasi premium untuk total bayar QRIS.</p>
                   </div>
                 </article>
               </div>
@@ -560,6 +756,47 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                         >
                           Simpan User
                         </button>
+                        <button
+                          type="button"
+                          className="apk-app-secondary-button"
+                          onClick={() =>
+                            runAction(async () => {
+                              if (!window.confirm(`Hapus akun @${selectedUser.username}? Riwayat dan deposit user ini juga akan ikut terhapus.`)) {
+                                return;
+                              }
+
+                              const response = await fetch('/api/admin/portal', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'x-admin-secret': secret,
+                                },
+                                body: JSON.stringify({
+                                  action: 'delete-user',
+                                  currentUsername: selectedUser.username,
+                                }),
+                              });
+                              const result = (await response.json()) as {
+                                status?: boolean;
+                                data?: {
+                                  msg?: string;
+                                  snapshot?: AdminPortalSnapshot;
+                                };
+                              };
+                              if (!response.ok || !result.status || !result.data?.snapshot) {
+                                throw new Error(result.data?.msg || 'Akun user belum bisa dihapus.');
+                              }
+                              setSnapshot(result.data.snapshot);
+                              setSelectedUsername(result.data.snapshot.users[0]?.username || '');
+                              setNotice({
+                                tone: 'success',
+                                text: result.data.msg || 'Akun user berhasil dihapus.',
+                              });
+                            })
+                          }
+                        >
+                          Hapus User
+                        </button>
                       </div>
                     </>
                   ) : (
@@ -616,6 +853,11 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                       />
                     </label>
                   </div>
+                  {normalizeImagePreviewUrl(newProductForm.imageUrl) ? (
+                    <div className="admin-portal-image-preview">
+                      <img src={normalizeImagePreviewUrl(newProductForm.imageUrl)} alt="Preview produk baru" />
+                    </div>
+                  ) : null}
                   <div className="apk-app-action-row apk-app-action-row--compact">
                     <button
                       type="button"
@@ -651,6 +893,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                           const createdProductId = result.data.product?.productId || '';
                           setSnapshot(nextSnapshot);
                           if (createdProductId) {
+                            setSelectedProductId(createdProductId);
                             setNewVariantForm((current) => ({ ...current, productId: createdProductId || current.productId }));
                           }
                           setNewProductForm({
@@ -854,6 +1097,7 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                             throw new Error(result.data?.msg || 'Data akun belum bisa ditambahkan.');
                           }
                           setSnapshot(result.data.snapshot);
+                          await fetchVariantAccounts(accountStockForm.variantId);
                           setAccountStockForm((current) => ({
                             ...current,
                             accountBatch: '',
@@ -869,6 +1113,166 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                       Simpan Data Akun
                     </button>
                   </div>
+                </article>
+              </div>
+
+              <div className="admin-portal-split">
+                <article className="account-popup-card">
+                  <label className="apk-app-form-field">
+                    <span>Cari produk premium</span>
+                    <input
+                      value={productQuery}
+                      onChange={(event) => setProductQuery(event.target.value)}
+                      placeholder="Cari nama produk atau kategori"
+                    />
+                  </label>
+
+                  <div className="admin-portal-list">
+                    {filteredProducts.length ? (
+                      filteredProducts.map((product) => (
+                        <button
+                          key={product.productId}
+                          type="button"
+                          className={selectedProductId === product.productId ? 'admin-portal-list-item admin-portal-list-item--active' : 'admin-portal-list-item'}
+                          onClick={() => setSelectedProductId(product.productId)}
+                        >
+                          <strong>{product.title}</strong>
+                          <span>{product.category}</span>
+                          <small>Stok {product.stock.toLocaleString('id-ID')} • Terjual {product.sold.toLocaleString('id-ID')}</small>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="apk-app-empty">Produk premium yang kamu cari belum ditemukan.</div>
+                    )}
+                  </div>
+                </article>
+
+                <article className="account-popup-card">
+                  {selectedProductEditor ? (
+                    <>
+                      <span className="smm-profile-title">Editor produk</span>
+                      <div className="smm-profile-lines">
+                        <p>Produk aktif : {selectedProductEditor.title}</p>
+                        <p>Stok real : {selectedProductEditor.stock.toLocaleString('id-ID')}</p>
+                        <p>Terjual real : {selectedProductEditor.sold.toLocaleString('id-ID')}</p>
+                      </div>
+
+                      <div className="apk-app-form-grid smm-profile-form-grid">
+                        <label className="apk-app-form-field">
+                          <span>Nama produk</span>
+                          <input
+                            value={productForm.title}
+                            onChange={(event) => setProductForm((current) => ({ ...current, title: event.target.value }))}
+                            placeholder="Nama produk"
+                          />
+                        </label>
+                        <label className="apk-app-form-field">
+                          <span>Subtitle</span>
+                          <input
+                            value={productForm.subtitle}
+                            onChange={(event) => setProductForm((current) => ({ ...current, subtitle: event.target.value }))}
+                            placeholder="Deskripsi singkat"
+                          />
+                        </label>
+                        <label className="apk-app-form-field">
+                          <span>Kategori</span>
+                          <input
+                            value={productForm.category}
+                            onChange={(event) => setProductForm((current) => ({ ...current, category: event.target.value }))}
+                            placeholder="Kategori"
+                          />
+                        </label>
+                        <label className="apk-app-form-field">
+                          <span>Pengiriman</span>
+                          <input
+                            value={productForm.delivery}
+                            onChange={(event) => setProductForm((current) => ({ ...current, delivery: event.target.value }))}
+                            placeholder="Auto kirim akun"
+                          />
+                        </label>
+                        <label className="apk-app-form-field apk-app-form-field--full">
+                          <span>Link gambar</span>
+                          <input
+                            value={productForm.imageUrl}
+                            onChange={(event) => setProductForm((current) => ({ ...current, imageUrl: event.target.value }))}
+                            placeholder="https://... atau /premium-icons/..."
+                          />
+                        </label>
+                        <label className="apk-app-form-field apk-app-form-field--full">
+                          <span>Catatan produk</span>
+                          <textarea
+                            value={productForm.note}
+                            onChange={(event) => setProductForm((current) => ({ ...current, note: event.target.value }))}
+                            rows={4}
+                            placeholder="Catatan produk"
+                          />
+                        </label>
+                        <label className="apk-app-form-field apk-app-form-field--full">
+                          <span>Garansi</span>
+                          <textarea
+                            value={productForm.guarantee}
+                            onChange={(event) => setProductForm((current) => ({ ...current, guarantee: event.target.value }))}
+                            rows={3}
+                            placeholder="Ketentuan garansi"
+                          />
+                        </label>
+                      </div>
+
+                      {normalizeImagePreviewUrl(productForm.imageUrl) ? (
+                        <div className="admin-portal-image-preview">
+                          <img src={normalizeImagePreviewUrl(productForm.imageUrl)} alt={`Preview ${productForm.title || selectedProductEditor.title}`} />
+                        </div>
+                      ) : null}
+
+                      <div className="apk-app-action-row apk-app-action-row--compact">
+                        <button
+                          type="button"
+                          className="apk-app-primary-button"
+                          onClick={() =>
+                            runAction(async () => {
+                              const response = await fetch('/api/admin/portal', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'x-admin-secret': secret,
+                                },
+                                body: JSON.stringify({
+                                  action: 'save-apk-product',
+                                  productId: selectedProductEditor.productId,
+                                  title: productForm.title,
+                                  subtitle: productForm.subtitle,
+                                  category: productForm.category,
+                                  delivery: productForm.delivery,
+                                  note: productForm.note,
+                                  guarantee: productForm.guarantee,
+                                  imageUrl: productForm.imageUrl,
+                                }),
+                              });
+                              const result = (await response.json()) as {
+                                status?: boolean;
+                                data?: {
+                                  msg?: string;
+                                  snapshot?: AdminPortalSnapshot;
+                                };
+                              };
+                              if (!response.ok || !result.status || !result.data?.snapshot) {
+                                throw new Error(result.data?.msg || 'Produk App Premium belum bisa diperbarui.');
+                              }
+                              setSnapshot(result.data.snapshot);
+                              setNotice({
+                                tone: 'success',
+                                text: result.data.msg || 'Produk App Premium berhasil diperbarui.',
+                              });
+                            })
+                          }
+                        >
+                          Simpan Produk
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="apk-app-empty">Belum ada produk premium untuk diedit.</div>
+                  )}
                 </article>
               </div>
 
@@ -942,15 +1346,6 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                           />
                         </label>
                         <label className="apk-app-form-field">
-                          <span>Tambah stok</span>
-                          <input
-                            value={variantForm.stockDelta}
-                            onChange={(event) => setVariantForm((current) => ({ ...current, stockDelta: event.target.value.replace(/[^\d-]/g, '') }))}
-                            inputMode="numeric"
-                            placeholder="contoh: 5 atau -1"
-                          />
-                        </label>
-                        <label className="apk-app-form-field">
                           <span>Badge</span>
                           <input
                             value={variantForm.badge}
@@ -978,7 +1373,6 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                                   variantTitle: variantForm.variantTitle,
                                   duration: variantForm.duration,
                                   price: Number(variantForm.price || 0),
-                                  stockDelta: Number(variantForm.stockDelta || 0),
                                   badge: variantForm.badge,
                                 }),
                               });
@@ -1006,6 +1400,173 @@ export function AdminPortalBrowser({ initialSnapshot, secret }: Props) {
                     </>
                   ) : (
                     <div className="apk-app-empty">Belum ada varian premium untuk dikelola.</div>
+                  )}
+                </article>
+              </div>
+
+              <div className="admin-portal-split">
+                <article className="account-popup-card">
+                  <div className="smm-profile-lines">
+                    <p>Kelola akun varian : {selectedAccountVariant?.variantTitle || '-'}</p>
+                    <p>Pilih akun di bawah untuk edit, pindah varian, atau hapus data akun yang masih available.</p>
+                  </div>
+
+                  <div className="admin-portal-list">
+                    {variantAccounts.length ? (
+                      variantAccounts.map((account) => (
+                        <button
+                          key={account.id}
+                          type="button"
+                          className={selectedAccountId === account.id ? 'admin-portal-list-item admin-portal-list-item--active' : 'admin-portal-list-item'}
+                          onClick={() => setSelectedAccountId(account.id)}
+                        >
+                          <strong>#{account.id} • {account.deliveryStatus}</strong>
+                          <span>{account.accountData}</span>
+                          <small>{account.adminNote || 'Tanpa catatan admin'}</small>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="apk-app-empty">Belum ada data akun pada varian ini.</div>
+                    )}
+                  </div>
+                </article>
+
+                <article className="account-popup-card">
+                  {selectedAccount ? (
+                    <>
+                      <span className="smm-profile-title">Editor data akun</span>
+                      <div className="smm-profile-lines">
+                        <p>ID akun : #{selectedAccount.id}</p>
+                        <p>Status : {selectedAccount.deliveryStatus}</p>
+                        <p>Assigned order : {selectedAccount.assignedOrderCode || '-'}</p>
+                      </div>
+
+                      <div className="apk-app-form-grid smm-profile-form-grid">
+                        <label className="apk-app-form-field">
+                          <span>Pindah ke varian</span>
+                          <select
+                            value={accountEditForm.variantId}
+                            onChange={(event) => setAccountEditForm((current) => ({ ...current, variantId: event.target.value }))}
+                            className="smm-select"
+                          >
+                            {snapshot.apkVariants.map((variant) => (
+                              <option key={variant.variantId} value={variant.variantId}>
+                                {variant.productTitle} - {variant.variantTitle}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="apk-app-form-field apk-app-form-field--full">
+                          <span>Data akun</span>
+                          <textarea
+                            value={accountEditForm.accountData}
+                            onChange={(event) => setAccountEditForm((current) => ({ ...current, accountData: event.target.value }))}
+                            rows={4}
+                            placeholder="Isi data akun"
+                          />
+                        </label>
+                        <label className="apk-app-form-field apk-app-form-field--full">
+                          <span>Catatan admin</span>
+                          <textarea
+                            value={accountEditForm.adminNote}
+                            onChange={(event) => setAccountEditForm((current) => ({ ...current, adminNote: event.target.value }))}
+                            rows={3}
+                            placeholder="Catatan admin"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="apk-app-action-row apk-app-action-row--compact">
+                        <button
+                          type="button"
+                          className="apk-app-primary-button"
+                          onClick={() =>
+                            runAction(async () => {
+                              const response = await fetch('/api/admin/portal', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'x-admin-secret': secret,
+                                },
+                                body: JSON.stringify({
+                                  action: 'save-apk-account',
+                                  accountId: selectedAccount.id,
+                                  variantId: accountEditForm.variantId,
+                                  accountData: accountEditForm.accountData,
+                                  adminNote: accountEditForm.adminNote,
+                                }),
+                              });
+                              const result = (await response.json()) as {
+                                status?: boolean;
+                                data?: {
+                                  msg?: string;
+                                  snapshot?: AdminPortalSnapshot;
+                                };
+                              };
+                              if (!response.ok || !result.status || !result.data?.snapshot) {
+                                throw new Error(result.data?.msg || 'Data akun premium belum bisa diperbarui.');
+                              }
+                              setSnapshot(result.data.snapshot);
+                              setAccountStockForm((current) => ({
+                                ...current,
+                                variantId: accountEditForm.variantId,
+                              }));
+                              await fetchVariantAccounts(accountEditForm.variantId);
+                              setNotice({
+                                tone: 'success',
+                                text: result.data.msg || 'Data akun premium berhasil diperbarui.',
+                              });
+                            })
+                          }
+                        >
+                          Simpan Data Akun
+                        </button>
+                        <button
+                          type="button"
+                          className="apk-app-secondary-button"
+                          onClick={() =>
+                            runAction(async () => {
+                              if (!window.confirm(`Hapus data akun #${selectedAccount.id}?`)) {
+                                return;
+                              }
+
+                              const response = await fetch('/api/admin/portal', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'x-admin-secret': secret,
+                                },
+                                body: JSON.stringify({
+                                  action: 'delete-apk-account',
+                                  accountId: selectedAccount.id,
+                                }),
+                              });
+                              const result = (await response.json()) as {
+                                status?: boolean;
+                                data?: {
+                                  msg?: string;
+                                  snapshot?: AdminPortalSnapshot;
+                                };
+                              };
+                              if (!response.ok || !result.status || !result.data?.snapshot) {
+                                throw new Error(result.data?.msg || 'Data akun premium belum bisa dihapus.');
+                              }
+                              setSnapshot(result.data.snapshot);
+                              await fetchVariantAccounts(accountStockForm.variantId);
+                              setSelectedAccountId(0);
+                              setNotice({
+                                tone: 'success',
+                                text: result.data.msg || 'Data akun premium berhasil dihapus.',
+                              });
+                            })
+                          }
+                        >
+                          Hapus Data Akun
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="apk-app-empty">Pilih salah satu data akun untuk mulai mengedit.</div>
                   )}
                 </article>
               </div>

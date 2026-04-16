@@ -12,6 +12,7 @@ type Props = {
   products: ApkPremiumProduct[];
   categories: string[];
   minimumDeposit: number;
+  adminFee: number;
   requestedTab?: string | null;
 };
 
@@ -89,6 +90,8 @@ type AppremQrisState = {
   productTitle: string;
   variantTitle: string;
   quantity: number;
+  adminFee: number;
+  adminFeeLabel: string;
   totalPriceLabel: string;
   orderStatus: string;
   paymentStatus: string;
@@ -138,8 +141,25 @@ const productArtwork: Record<string, string> = {
   chatgpt: '/premium-icons/chatgpt.jpg',
 };
 
+function normalizeArtworkUrl(value: string | undefined) {
+  const raw = String(value || '')
+    .trim()
+    .replace(/^[\s"'“”‘’]+|[\s"'“”‘’]+$/g, '');
+  if (!raw) {
+    return '';
+  }
+  if (raw.startsWith('/')) {
+    return raw;
+  }
+  try {
+    return encodeURI(raw);
+  } catch {
+    return raw.replace(/\s+/g, '%20');
+  }
+}
+
 function getProductArtwork(product: ApkPremiumProduct) {
-  return product.imageUrl || productArtwork[product.id] || '/dashboard-apk-premium.svg';
+  return normalizeArtworkUrl(product.imageUrl) || productArtwork[product.id] || '/dashboard-apk-premium.svg';
 }
 
 function getLowestPrice(product: ApkPremiumProduct) {
@@ -336,7 +356,7 @@ function NavGlyph({ type }: { type: PremiumTab }) {
   );
 }
 
-export function ApkPremiumBrowser({ products, categories, minimumDeposit, requestedTab }: Props) {
+export function ApkPremiumBrowser({ products, categories, minimumDeposit, adminFee, requestedTab }: Props) {
   const quickDepositAmounts = buildQuickDepositAmounts(minimumDeposit);
   const [activeTab, setActiveTab] = useState<PremiumTab>('apprem');
   const [query, setQuery] = useState('');
@@ -552,7 +572,9 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
   };
 
   const selectedQuantity = Math.max(1, Number(checkoutForm.quantity || 1));
-  const selectedTotal = selectedVariant ? selectedVariant.price * selectedQuantity : 0;
+  const selectedSubtotal = selectedVariant ? selectedVariant.price * selectedQuantity : 0;
+  const selectedAdminFee = Math.max(0, Number(adminFee || 0));
+  const selectedTotal = selectedVariant ? selectedSubtotal + selectedAdminFee : 0;
   const normalizedDepositAmount = Math.max(0, Number(depositAmount.replace(/[^\d]/g, '') || 0));
   const depositLocked = !walletProfile.registered || !walletProfile.loggedIn;
   const appremHistoryEntries = historyEntries.filter((entry) => {
@@ -772,6 +794,8 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
             productTitle?: string;
             variantTitle?: string;
             quantity?: number;
+            adminFee?: number;
+            adminFeeLabel?: string;
             totalPriceLabel?: string;
             nextStep?: string;
             orderStatus?: 'pending' | 'paid';
@@ -801,6 +825,8 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
           productTitle: String(result.data.productTitle || selectedProduct.title),
           variantTitle: String(result.data.variantTitle || selectedVariant.title),
           quantity: Math.max(1, Number(result.data.quantity || checkoutForm.quantity || 1)),
+          adminFee: Math.max(0, Number(result.data.adminFee || selectedAdminFee)),
+          adminFeeLabel: String(result.data.adminFeeLabel || formatRupiah(selectedAdminFee)),
           totalPriceLabel: String(result.data.totalPriceLabel || ''),
           orderStatus: String(result.data.orderStatus || 'pending'),
           paymentStatus: String(result.data.paymentStatus || 'awaiting-payment'),
@@ -1450,6 +1476,11 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
                       <span>Total Bayar Saat Ini</span>
                       <strong>Rp {formatRupiah(selectedTotal)}</strong>
                     </div>
+                    {selectedVariant && selectedAdminFee > 0 ? (
+                      <div className="apk-app-inline-helper">
+                        Sudah termasuk fee admin QRIS Rp {formatRupiah(selectedAdminFee)}.
+                      </div>
+                    ) : null}
 
                     {showPendingQris ? (
                       <div className="apk-app-qris-shell">
@@ -1498,6 +1529,9 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
                           <p>Produk : {activeQrisOrder?.productTitle || selectedProduct.title}</p>
                           <p>Varian : {activeQrisOrder?.variantTitle || selectedVariant.title}</p>
                           <p>Jumlah : {activeQrisOrder?.quantity || selectedQuantity}</p>
+                          {(activeQrisOrder?.adminFee || selectedAdminFee) > 0 ? (
+                            <p>Fee admin : Rp {activeQrisOrder?.adminFeeLabel || formatRupiah(selectedAdminFee)}</p>
+                          ) : null}
                           <p>Total : Rp {activeQrisOrder?.totalPriceLabel || formatRupiah(selectedTotal)}</p>
                         </div>
 
@@ -1520,6 +1554,9 @@ export function ApkPremiumBrowser({ products, categories, minimumDeposit, reques
                           <p>Produk : {activeQrisOrder?.productTitle || selectedProduct.title}</p>
                           <p>Varian : {activeQrisOrder?.variantTitle || selectedVariant.title}</p>
                           <p>Jumlah : {activeQrisOrder?.quantity || selectedQuantity}</p>
+                          {(activeQrisOrder?.adminFee || selectedAdminFee) > 0 ? (
+                            <p>Fee admin : Rp {activeQrisOrder?.adminFeeLabel || formatRupiah(selectedAdminFee)}</p>
+                          ) : null}
                           <p>Total : Rp {activeQrisOrder?.totalPriceLabel || formatRupiah(selectedTotal)}</p>
                         </div>
 
