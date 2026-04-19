@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "putri-temp-mail-inbound",
+  "main": "src/index.js",
+  "compatibility_date": "2026-04-19",
+  "vars": {
+    "TEMP_MAIL_INBOUND_URL": "https://putrigmoyy.vercel.app/api/temp-mail/inbound",
+    "TEMP_MAIL_ALLOWED_DOMAINS": "mail.putrigmoyy.com",
+    "TEMP_MAIL_DEBUG": "false"
+  }
+}

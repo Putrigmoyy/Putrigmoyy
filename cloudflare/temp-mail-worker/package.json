@@ -1,0 +1,12 @@
+{
+  "name": "putri-temp-mail-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.11.1"
+  }
+}

@@ -6,3 +6,5 @@ tsconfig.tsbuildinfo
 *.log
 
 .vercel
+.wrangler
+.vercel-temp*.env
