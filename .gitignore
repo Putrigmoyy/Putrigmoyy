@@ -8,3 +8,4 @@ tsconfig.tsbuildinfo
 .vercel
 .wrangler
 .vercel-temp*.env
+worker-configuration.d.ts
