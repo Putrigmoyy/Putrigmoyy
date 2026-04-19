@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { neon } from '@neondatabase/serverless';
 import { getAppDataSourceConfig } from '@/lib/data-sources';
+import {
+  getExternalProviderBaseUrl,
+  getExternalProviderDefaultDomain,
+  getExternalProviderLabel,
+  getExternalProviderMode,
+} from '@/lib/temp-mail-external';
 import type {
   TempMailConfigSnapshot,
   TempMailEmailDetail,
@@ -139,24 +145,34 @@ export function getTempMailAccessPath() {
 }
 
 export function getTempMailConfigSnapshot(): TempMailConfigSnapshot {
+  const providerMode = getExternalProviderMode();
   const domains = getTempMailDomains();
+  const externalEnabled = providerMode === 'external';
+  const externalDomain = getExternalProviderDefaultDomain();
+  const visibleDomains = domains.length > 0 ? domains : externalEnabled && externalDomain ? [externalDomain] : [];
   const setupChecklist = {
     database: Boolean(getTempMailDatabaseUrl()),
-    domains: domains.length > 0,
+    domains: visibleDomains.length > 0,
     inboundSecret: Boolean(getTempMailInboundSecret()),
     cronSecret: Boolean(getTempMailCronSecret()),
   };
+  const localCoreReady = Boolean(getTempMailDatabaseUrl()) && domains.length > 0;
 
   return {
-    primaryDomain: domains[0] ?? '',
-    domains,
+    primaryDomain: visibleDomains[0] ?? '',
+    domains: visibleDomains,
     retentionHours: TEMP_MAIL_RETENTION_HOURS,
-    coreReady: setupChecklist.database && setupChecklist.domains,
-    operationalReady:
-      setupChecklist.database &&
-      setupChecklist.domains &&
-      setupChecklist.inboundSecret,
+    dashboardReady: externalEnabled || localCoreReady,
+    coreReady: localCoreReady,
+    operationalReady: externalEnabled || (localCoreReady && setupChecklist.inboundSecret),
     privateModeEnabled: Boolean(getTempMailPrivateKey()),
+    providerMode,
+    externalProvider: {
+      enabled: externalEnabled,
+      provider: getExternalProviderLabel(),
+      baseUrl: getExternalProviderBaseUrl(),
+      defaultDomain: externalDomain,
+    },
     setupChecklist,
   };
 }

@@ -5,13 +5,25 @@ export type TempMailSetupChecklist = {
   cronSecret: boolean;
 };
 
+export type TempMailProviderMode = 'local' | 'external';
+
+export type TempMailExternalProviderSnapshot = {
+  enabled: boolean;
+  provider: string;
+  baseUrl: string;
+  defaultDomain: string;
+};
+
 export type TempMailConfigSnapshot = {
   primaryDomain: string;
   domains: string[];
   retentionHours: number;
+  dashboardReady: boolean;
   coreReady: boolean;
   operationalReady: boolean;
   privateModeEnabled: boolean;
+  providerMode: TempMailProviderMode;
+  externalProvider: TempMailExternalProviderSnapshot;
   setupChecklist: TempMailSetupChecklist;
 };
 

@@ -4,6 +4,8 @@ import { useDeferredValue, useEffect, useEffectEvent, useRef, useState, useTrans
 import styles from '@/app/temp-mail/temp-mail.module.css';
 import type {
   TempMailConfigSnapshot,
+  TempMailEmailDetail,
+  TempMailEmailSummary,
   TempMailInboxDetailPayload,
   TempMailInboxListPayload,
   TempMailInboxSummary,
@@ -174,6 +176,62 @@ function SectionEmpty({ title, text }: { title: string; text: string }) {
   );
 }
 
+const EXTERNAL_INBOX_STORAGE_KEY = 'putri-temp-mail-external-inboxes-v1';
+
+function normalizeLocalPart(value: string) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[^a-z0-9._-]/g, '');
+}
+
+function randomLocalPart() {
+  const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let value = 'putri';
+
+  for (let index = 0; index < 7; index += 1) {
+    value += characters[Math.floor(Math.random() * characters.length)];
+  }
+
+  return value;
+}
+
+function loadExternalInboxes() {
+  if (typeof window === 'undefined') {
+    return [] as TempMailInboxSummary[];
+  }
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(EXTERNAL_INBOX_STORAGE_KEY) || '[]') as TempMailInboxSummary[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [] as TempMailInboxSummary[];
+  }
+}
+
+function saveExternalInboxes(inboxes: TempMailInboxSummary[]) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(EXTERNAL_INBOX_STORAGE_KEY, JSON.stringify(inboxes));
+}
+
+function upsertExternalInbox(inbox: TempMailInboxSummary) {
+  const next = [...loadExternalInboxes().filter((item) => item.id !== inbox.id), inbox].sort((left, right) =>
+    right.createdAt.localeCompare(left.createdAt),
+  );
+  saveExternalInboxes(next);
+  return next;
+}
+
+function removeExternalInbox(inboxId: string) {
+  const next = loadExternalInboxes().filter((item) => item.id !== inboxId);
+  saveExternalInboxes(next);
+  return next;
+}
+
 export function TempMailBrowser({ initialConfig }: Props) {
   const [config, setConfig] = useState(initialConfig);
   const [inboxes, setInboxes] = useState<TempMailInboxSummary[]>([]);
@@ -186,7 +244,7 @@ export function TempMailBrowser({ initialConfig }: Props) {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [isBooting, setIsBooting] = useState(initialConfig.coreReady);
+  const [isBooting, setIsBooting] = useState(initialConfig.dashboardReady);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<'text' | 'html'>('text');
@@ -195,6 +253,7 @@ export function TempMailBrowser({ initialConfig }: Props) {
   const [isPending, startTransition] = useTransition();
   const deferredSearch = useDeferredValue(searchDraft);
   const inboxPanelRef = useRef<HTMLElement | null>(null);
+  const externalMode = config.providerMode === 'external' && config.externalProvider.enabled;
 
   const activeDomain = config.domains.includes(domainDraft) ? domainDraft : config.primaryDomain;
   const selectedEmail = detail?.selectedEmail || null;
@@ -215,12 +274,104 @@ export function TempMailBrowser({ initialConfig }: Props) {
   const currentAddress = detail?.inbox.emailAddress || '';
   const previewAddress = currentAddress || (activeDomain ? `random@${activeDomain}` : 'domain-belum-aktif');
 
+  async function refreshExternalDashboard(override?: {
+    inboxId?: string | null;
+    messageId?: string | null;
+  }) {
+    const storedInboxes = loadExternalInboxes();
+    setInboxes(storedInboxes);
+
+    try {
+      const retention = await readJson<{ seconds: number; hours: number; updatedAt: string | null }>(
+        await fetch('/api/temp-mail/external/retention', {
+          cache: 'no-store',
+        }),
+      );
+
+      setConfig((current) => ({
+        ...current,
+        retentionHours: retention.hours || current.retentionHours,
+      }));
+    } catch {
+      // keep default retention
+    }
+
+    const preferredInboxId = override?.inboxId ?? selectedInboxId;
+    const nextInbox =
+      (preferredInboxId && storedInboxes.find((item) => item.id === preferredInboxId)) || storedInboxes[0] || null;
+
+    if (!nextInbox) {
+      setDetail(null);
+      setSelectedInboxId(null);
+      setSelectedMessageId(null);
+      setLastSyncedAt(new Date().toISOString());
+      return;
+    }
+
+    setSelectedInboxId(nextInbox.id);
+
+    const inboxPayload = await readJson<{ emails: TempMailEmailSummary[] }>(
+      await fetch(`/api/temp-mail/external/inbox?address=${encodeURIComponent(nextInbox.emailAddress)}`, {
+        cache: 'no-store',
+      }),
+    );
+
+    const emails = inboxPayload.emails || [];
+    const updatedInbox: TempMailInboxSummary = {
+      ...nextInbox,
+      messageCount: emails.length,
+      latestReceivedAt: emails[0]?.receivedAt || null,
+    };
+    const nextStored = upsertExternalInbox(updatedInbox);
+    setInboxes(nextStored);
+
+    const requestedMessageId = override?.messageId ?? selectedMessageId;
+    const selectedSummary = (requestedMessageId && emails.find((item) => item.id === requestedMessageId)) || emails[0] || null;
+
+    let selectedDetail: TempMailEmailDetail | null = null;
+
+    if (selectedSummary) {
+      try {
+        const downloadPayload = await readJson<{ detail: TempMailEmailDetail }>(
+          await fetch(
+            `/api/temp-mail/external/download?address=${encodeURIComponent(
+              nextInbox.emailAddress,
+            )}&emailId=${encodeURIComponent(selectedSummary.id)}&type=email`,
+            {
+              cache: 'no-store',
+            },
+          ),
+        );
+
+        selectedDetail = downloadPayload.detail;
+      } catch {
+        selectedDetail = {
+          ...selectedSummary,
+          messageId: selectedSummary.id,
+          textBody: selectedSummary.snippet || 'Isi email belum bisa dimuat dari provider eksternal.',
+          htmlBody: null,
+          headers: null,
+          attachments: [],
+        };
+      }
+    }
+
+    setDetail({
+      inbox: updatedInbox,
+      emails,
+      selectedEmail: selectedDetail,
+    });
+    setSelectedMessageId(selectedDetail?.id || null);
+    setPreviewMode(selectedDetail?.htmlBody && !selectedDetail?.textBody ? 'html' : 'text');
+    setLastSyncedAt(new Date().toISOString());
+  }
+
   async function refreshDashboard(override?: {
     inboxId?: string | null;
     messageId?: string | null;
     silent?: boolean;
   }) {
-    if (!config.coreReady && !initialConfig.coreReady) {
+    if (!config.dashboardReady && !initialConfig.dashboardReady) {
       setIsBooting(false);
       return;
     }
@@ -230,6 +381,15 @@ export function TempMailBrowser({ initialConfig }: Props) {
     }
 
     try {
+      if (externalMode) {
+        await refreshExternalDashboard({
+          inboxId: override?.inboxId,
+          messageId: override?.messageId,
+        });
+        setErrorMessage(null);
+        return;
+      }
+
       const listPayload = await readJson<TempMailInboxListPayload>(
         await fetch('/api/temp-mail/inboxes', {
           cache: 'no-store',
@@ -285,7 +445,7 @@ export function TempMailBrowser({ initialConfig }: Props) {
   });
 
   useEffect(() => {
-    if (!initialConfig.coreReady) {
+    if (!initialConfig.dashboardReady) {
       return;
     }
 
@@ -301,7 +461,7 @@ export function TempMailBrowser({ initialConfig }: Props) {
       window.clearTimeout(kickoff);
       window.clearInterval(timer);
     };
-  }, [initialConfig.coreReady, kickoffLoad, silentPoll]);
+  }, [initialConfig.dashboardReady, kickoffLoad, silentPoll]);
 
   async function handleCopyEmail(emailAddress: string) {
     try {
@@ -314,7 +474,7 @@ export function TempMailBrowser({ initialConfig }: Props) {
   }
 
   async function handleCreateInbox(customAlias?: string) {
-    if (!config.coreReady) {
+    if (!config.dashboardReady) {
       return;
     }
 
@@ -323,6 +483,29 @@ export function TempMailBrowser({ initialConfig }: Props) {
     setErrorMessage(null);
 
     try {
+      if (externalMode) {
+        const localPart = normalizeLocalPart(customAlias || '') || randomLocalPart();
+        const domain = config.externalProvider.defaultDomain || activeDomain;
+        const inbox: TempMailInboxSummary = {
+          id: `${localPart}@${domain}`,
+          localPart,
+          domain,
+          emailAddress: `${localPart}@${domain}`,
+          createdAt: new Date().toISOString(),
+          messageCount: 0,
+          latestReceivedAt: null,
+        };
+
+        upsertExternalInbox(inbox);
+        setAliasDraft('');
+        setStatusMessage(`Inbox eksternal ${inbox.emailAddress} berhasil ditambahkan ke riwayat.`);
+        await refreshDashboard({
+          inboxId: inbox.id,
+          messageId: null,
+        });
+        return;
+      }
+
       const payload = await readJson<{ inbox: TempMailInboxSummary }>(
         await fetch('/api/temp-mail/inboxes', {
           method: 'POST',
@@ -354,7 +537,11 @@ export function TempMailBrowser({ initialConfig }: Props) {
       return;
     }
 
-    const approved = window.confirm(`Hapus inbox ${detail.inbox.emailAddress}? Isi email di dalamnya ikut terhapus.`);
+    const approved = window.confirm(
+      externalMode
+        ? `Hapus ${detail.inbox.emailAddress} dari riwayat lokal browser ini?`
+        : `Hapus inbox ${detail.inbox.emailAddress}? Isi email di dalamnya ikut terhapus.`,
+    );
     if (!approved) {
       return;
     }
@@ -364,6 +551,16 @@ export function TempMailBrowser({ initialConfig }: Props) {
     setErrorMessage(null);
 
     try {
+      if (externalMode) {
+        removeExternalInbox(detail.inbox.id);
+        setStatusMessage(`Inbox ${detail.inbox.emailAddress} dihapus dari riwayat lokal.`);
+        await refreshDashboard({
+          inboxId: null,
+          messageId: null,
+        });
+        return;
+      }
+
       await readJson(
         await fetch(`/api/temp-mail/inboxes/${encodeURIComponent(detail.inbox.id)}`, {
           method: 'DELETE',
@@ -384,6 +581,11 @@ export function TempMailBrowser({ initialConfig }: Props) {
 
   async function handleClearInbox() {
     if (!detail?.inbox.id) {
+      return;
+    }
+
+    if (externalMode) {
+      setErrorMessage('Provider eksternal ini tidak menyediakan fitur hapus isi inbox lewat API publik.');
       return;
     }
 
@@ -439,7 +641,9 @@ export function TempMailBrowser({ initialConfig }: Props) {
             </div>
           </div>
 
-          <div className={styles.liveBadge}>{config.operationalReady ? 'engine ready' : 'setup incomplete'}</div>
+          <div className={styles.liveBadge}>
+            {externalMode ? `${config.externalProvider.provider} mode` : config.operationalReady ? 'engine ready' : 'setup incomplete'}
+          </div>
         </header>
 
         <section className={styles.heroCard}>
@@ -452,6 +656,7 @@ export function TempMailBrowser({ initialConfig }: Props) {
             </p>
 
             <div className={styles.pillRow}>
+              <span className={styles.heroPill}>provider {externalMode ? config.externalProvider.provider : 'private'}</span>
               <span className={styles.heroPill}>akses {config.privateModeEnabled ? 'privat' : 'publik'}</span>
               <span className={styles.heroPill}>domain {config.domains.length}</span>
               <span className={styles.heroPill}>retensi {config.retentionHours} jam</span>
@@ -480,7 +685,7 @@ export function TempMailBrowser({ initialConfig }: Props) {
                 <button
                   type="button"
                   className={styles.secondaryButton}
-                  disabled={!config.coreReady || busyAction === 'create'}
+                  disabled={!config.dashboardReady || busyAction === 'create'}
                   onClick={() => void handleCreateInbox()}
                 >
                   {busyAction === 'create' ? <InlineSpinner /> : <IconSpark className={styles.inlineIcon} />}
@@ -501,7 +706,7 @@ export function TempMailBrowser({ initialConfig }: Props) {
               <button
                 type="button"
                 className={styles.iconButton}
-                disabled={isRefreshing || !config.coreReady}
+                disabled={isRefreshing || !config.dashboardReady}
                 onClick={() => void refreshDashboard()}
               >
                 {isRefreshing ? <InlineSpinner /> : <IconRefresh className={styles.inlineIcon} />}
@@ -527,7 +732,7 @@ export function TempMailBrowser({ initialConfig }: Props) {
                 value={aliasDraft}
                 onChange={(event) => setAliasDraft(event.target.value)}
                 placeholder="misal: otp-senja"
-                disabled={!config.coreReady || busyAction === 'create'}
+                disabled={!config.dashboardReady || busyAction === 'create'}
               />
             </label>
 
@@ -535,10 +740,10 @@ export function TempMailBrowser({ initialConfig }: Props) {
               <span className={styles.label}>Domain aktif</span>
               <select
                 className={styles.select}
-                value={activeDomain}
-                onChange={(event) => setDomainDraft(event.target.value)}
-                disabled={!config.coreReady || busyAction === 'create'}
-              >
+              value={activeDomain}
+              onChange={(event) => setDomainDraft(event.target.value)}
+              disabled={!config.dashboardReady || busyAction === 'create'}
+            >
                 {config.domains.map((domain) => (
                   <option key={domain} value={domain}>
                     {domain}
@@ -551,7 +756,7 @@ export function TempMailBrowser({ initialConfig }: Props) {
               <button
                 type="button"
                 className={styles.secondaryButton}
-                disabled={!config.coreReady || busyAction === 'create' || !aliasDraft.trim()}
+                disabled={!config.dashboardReady || busyAction === 'create' || !aliasDraft.trim()}
                 onClick={() => void handleCreateInbox(aliasDraft.trim() || undefined)}
               >
                 {busyAction === 'create' ? <InlineSpinner /> : <IconBrand className={styles.inlineIcon} />}
@@ -560,7 +765,7 @@ export function TempMailBrowser({ initialConfig }: Props) {
               <button
                 type="button"
                 className={styles.secondaryButton}
-                disabled={isRefreshing || !config.coreReady}
+                disabled={isRefreshing || !config.dashboardReady}
                 onClick={() => void refreshDashboard()}
               >
                 {isRefreshing ? <InlineSpinner /> : <IconRefresh className={styles.inlineIcon} />}
@@ -570,8 +775,9 @@ export function TempMailBrowser({ initialConfig }: Props) {
           </div>
 
           <p className={styles.helperLine}>
-            OTP dari layanan luar baru bisa masuk kalau domain email benar-benar punya DNS dan inbound routing aktif. Kalau belum aktif,
-            inbox tetap bisa dibuat tapi email publik tidak akan sampai.
+            {externalMode
+              ? `Mode ini memakai provider eksternal ${config.externalProvider.provider} dengan domain bawaan ${config.externalProvider.defaultDomain}, jadi kamu bisa uji inbox tanpa beli domain dulu.`
+              : 'OTP dari layanan luar baru bisa masuk kalau domain email benar-benar punya DNS dan inbound routing aktif. Kalau belum aktif, inbox tetap bisa dibuat tapi email publik tidak akan sampai.'}
           </p>
         </section>
 
@@ -590,7 +796,11 @@ export function TempMailBrowser({ initialConfig }: Props) {
                   <span className={styles.setupKey}>TEMP_MAIL_DATABASE_URL / DATABASE_URL_CORE</span>
                   <SetupStatus ready={config.setupChecklist.database} />
                 </div>
-                <p className={styles.setupText}>Dipakai untuk menyimpan daftar inbox dan email masuk.</p>
+                <p className={styles.setupText}>
+                  {externalMode
+                    ? 'Tidak wajib untuk mode eksternal. Database hanya dipakai kalau kamu kembali ke mode private/local.'
+                    : 'Dipakai untuk menyimpan daftar inbox dan email masuk.'}
+                </p>
               </div>
               <div className={styles.setupItem}>
                 <div className={styles.setupHead}>
@@ -631,9 +841,9 @@ export function TempMailBrowser({ initialConfig }: Props) {
           <div>
             <p className={styles.warningTitle}>Kenapa email OTP dari luar belum masuk?</p>
             <p className={styles.warningText}>
-              Saat ini inbox web dan database sudah siap, tetapi email publik hanya akan mendarat jika domain email sudah memiliki DNS yang valid,
-              lalu diarahkan ke jalur inbound seperti Cloudflare Email Routing atau provider sejenis. Kalau domain belum hidup, pesan OTP dari layanan
-              pendaftaran memang tidak akan pernah sampai ke dashboard.
+              {externalMode
+                ? `Dalam mode eksternal, email akan mengikuti ketersediaan provider ${config.externalProvider.provider}. Jadi kamu tidak perlu DNS sendiri untuk uji coba, tetapi kestabilan, limit, dan isi inbox tetap bergantung pada provider tersebut.`
+                : 'Saat ini inbox web dan database sudah siap, tetapi email publik hanya akan mendarat jika domain email sudah memiliki DNS yang valid, lalu diarahkan ke jalur inbound seperti Cloudflare Email Routing atau provider sejenis. Kalau domain belum hidup, pesan OTP dari layanan pendaftaran memang tidak akan pernah sampai ke dashboard.'}
             </p>
           </div>
         </section>
@@ -718,15 +928,17 @@ export function TempMailBrowser({ initialConfig }: Props) {
                   <IconCopy className={styles.inlineIcon} />
                   {copiedEmail ? 'Tersalin' : 'Copy alamat'}
                 </button>
-                <button
-                  type="button"
-                  className={styles.miniButton}
-                  disabled={busyAction === 'clear'}
-                  onClick={() => void handleClearInbox()}
-                >
-                  {busyAction === 'clear' ? <InlineSpinner /> : <IconRefresh className={styles.inlineIcon} />}
-                  Kosongkan
-                </button>
+                {!externalMode ? (
+                  <button
+                    type="button"
+                    className={styles.miniButton}
+                    disabled={busyAction === 'clear'}
+                    onClick={() => void handleClearInbox()}
+                  >
+                    {busyAction === 'clear' ? <InlineSpinner /> : <IconRefresh className={styles.inlineIcon} />}
+                    Kosongkan
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className={styles.dangerButton}
@@ -777,7 +989,11 @@ export function TempMailBrowser({ initialConfig }: Props) {
                 ) : (
                   <SectionEmpty
                     title="Belum ada email masuk"
-                    text="Kirim email ke inbox ini. Kalau routing domain sudah aktif, pesan OTP akan muncul di sini."
+                    text={
+                      externalMode
+                        ? 'Alamat ini sudah aktif di provider eksternal. Kalau ada pesan masuk, daftar email akan muncul di sini saat kamu refresh atau auto-sync.'
+                        : 'Kirim email ke inbox ini. Kalau routing domain sudah aktif, pesan OTP akan muncul di sini.'
+                    }
                   />
                 )
               ) : (
@@ -920,12 +1136,16 @@ export function TempMailBrowser({ initialConfig }: Props) {
               <IconGlobe className={styles.featureIcon} />
             </div>
             <h3 className={styles.featureTitle}>Siap untuk domain sendiri</h3>
-            <p className={styles.featureText}>Begitu DNS dan routing inbound benar-benar aktif, inbox ini siap menerima email publik dari luar.</p>
+            <p className={styles.featureText}>
+              {externalMode
+                ? 'Sambil menunggu domain sendiri siap, kamu masih bisa uji temp mail memakai provider eksternal dari mode ini.'
+                : 'Begitu DNS dan routing inbound benar-benar aktif, inbox ini siap menerima email publik dari luar.'}
+            </p>
           </article>
         </section>
       </div>
 
-      {(isPending || isRefreshing) && config.coreReady ? (
+      {(isPending || isRefreshing) && config.dashboardReady ? (
         <div className={styles.floatingSync}>
           <InlineSpinner />
           Menyinkronkan inbox...
