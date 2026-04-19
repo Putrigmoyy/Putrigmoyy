@@ -1,6 +1,6 @@
 'use client';
 
-import { useDeferredValue, useEffect, useEffectEvent, useState, useTransition } from 'react';
+import { useDeferredValue, useEffect, useEffectEvent, useRef, useState, useTransition } from 'react';
 import styles from '@/app/temp-mail/temp-mail.module.css';
 import type {
   TempMailConfigSnapshot,
@@ -11,6 +11,10 @@ import type {
 
 type Props = {
   initialConfig: TempMailConfigSnapshot;
+};
+
+type IconProps = {
+  className?: string;
 };
 
 function formatDateTime(value: string) {
@@ -58,7 +62,7 @@ async function readJson<T>(response: Response) {
 }
 
 function createPreviewDocument(html: string) {
-  return `<!doctype html><html lang="id"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><base target="_blank" /><style>body{font-family:Roboto,Segoe UI,Arial,sans-serif;padding:20px;margin:0;color:#111;background:#fff;}img{max-width:100%;height:auto;}pre{white-space:pre-wrap;}a{color:#1799f2;}</style></head><body>${html}</body></html>`;
+  return `<!doctype html><html lang="id"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><base target="_blank" /><style>body{font-family:Roboto,Segoe UI,Arial,sans-serif;padding:18px;margin:0;color:#111;background:#fff;}img{max-width:100%;height:auto;}pre{white-space:pre-wrap;}a{color:#1799f2;}</style></head><body>${html}</body></html>`;
 }
 
 function SetupStatus({ ready }: { ready: boolean }) {
@@ -67,6 +71,107 @@ function SetupStatus({ ready }: { ready: boolean }) {
 
 function InlineSpinner() {
   return <span className={styles.spin}>o</span>;
+}
+
+function IconBrand({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="5" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M6.5 8.5 12 12.7 17.5 8.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 15.5h8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconCopy({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <rect x="9" y="9" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M6 15V7a2 2 0 0 1 2-2h8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconRefresh({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M20 11a8 8 0 1 0 2 5.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M20 4v6h-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconSettings({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M6 7h12M4 7h1M19 7h1M9 17h11M4 17h2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <circle cx="8" cy="7" r="2" stroke="currentColor" strokeWidth="1.7" />
+      <circle cx="17" cy="17" r="2" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function IconHistory({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M4 12a8 8 0 1 0 2.4-5.7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 5v4h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 8v4l3 2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconSearch({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <circle cx="11" cy="11" r="6" stroke="currentColor" strokeWidth="1.7" />
+      <path d="m16 16 4 4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconTrash({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M4 7h16M9.5 11.5v5M14.5 11.5v5M7 7l1 11a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-11M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconSpark({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M12 3 14.5 9.5 21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconShield({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M12 3c1.8 1.7 4.4 3 7 3v5.6c0 4.3-2.8 7.2-7 9.4-4.2-2.2-7-5.1-7-9.4V6c2.6 0 5.2-1.3 7-3Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconGlobe({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M3.5 12h17M12 3c2.4 2.8 3.7 5.8 3.7 9S14.4 18.2 12 21M12 3c-2.4 2.8-3.7 5.8-3.7 9S9.6 18.2 12 21" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SectionEmpty({ title, text }: { title: string; text: string }) {
+  return (
+    <div className={styles.emptyCard}>
+      <div>
+        <p className={styles.emptyTitle}>{title}</p>
+        <p className={styles.emptyText}>{text}</p>
+      </div>
+    </div>
+  );
 }
 
 export function TempMailBrowser({ initialConfig }: Props) {
@@ -86,10 +191,13 @@ export function TempMailBrowser({ initialConfig }: Props) {
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<'text' | 'html'>('text');
   const [copiedEmail, setCopiedEmail] = useState(false);
+  const [showSetup, setShowSetup] = useState(false);
   const [isPending, startTransition] = useTransition();
   const deferredSearch = useDeferredValue(searchDraft);
+  const inboxPanelRef = useRef<HTMLElement | null>(null);
 
   const activeDomain = config.domains.includes(domainDraft) ? domainDraft : config.primaryDomain;
+  const selectedEmail = detail?.selectedEmail || null;
   const filteredEmails =
     detail?.emails.filter((email) => {
       const keyword = deferredSearch.trim().toLowerCase();
@@ -103,6 +211,9 @@ export function TempMailBrowser({ initialConfig }: Props) {
         email.snippet.toLowerCase().includes(keyword)
       );
     }) || [];
+
+  const currentAddress = detail?.inbox.emailAddress || '';
+  const previewAddress = currentAddress || (activeDomain ? `random@${activeDomain}` : 'domain-belum-aktif');
 
   async function refreshDashboard(override?: {
     inboxId?: string | null;
@@ -190,7 +301,7 @@ export function TempMailBrowser({ initialConfig }: Props) {
       window.clearTimeout(kickoff);
       window.clearInterval(timer);
     };
-  }, [initialConfig.coreReady]);
+  }, [initialConfig.coreReady, kickoffLoad, silentPoll]);
 
   async function handleCopyEmail(emailAddress: string) {
     try {
@@ -304,203 +415,242 @@ export function TempMailBrowser({ initialConfig }: Props) {
     }
   }
 
-  const selectedEmail = detail?.selectedEmail || null;
+  function scrollToInboxes() {
+    inboxPanelRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }
 
   return (
     <main className={styles.page}>
+      <div className={styles.auraLeft} />
+      <div className={styles.auraRight} />
+
       <div className={styles.shell}>
-        <section className={styles.heroGrid}>
-          <div className={styles.heroCard}>
-            <div className={styles.heroTop}>
-              <div>
-                <p className={styles.eyebrow}>Temp Mail Putri</p>
-                <h1 className={styles.title}>Inbox privat multi-domain yang siap dipakai dari link rahasia.</h1>
-                <p className={styles.description}>
-                  Website ini disiapkan supaya kamu bisa membuat inbox permanen, memantau email masuk secara realtime,
-                  membersihkan isi email lama otomatis, dan tetap memakai tampilan yang ringan di HP maupun desktop.
-                </p>
-              </div>
-
-              <div className={styles.badgeRow}>
-                <span className={`${styles.badge} ${styles.badgeSoft}`}>akses: {config.privateModeEnabled ? 'privat' : 'publik'}</span>
-                <span className={styles.badge}>domain aktif: {config.domains.length}</span>
-                <span className={styles.badge}>cleanup: {config.retentionHours} jam</span>
-                <span className={styles.badge}>sinkron: 15 detik</span>
-              </div>
+        <header className={styles.header}>
+          <div className={styles.brandCluster}>
+            <div className={styles.brandMark}>
+              <IconBrand className={styles.brandIcon} />
             </div>
-
-            <div className={styles.statGrid}>
-              <div className={styles.statCard}>
-                <p className={styles.statLabel}>Permanen</p>
-                <p className={styles.statText}>Alamat inbox tetap ada sampai kamu hapus sendiri. Yang dibersihkan hanya isi email lama.</p>
-              </div>
-              <div className={styles.statCard}>
-                <p className={styles.statLabel}>Webhook siap</p>
-                <p className={styles.statText}>Begitu webhook inbound diarahkan ke website ini, email masuk akan otomatis muncul di dashboard.</p>
-              </div>
-              <div className={styles.statCard}>
-                <p className={styles.statLabel}>Mode rahasia</p>
-                <p className={styles.statText}>Halaman inbox tidak tampil di menu utama, jadi hanya bisa dibuka jika tahu link aksesnya.</p>
-              </div>
+            <div>
+              <p className={styles.brandOverline}>Temp mail privat</p>
+              <h1 className={styles.brandTitle}>Putri Mail Vault</h1>
             </div>
           </div>
 
-          <aside className={styles.checklistCard}>
-            <div className={styles.panelTitleRow}>
-              <h2 className={styles.panelTitle}>Checklist Deploy</h2>
+          <div className={styles.liveBadge}>{config.operationalReady ? 'engine ready' : 'setup incomplete'}</div>
+        </header>
+
+        <section className={styles.heroCard}>
+          <div className={styles.heroCopy}>
+            <p className={styles.eyebrow}>Instant inbox for OTP</p>
+            <h2 className={styles.heroTitle}>Buat inbox cepat, tunggu email OTP, lalu baca pesannya nyaman dari HP Android.</h2>
+            <p className={styles.heroText}>
+              Saya ubah layout-nya jadi mobile-first: alamat aktif langsung terlihat, tombol utama tidak berantakan, daftar inbox rapi,
+              dan isi email lebih enak dibaca tanpa membuat layar sempit terasa penuh.
+            </p>
+
+            <div className={styles.pillRow}>
+              <span className={styles.heroPill}>akses {config.privateModeEnabled ? 'privat' : 'publik'}</span>
+              <span className={styles.heroPill}>domain {config.domains.length}</span>
+              <span className={styles.heroPill}>retensi {config.retentionHours} jam</span>
+              <span className={styles.heroPill}>sinkron 15 detik</span>
             </div>
-            <p className={styles.panelSubtext}>Kalau empat bagian ini sudah siap, temp mail kamu bisa langsung dipakai di Vercel.</p>
+          </div>
 
-            <div className={styles.checklistList}>
-              <div className={styles.checklistItem}>
-                <div className={styles.checklistHead}>
-                  <span className={styles.monoKey}>TEMP_MAIL_DATABASE_URL / DATABASE_URL_CORE</span>
-                  <SetupStatus ready={config.setupChecklist.database} />
-                </div>
-                <p className={styles.helperText}>Dipakai untuk menyimpan inbox permanen dan isi email masuk.</p>
+          <div className={styles.heroUtility}>
+            <div className={styles.addressCard}>
+              <p className={styles.addressLabel}>Alamat inbox aktif</p>
+              <p className={styles.addressValue}>{previewAddress}</p>
+              <div className={styles.addressMeta}>
+                <span>{lastSyncedAt ? `sinkron ${formatDateTime(lastSyncedAt)}` : 'belum ada sinkron pertama'}</span>
+                <span>{config.domains.join(', ') || 'domain belum aktif'}</span>
               </div>
-
-              <div className={styles.checklistItem}>
-                <div className={styles.checklistHead}>
-                  <span className={styles.monoKey}>TEMP_MAIL_DOMAINS</span>
-                  <SetupStatus ready={config.setupChecklist.domains} />
-                </div>
-                <p className={styles.helperText}>Isi dengan domain-domain email yang akan dipakai, dipisah koma.</p>
-              </div>
-
-              <div className={styles.checklistItem}>
-                <div className={styles.checklistHead}>
-                  <span className={styles.monoKey}>TEMP_MAIL_INBOUND_SECRET</span>
-                  <SetupStatus ready={config.setupChecklist.inboundSecret} />
-                </div>
-                <p className={styles.helperText}>Kunci rahasia untuk mengamankan webhook email masuk.</p>
-              </div>
-
-              <div className={styles.checklistItem}>
-                <div className={styles.checklistHead}>
-                  <span className={styles.monoKey}>CRON_SECRET</span>
-                  <SetupStatus ready={config.setupChecklist.cronSecret} />
-                </div>
-                <p className={styles.helperText}>Opsional, untuk cleanup otomatis lewat cron Vercel kalau kamu aktifkan nanti.</p>
-              </div>
-            </div>
-          </aside>
-        </section>
-
-        <section className={styles.toolGrid}>
-          <div className={`${styles.panelCard} ${styles.createCard}`}>
-            <div className={styles.panelTitleRow}>
-              <div>
-                <h2 className={styles.panelTitle}>Buat Inbox</h2>
-                <p className={styles.panelSubtext}>Pilih domain lalu buat alias custom atau alias otomatis.</p>
-              </div>
-            </div>
-
-            <div className={styles.formGrid}>
-              <label className={styles.field}>
-                <span className={styles.label}>Alias sebelum @</span>
-                <input
-                  className={styles.input}
-                  value={aliasDraft}
-                  onChange={(event) => setAliasDraft(event.target.value)}
-                  placeholder="misal: senjaotp"
-                  disabled={!config.coreReady || busyAction === 'create'}
-                />
-              </label>
-
-              <label className={styles.field}>
-                <span className={styles.label}>Domain aktif</span>
-                <select
-                  className={styles.select}
-                  value={activeDomain}
-                  onChange={(event) => setDomainDraft(event.target.value)}
-                  disabled={!config.coreReady || busyAction === 'create'}
-                >
-                  {config.domains.map((domain) => (
-                    <option key={domain} value={domain}>
-                      {domain}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <div className={styles.buttonRow}>
+              <div className={styles.actionRow}>
                 <button
                   type="button"
-                  className={styles.button}
+                  className={styles.primaryButton}
+                  disabled={!detail?.inbox.emailAddress}
+                  onClick={() => void handleCopyEmail(detail?.inbox.emailAddress || '')}
+                >
+                  <IconCopy className={styles.inlineIcon} />
+                  {copiedEmail ? 'Tersalin' : 'Copy alamat'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
                   disabled={!config.coreReady || busyAction === 'create'}
                   onClick={() => void handleCreateInbox()}
                 >
-                  {busyAction === 'create' ? <InlineSpinner /> : null}
-                  New otomatis
-                </button>
-                <button
-                  type="button"
-                  className={styles.ghostButton}
-                  disabled={!config.coreReady || busyAction === 'create'}
-                  onClick={() => void handleCreateInbox(aliasDraft.trim() || undefined)}
-                >
-                  Buat custom
-                </button>
-                <button
-                  type="button"
-                  className={styles.ghostButton}
-                  disabled={isRefreshing || !config.coreReady}
-                  onClick={() => void refreshDashboard()}
-                >
-                  {isRefreshing ? <InlineSpinner /> : null}
-                  Sinkronkan sekarang
+                  {busyAction === 'create' ? <InlineSpinner /> : <IconSpark className={styles.inlineIcon} />}
+                  New random
                 </button>
               </div>
             </div>
 
-            <div className={styles.metaRow}>
-              <span>Terakhir sinkron: {lastSyncedAt ? formatDateTime(lastSyncedAt) : 'belum ada'}</span>
-              <span>Domain aktif: {config.domains.join(', ') || '-'}</span>
+            <div className={styles.shortcutRow}>
+              <button type="button" className={styles.iconButton} onClick={() => setShowSetup((value) => !value)}>
+                <IconSettings className={styles.inlineIcon} />
+                {showSetup ? 'Tutup setup' : 'Lihat setup'}
+              </button>
+              <button type="button" className={styles.iconButton} onClick={scrollToInboxes}>
+                <IconHistory className={styles.inlineIcon} />
+                Riwayat inbox
+              </button>
+              <button
+                type="button"
+                className={styles.iconButton}
+                disabled={isRefreshing || !config.coreReady}
+                onClick={() => void refreshDashboard()}
+              >
+                {isRefreshing ? <InlineSpinner /> : <IconRefresh className={styles.inlineIcon} />}
+                Refresh
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.composerCard}>
+          <div className={styles.panelHeading}>
+            <div>
+              <p className={styles.eyebrow}>Compose inbox</p>
+              <h2 className={styles.sectionTitle}>Buat alamat sendiri atau pakai random</h2>
+            </div>
+          </div>
+
+          <div className={styles.composerGrid}>
+            <label className={styles.field}>
+              <span className={styles.label}>Username sebelum @</span>
+              <input
+                className={styles.input}
+                value={aliasDraft}
+                onChange={(event) => setAliasDraft(event.target.value)}
+                placeholder="misal: otp-senja"
+                disabled={!config.coreReady || busyAction === 'create'}
+              />
+            </label>
+
+            <label className={styles.field}>
+              <span className={styles.label}>Domain aktif</span>
+              <select
+                className={styles.select}
+                value={activeDomain}
+                onChange={(event) => setDomainDraft(event.target.value)}
+                disabled={!config.coreReady || busyAction === 'create'}
+              >
+                {config.domains.map((domain) => (
+                  <option key={domain} value={domain}>
+                    {domain}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className={styles.composeActions}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                disabled={!config.coreReady || busyAction === 'create' || !aliasDraft.trim()}
+                onClick={() => void handleCreateInbox(aliasDraft.trim() || undefined)}
+              >
+                {busyAction === 'create' ? <InlineSpinner /> : <IconBrand className={styles.inlineIcon} />}
+                Buat custom
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                disabled={isRefreshing || !config.coreReady}
+                onClick={() => void refreshDashboard()}
+              >
+                {isRefreshing ? <InlineSpinner /> : <IconRefresh className={styles.inlineIcon} />}
+                Sinkronkan
+              </button>
+            </div>
+          </div>
+
+          <p className={styles.helperLine}>
+            OTP dari layanan luar baru bisa masuk kalau domain email benar-benar punya DNS dan inbound routing aktif. Kalau belum aktif,
+            inbox tetap bisa dibuat tapi email publik tidak akan sampai.
+          </p>
+        </section>
+
+        {showSetup ? (
+          <section className={styles.setupCard}>
+            <div className={styles.panelHeading}>
+              <div>
+                <p className={styles.eyebrow}>Deploy checklist</p>
+                <h2 className={styles.sectionTitle}>Status komponen temp mail</h2>
+              </div>
             </div>
 
+            <div className={styles.setupGrid}>
+              <div className={styles.setupItem}>
+                <div className={styles.setupHead}>
+                  <span className={styles.setupKey}>TEMP_MAIL_DATABASE_URL / DATABASE_URL_CORE</span>
+                  <SetupStatus ready={config.setupChecklist.database} />
+                </div>
+                <p className={styles.setupText}>Dipakai untuk menyimpan daftar inbox dan email masuk.</p>
+              </div>
+              <div className={styles.setupItem}>
+                <div className={styles.setupHead}>
+                  <span className={styles.setupKey}>TEMP_MAIL_DOMAINS</span>
+                  <SetupStatus ready={config.setupChecklist.domains} />
+                </div>
+                <p className={styles.setupText}>Daftar domain email yang boleh dipakai oleh inbox temp mail.</p>
+              </div>
+              <div className={styles.setupItem}>
+                <div className={styles.setupHead}>
+                  <span className={styles.setupKey}>TEMP_MAIL_INBOUND_SECRET</span>
+                  <SetupStatus ready={config.setupChecklist.inboundSecret} />
+                </div>
+                <p className={styles.setupText}>Kunci rahasia untuk mengamankan webhook inbound email.</p>
+              </div>
+              <div className={styles.setupItem}>
+                <div className={styles.setupHead}>
+                  <span className={styles.setupKey}>CRON_SECRET</span>
+                  <SetupStatus ready={config.setupChecklist.cronSecret} />
+                </div>
+                <p className={styles.setupText}>Dipakai Vercel Cron untuk membersihkan isi inbox lama secara otomatis.</p>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {statusMessage || errorMessage ? (
+          <div className={styles.noticeStack}>
             {statusMessage ? <div className={styles.statusNotice}>{statusMessage}</div> : null}
             {errorMessage ? <div className={styles.errorNotice}>{errorMessage}</div> : null}
           </div>
+        ) : null}
 
-          <aside className={styles.panelCard}>
-            <div className={styles.panelTitleRow}>
-              <h2 className={styles.panelTitle}>Catatan Penting</h2>
-            </div>
-            <p className={styles.panelSubtext}>
-              Kalau mau inbox ini benar-benar menerima email dari luar, kamu perlu mengarahkan provider inbound ke endpoint website ini.
-              Setelah itu dashboard akan otomatis membaca email masuk ke inbox yang sesuai.
+        <section className={styles.warningCard}>
+          <div className={styles.warningIconWrap}>
+            <IconShield className={styles.warningIcon} />
+          </div>
+          <div>
+            <p className={styles.warningTitle}>Kenapa email OTP dari luar belum masuk?</p>
+            <p className={styles.warningText}>
+              Saat ini inbox web dan database sudah siap, tetapi email publik hanya akan mendarat jika domain email sudah memiliki DNS yang valid,
+              lalu diarahkan ke jalur inbound seperti Cloudflare Email Routing atau provider sejenis. Kalau domain belum hidup, pesan OTP dari layanan
+              pendaftaran memang tidak akan pernah sampai ke dashboard.
             </p>
-            <div className={styles.detailGrid}>
-              <div className={styles.detailCard}>
-                <p className={styles.detailLabel}>Akses halaman</p>
-                <p className={styles.detailValue}>Link temp mail hanya aktif lewat route rahasia temp-mail/kunci-kamu.</p>
-              </div>
-              <div className={styles.detailCard}>
-                <p className={styles.detailLabel}>Pembersihan</p>
-                <p className={styles.detailValue}>Isi email lebih dari {config.retentionHours} jam akan dibersihkan, tapi alamat inbox tetap disimpan.</p>
-              </div>
-            </div>
-          </aside>
+          </div>
         </section>
 
-        <section className={styles.contentGrid}>
-          <section className={styles.panelCard}>
-            <div className={styles.panelTitleRow}>
+        <section className={styles.workspace}>
+          <section className={styles.columnCard} ref={inboxPanelRef}>
+            <div className={styles.panelHeading}>
               <div>
-                <p className={styles.eyebrow}>Inbox permanen</p>
-                <h2 className={styles.panelTitle}>{inboxes.length} inbox aktif</h2>
+                <p className={styles.eyebrow}>Inbox list</p>
+                <h2 className={styles.sectionTitle}>{inboxes.length} inbox aktif</h2>
               </div>
+              <span className={styles.cornerBadge}>history</span>
             </div>
 
-            <div className={styles.list}>
+            <div className={styles.scrollList}>
               {isBooting ? (
-                <div className={styles.emptyCard}>
-                  <div>
-                    <p className={styles.emptyTitle}>Memuat inbox...</p>
-                    <p className={styles.emptyText}>Dashboard sedang mengambil daftar inbox temp mail kamu.</p>
-                  </div>
-                </div>
+                <SectionEmpty title="Memuat inbox..." text="Dashboard sedang mengambil daftar inbox temp mail kamu." />
               ) : inboxes.length > 0 ? (
                 inboxes.map((inbox) => {
                   const active = detail?.inbox.id === inbox.id;
@@ -508,7 +658,7 @@ export function TempMailBrowser({ initialConfig }: Props) {
                     <button
                       key={inbox.id}
                       type="button"
-                      className={`${styles.itemButton} ${active ? styles.itemButtonActive : ''}`}
+                      className={`${styles.inboxButton} ${active ? styles.inboxButtonActive : ''}`}
                       onClick={() => {
                         startTransition(() => {
                           setSelectedInboxId(inbox.id);
@@ -521,68 +671,75 @@ export function TempMailBrowser({ initialConfig }: Props) {
                         });
                       }}
                     >
-                      <div className={styles.itemHead}>
-                        <div>
-                          <p className={styles.itemEmail}>{inbox.emailAddress}</p>
-                          <div className={styles.itemMeta}>
-                            <span>dibuat {formatDateTime(inbox.createdAt)}</span>
-                            <span className={styles.pill}>{inbox.messageCount} pesan</span>
-                          </div>
-                        </div>
+                      <div className={styles.inboxHead}>
+                        <p className={styles.inboxAddress}>{inbox.emailAddress}</p>
+                        <span className={styles.smallPill}>{inbox.messageCount}</span>
                       </div>
-                      <p className={styles.itemRelative}>{formatRelative(inbox.latestReceivedAt)}</p>
+                      <p className={styles.inboxMeta}>dibuat {formatDateTime(inbox.createdAt)}</p>
+                      <p className={styles.inboxRelative}>{formatRelative(inbox.latestReceivedAt)}</p>
                     </button>
                   );
                 })
               ) : (
-                <div className={styles.emptyCard}>
-                  <div>
-                    <p className={styles.emptyTitle}>Belum ada inbox</p>
-                    <p className={styles.emptyText}>Buat inbox pertama di panel atas. Alamat email akan tetap ada sampai kamu hapus sendiri.</p>
-                  </div>
-                </div>
+                <SectionEmpty
+                  title="Belum ada inbox"
+                  text="Buat inbox pertama di bagian atas. Alamat akan tetap ada sampai kamu hapus sendiri."
+                />
               )}
             </div>
           </section>
 
-          <section className={styles.panelCard}>
-            <div className={styles.panelTitleRow}>
+          <section className={styles.columnCard}>
+            <div className={styles.panelHeading}>
               <div>
-                <p className={styles.eyebrow}>Daftar email</p>
-                <h2 className={styles.panelTitle}>{detail?.inbox.emailAddress || 'Pilih inbox dulu'}</h2>
+                <p className={styles.eyebrow}>Message list</p>
+                <h2 className={styles.sectionTitle}>{detail?.inbox.emailAddress || 'Pilih inbox dulu'}</h2>
               </div>
-              {detail?.inbox.emailAddress ? (
-                <div className={styles.buttonRow}>
-                  <button
-                    type="button"
-                    className={styles.tinyButton}
-                    onClick={() => void handleCopyEmail(detail.inbox.emailAddress)}
-                  >
-                    {copiedEmail ? 'Tersalin' : 'Salin alamat'}
-                  </button>
-                  <button type="button" className={styles.tinyButton} onClick={() => void handleClearInbox()} disabled={busyAction === 'clear'}>
-                    {busyAction === 'clear' ? <InlineSpinner /> : null}
-                    Kosongkan isi
-                  </button>
-                  <button type="button" className={styles.dangerButton} onClick={() => void handleDeleteInbox()} disabled={busyAction === 'delete'}>
-                    {busyAction === 'delete' ? <InlineSpinner /> : null}
-                    Hapus inbox
-                  </button>
-                </div>
-              ) : null}
             </div>
 
-            <div className={styles.hiddenSearch}>
+            <div className={styles.searchWrap}>
+              <IconSearch className={styles.searchIcon} />
               <input
                 className={styles.search}
                 value={searchDraft}
                 onChange={(event) => setSearchDraft(event.target.value)}
-                placeholder="Cari subjek, pengirim, atau ringkasan email..."
+                placeholder="Cari subjek, pengirim, isi ringkas, atau OTP..."
                 disabled={!detail}
               />
             </div>
 
-            <div className={styles.list}>
+            {detail?.inbox.emailAddress ? (
+              <div className={styles.messageActionRow}>
+                <button
+                  type="button"
+                  className={styles.miniButton}
+                  onClick={() => void handleCopyEmail(detail.inbox.emailAddress)}
+                >
+                  <IconCopy className={styles.inlineIcon} />
+                  {copiedEmail ? 'Tersalin' : 'Copy alamat'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.miniButton}
+                  disabled={busyAction === 'clear'}
+                  onClick={() => void handleClearInbox()}
+                >
+                  {busyAction === 'clear' ? <InlineSpinner /> : <IconRefresh className={styles.inlineIcon} />}
+                  Kosongkan
+                </button>
+                <button
+                  type="button"
+                  className={styles.dangerButton}
+                  disabled={busyAction === 'delete'}
+                  onClick={() => void handleDeleteInbox()}
+                >
+                  {busyAction === 'delete' ? <InlineSpinner /> : <IconTrash className={styles.inlineIcon} />}
+                  Hapus
+                </button>
+              </div>
+            ) : null}
+
+            <div className={styles.scrollList}>
               {detail ? (
                 filteredEmails.length > 0 ? (
                   filteredEmails.map((email) => {
@@ -591,7 +748,7 @@ export function TempMailBrowser({ initialConfig }: Props) {
                       <button
                         key={email.id}
                         type="button"
-                        className={`${styles.messageButton} ${active ? styles.messageButtonActive : ''}`}
+                        className={`${styles.mailButton} ${active ? styles.mailButtonActive : ''}`}
                         onClick={() => {
                           startTransition(() => {
                             setSelectedMessageId(email.id);
@@ -602,62 +759,76 @@ export function TempMailBrowser({ initialConfig }: Props) {
                           });
                         }}
                       >
-                        <div className={styles.messageHead}>
+                        <div className={styles.mailTop}>
                           <div>
-                            <p className={styles.itemEmail}>{email.subject}</p>
-                            <div className={styles.messageMeta}>
-                              <span>{email.fromAddress}</span>
-                              <span className={styles.pill}>{formatDateTime(email.receivedAt)}</span>
-                            </div>
+                            <p className={styles.mailSubject}>{email.subject}</p>
+                            <p className={styles.mailFrom}>{email.fromName || email.fromAddress}</p>
                           </div>
+                          <span className={styles.smallPill}>{email.attachmentCount}</span>
                         </div>
-                        <p className={styles.snippet}>{email.snippet || 'Email masuk tanpa ringkasan isi.'}</p>
+                        <p className={styles.mailSnippet}>{email.snippet || 'Email masuk tanpa ringkasan isi.'}</p>
+                        <div className={styles.mailFooter}>
+                          <span>{email.fromAddress}</span>
+                          <span>{formatDateTime(email.receivedAt)}</span>
+                        </div>
                       </button>
                     );
                   })
                 ) : (
-                  <div className={styles.emptyCard}>
-                    <div>
-                      <p className={styles.emptyTitle}>Belum ada email masuk</p>
-                      <p className={styles.emptyText}>Kirim email ke inbox ini, lalu dashboard akan otomatis menampilkannya di sini.</p>
-                    </div>
-                  </div>
+                  <SectionEmpty
+                    title="Belum ada email masuk"
+                    text="Kirim email ke inbox ini. Kalau routing domain sudah aktif, pesan OTP akan muncul di sini."
+                  />
                 )
               ) : (
-                <div className={styles.emptyCard}>
-                  <div>
-                    <p className={styles.emptyTitle}>Pilih inbox</p>
-                    <p className={styles.emptyText}>Daftar email akan muncul setelah kamu memilih salah satu inbox di panel kiri.</p>
-                  </div>
-                </div>
+                <SectionEmpty
+                  title="Pilih inbox dulu"
+                  text="Setelah kamu memilih inbox di panel kiri, daftar email akan langsung tampil di sini."
+                />
               )}
             </div>
           </section>
 
-          <section className={styles.panelCard}>
+          <section className={styles.columnCard}>
             {selectedEmail ? (
               <>
-                <div className={styles.previewHeader}>
-                  <p className={styles.eyebrow}>Detail email</p>
-                  <h2 className={styles.previewTitle}>{selectedEmail.subject}</h2>
-                  <div className={styles.previewMeta}>
-                    <span className={styles.pill}>Dari: {selectedEmail.fromAddress}</span>
-                    <span className={styles.pill}>Ke: {selectedEmail.toAddress}</span>
-                    <span className={styles.pill}>{formatDateTime(selectedEmail.receivedAt)}</span>
+                <div className={styles.panelHeading}>
+                  <div>
+                    <p className={styles.eyebrow}>Reader</p>
+                    <h2 className={styles.sectionTitle}>{selectedEmail.subject}</h2>
                   </div>
                 </div>
 
-                <div className={styles.detailToggleRow}>
+                <div className={styles.readerMetaGrid}>
+                  <div className={styles.readerMetaCard}>
+                    <p className={styles.metaLabel}>Dari</p>
+                    <p className={styles.metaValue}>{selectedEmail.fromAddress}</p>
+                  </div>
+                  <div className={styles.readerMetaCard}>
+                    <p className={styles.metaLabel}>Ke</p>
+                    <p className={styles.metaValue}>{selectedEmail.toAddress}</p>
+                  </div>
+                  <div className={styles.readerMetaCard}>
+                    <p className={styles.metaLabel}>Waktu</p>
+                    <p className={styles.metaValue}>{formatDateTime(selectedEmail.receivedAt)}</p>
+                  </div>
+                  <div className={styles.readerMetaCard}>
+                    <p className={styles.metaLabel}>Attachment</p>
+                    <p className={styles.metaValue}>{selectedEmail.attachmentCount} file</p>
+                  </div>
+                </div>
+
+                <div className={styles.readerSwitch}>
                   <button
                     type="button"
-                    className={previewMode === 'text' ? styles.segmentedButtonActive : styles.segmentedButton}
+                    className={previewMode === 'text' ? styles.segmentActive : styles.segmentButton}
                     onClick={() => setPreviewMode('text')}
                   >
                     Mode teks
                   </button>
                   <button
                     type="button"
-                    className={previewMode === 'html' ? styles.segmentedButtonActive : styles.segmentedButton}
+                    className={previewMode === 'html' ? styles.segmentActive : styles.segmentButton}
                     onClick={() => setPreviewMode('html')}
                     disabled={!selectedEmail.htmlBody}
                   >
@@ -665,28 +836,17 @@ export function TempMailBrowser({ initialConfig }: Props) {
                   </button>
                 </div>
 
-                <div className={styles.detailGrid}>
-                  <div className={styles.detailCard}>
-                    <p className={styles.detailLabel}>Message ID</p>
-                    <p className={styles.detailValue}>{selectedEmail.messageId || 'Tidak tersedia'}</p>
-                  </div>
-                  <div className={styles.detailCard}>
-                    <p className={styles.detailLabel}>Attachment</p>
-                    <p className={styles.detailValue}>{selectedEmail.attachmentCount} file terdeteksi</p>
-                  </div>
-                </div>
-
                 {selectedEmail.attachments.length > 0 ? (
-                  <div className={styles.attachmentWrap}>
+                  <div className={styles.attachmentRow}>
                     {selectedEmail.attachments.map((attachment, index) => (
-                      <span key={`${attachment.filename || 'file'}-${index}`} className={styles.pill}>
-                        {attachment.filename || 'attachment'} / {attachment.mimeType || 'unknown'}
+                      <span key={`${attachment.filename || 'file'}-${index}`} className={styles.smallPill}>
+                        {attachment.filename || 'attachment'}
                       </span>
                     ))}
                   </div>
                 ) : null}
 
-                <div className={styles.previewBody}>
+                <div className={styles.readerBody}>
                   {previewMode === 'html' && selectedEmail.htmlBody ? (
                     <iframe
                       title={`temp-mail-preview-${selectedEmail.id}`}
@@ -710,6 +870,11 @@ export function TempMailBrowser({ initialConfig }: Props) {
                   )}
                 </div>
 
+                <div className={styles.messageInfoCard}>
+                  <p className={styles.metaLabel}>Message ID</p>
+                  <p className={styles.metaValue}>{selectedEmail.messageId || 'Tidak tersedia'}</p>
+                </div>
+
                 {selectedEmail.headers ? (
                   <details className={styles.headerDetails}>
                     <summary className={styles.summary}>Lihat header mentah</summary>
@@ -717,7 +882,7 @@ export function TempMailBrowser({ initialConfig }: Props) {
                       {Object.entries(selectedEmail.headers).map(([key, value]) => (
                         <div key={key} className={styles.headerRow}>
                           <span className={styles.headerKey}>{key}</span>
-                          <span>{value}</span>
+                          <span className={styles.headerValue}>{value}</span>
                         </div>
                       ))}
                     </div>
@@ -725,14 +890,38 @@ export function TempMailBrowser({ initialConfig }: Props) {
                 ) : null}
               </>
             ) : (
-              <div className={styles.emptyCard}>
-                <div>
-                  <p className={styles.emptyTitle}>Belum ada email dipilih</p>
-                  <p className={styles.emptyText}>Pilih salah satu email dari daftar tengah untuk membaca isi pesan lengkap di sini.</p>
-                </div>
-              </div>
+              <SectionEmpty
+                title="Pilih email untuk dibaca"
+                text="Begitu ada pesan masuk, kamu bisa buka detail email di panel ini dan membaca isi OTP atau verifikasi dengan lebih nyaman."
+              />
             )}
           </section>
+        </section>
+
+        <section className={styles.featureGrid}>
+          <article className={styles.featureCard}>
+            <div className={styles.featureIconWrap}>
+              <IconSpark className={styles.featureIcon} />
+            </div>
+            <h3 className={styles.featureTitle}>Cepat untuk OTP</h3>
+            <p className={styles.featureText}>Fokus utamanya sekarang ada di alur buka inbox, tunggu pesan, lalu baca OTP tanpa perlu scroll yang bikin ribet.</p>
+          </article>
+
+          <article className={styles.featureCard}>
+            <div className={styles.featureIconWrap}>
+              <IconShield className={styles.featureIcon} />
+            </div>
+            <h3 className={styles.featureTitle}>Akses privat</h3>
+            <p className={styles.featureText}>Halaman tetap berada di link rahasia, jadi tidak ikut tampil di dashboard utama website kamu.</p>
+          </article>
+
+          <article className={styles.featureCard}>
+            <div className={styles.featureIconWrap}>
+              <IconGlobe className={styles.featureIcon} />
+            </div>
+            <h3 className={styles.featureTitle}>Siap untuk domain sendiri</h3>
+            <p className={styles.featureText}>Begitu DNS dan routing inbound benar-benar aktif, inbox ini siap menerima email publik dari luar.</p>
+          </article>
         </section>
       </div>
 
