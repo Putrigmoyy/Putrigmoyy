@@ -77,3 +77,32 @@ Alur yang direkomendasikan:
 3. Deploy worker di folder `cloudflare/temp-mail-worker`.
 4. Worker akan meneruskan raw email ke `https://putrigmoyy.vercel.app/api/temp-mail/inbound`.
 5. Endpoint Vercel akan menyimpan email ke database temp mail yang sudah aktif.
+
+## Cleanup Otomatis Temp Mail
+
+Cleanup email temp mail yang sudah lewat masa simpan dipanggil otomatis oleh Vercel Cron Jobs.
+
+- Path cron: `/api/temp-mail/cron/cleanup`
+- Jadwal: `5 18 * * *` UTC
+- Konversi Asia/Makassar: setiap hari pukul `02:05` WITA
+
+Route cleanup ini memakai `CRON_SECRET`. Berdasarkan dokumentasi resmi Vercel, jika env `CRON_SECRET` diisi di project, Vercel otomatis mengirim header `Authorization: Bearer <CRON_SECRET>` saat cron memanggil endpoint:
+
+- https://vercel.com/docs/cron-jobs/manage-cron-jobs
+
+## Tes Inbound Manual
+
+Jika ingin mengetes penyimpanan email tanpa menunggu Cloudflare aktif, pakai skrip berikut:
+
+- `scripts/temp-mail/send-test.ps1`
+
+Contoh:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\temp-mail\send-test.ps1 `
+  -SiteUrl "https://putrigmoyy.vercel.app" `
+  -InboxAddress "putriabc123@mail.putrigmoyy.com" `
+  -InboundSecret "ISI_TEMP_MAIL_INBOUND_SECRET"
+```
+
+Skrip ini akan mengirim email MIME contoh ke endpoint inbound production, jadi inbox temp mail bisa langsung dicek di link privat.
